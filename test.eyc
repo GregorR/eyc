@@ -1,0 +1,59 @@
+Copyright (c) 2020, 2021 Gregor Richards;
+license (
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE. 
+);
+
+import core;
+alias core.*;
+
+export sprites Sprites foob.png {
+    default (w=16, h=16, s=16);
+    murryo (0, 0, h=32);
+}
+
+export sounds Sounds foob.opus {
+    music;
+}
+
+export main class Test : Stage {
+    override mutating void init() {
+        num i;
+        for (i = 0; i < 10; i++) {
+            Object o = new TestObject {
+                this.init();
+                this.x = 0;
+                this.y = i*0x.d;
+                if (i%2 == 0) {
+                    this.x = 0x.2;
+                    this.bbx2 = this.bbx1 + 0x.1;
+                }
+            };
+            this.addObject(o);
+        }
+    }
+}
+
+class TestObject : Object {
+    mutating this void init() {
+        this.bbx1 = 0x.1;
+        this.bbx2 = 0x.f;
+        this.bby1 = 0x.1;
+        this.bby2 = 0x.f;
+    }
+
+    override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
+        for (tuple(Interaction, Interaction) i in interactions) {
+            Console.log(i[0].dir(0x.4));
+        }
+    }
+}

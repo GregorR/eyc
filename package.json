@@ -1,0 +1,35 @@
+{
+  "name": "eyc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "eyc-compiler.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babel/compat-data": "^7.14.4",
+    "@babel/core": "^7.14.3",
+    "@babel/preset-env": "^7.14.4",
+    "@types/sha1": "^1.1.2",
+    "babelify": "^10.0.0",
+    "browserify": "^17.0.0",
+    "charenc": "0.0.2",
+    "core-js": "^3.13.1",
+    "crypt": "0.0.2",
+    "pegjs": "^0.10.0",
+    "semver": "^7.3.5",
+    "sha1": "^1.1.1",
+    "through": "^2.3.8",
+    "tinyify": "^3.0.0",
+    "tsify": "^5.0.4",
+    "typescript": "^4.3.2",
+    "url-polyfill": "^1.1.12"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.26.0",
+    "@typescript-eslint/parser": "^4.26.0",
+    "eslint": "^7.28.0"
+  }
+}

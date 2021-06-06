@@ -1,0 +1,321 @@
+Copyright (c) 2020, 2021 Gregor Richards;
+license (
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE. 
+);
+
+@prefix core;
+
+export class Root {
+    mutating void enforce(suggestion s, set(Root) ctx) {
+        @js (s, ctx) { eyc.enforce(s, ctx); } : void;
+    }
+
+    num rand() {
+        return @js () { return self.rand(); } : num;
+    }
+
+    num randRange(num min, num max) {
+        return Math.floor(this.rand() * (max-min) + min);
+    }
+
+    string prefix() {
+        return @js () { return self.prefix; } : string;
+    }
+
+    string id() {
+        return @js () { return self.id; } : string;
+    }
+}
+
+export class Math : Root {
+    num floor(num x) {
+        return @js (x) { return Math.floor(x); } : num;
+    }
+
+    num ceil(num x) {
+        return @js (x) { return Math.ceil(x); } : num;
+    }
+
+    num trunc(num x) {
+        return @js (x) { return Math.trunc(x); } : num;
+    }
+
+    num min(num x, num y) {
+        return @js (x, y) { return Math.min(x, y); } : num;
+    }
+
+    num max(num x, num y) {
+        return @js (x, y) { return Math.max(x, y); } : num;
+    }
+
+    num abs(num x) {
+        if (x < 0)
+            return -x;
+        return x;
+    }
+}
+
+export class Console : Root {
+    void log(string x) {
+        @js (x) { console.log(x); } : void;
+    }
+}
+
+export class Basic : Root {
+    mutating num main() {}
+}
+
+export class Stage : Root {
+    mutating void init() {
+        this.extStage = @js (w=this.w, h=this.h, ex=this.ex) {
+            return eyc.ext.newStage(w, h, ex);
+        } : string;
+    }
+
+    mutating void tick() {
+        // Step 1: Actions
+        for reverse (Object o in this.objects) {
+            this.remObjectMap(o);
+            this.enforce(o.act(), null);
+            this.addObjectMap(o);
+        }
+
+        // Step 2: Determine interactions
+        map(Object, array(tuple(Interaction, Interaction))) interactions = new;
+        for (Object o1 in this.objects) {
+            tuple(num, num, num, num) range = this.range(o1);
+            num o1x1 = o1.x + o1.bbx1,
+                o1x2 = o1.x + o1.bbx2,
+                o1y1 = o1.y + o1.bby1,
+                o1y2 = o1.y + o1.bby2;
+
+            // Add this object to the interaction map
+            if (!(o1 in interactions))
+                interactions[o1] = new;
+            array(tuple(Interaction, Interaction)) o1i = interactions[o1];
+
+            // Look for objects we interact with
+            for (num y = range[0]; y <= range[1]; y++) {
+                for (num x = range[2]; x <= range[3]; x++) {
+                    for (Object o2 in this.tiles[tuple(x, y)]) {
+                        if (o1 is Object && o2 is Object && o2 > o1) {
+                            num o2x1 = o2.x + o2.bbx1,
+                                o2x2 = o2.x + o2.bbx2,
+                                o2y1 = o2.y + o2.bby1,
+                                o2y2 = o2.y + o2.bby2;
+
+                            if ((o1.z == o2.z) &&
+                                !(o1x2 <= o2x1 || o2x2 <= o1x1 ||
+                                  o1y2 <= o2y1 || o2y2 <= o1y1)) {
+                                // Add o2 to the interaction map
+                                if (!(o2 in interactions))
+                                    interactions[o2] = new;
+                                array(tuple(Interaction, Interaction)) o2i = interactions[o2];
+
+                                // Add the interaction pair to the arrays
+                                Interaction i1 = new {
+                                    this.init(o1, o2);
+                                }, i2 = new {
+                                    this.init(o2, o1);
+                                };
+                                o1i += tuple(i1, i2);
+                                o2i += tuple(i2, i1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 3: Pre-interaction
+        for (Object o, array(tuple(Interaction, Interaction)) i in interactions) {
+            for (tuple(Interaction, Interaction) ti in i)
+                ti[0].setType(o.preinteract(ti[0]));
+        }
+
+        // Step 4: Interaction
+        array(suggestion) sa = new;
+        for (Object o, array(tuple(Interaction, Interaction)) i in interactions)
+            sa += o.interact(i);
+        for reverse (suggestion s in sa)
+            this.enforce(s, null);
+
+        // Step 5: Reaction
+        for reverse (Object o in this.objects)
+            this.enforce(o.react(), null);
+    }
+
+    mutating void addObject(Object o) {
+        this.objects[o] = true;
+        this.addObjectMap(o);
+    }
+
+    mutating void addObjectMap(Object o) {
+        tuple(num, num, num, num) range = this.range(o);
+        for (num y = range[0]; y <= range[1]; y++) {
+            for (num x = range[2]; x <= range[3]; x++) {
+                tuple(num, num) xy = tuple(x, y);
+                if (!(xy in this.tiles))
+                    this.tiles[xy] = new;
+                this.tiles[xy][o] = true;
+            }
+        }
+    }
+
+    mutating void remObjectMap(Object o) {
+        tuple(num, num, num, num) range = this.range(o);
+        for (num y = range[0]; y <= range[1]; y++) {
+            for (num x = range[2]; x <= range[3]; x++) {
+                tuple(num, num) xy = tuple(x, y);
+                set(Object) tset = this.tiles[xy];
+                tset[o] = false;
+                if (tset.length == 0)
+                    this.tiles -= xy;
+            }
+        }
+    }
+
+    tuple(num, num, num, num) range(Object o) {
+        return tuple (
+            Math.floor((o.y+o.bby1)/8),
+            Math.floor((o.y+o.bby2)/8),
+            Math.floor((o.x+o.bbx1)/8),
+            Math.floor((o.x+o.bbx2)/8)
+        );
+    }
+
+    num w = 1920, h = 1080;
+    string ex; // Extra properties for the stage
+    string extStage; // External stage ref
+    set(Object) objects;
+    map(tuple(num, num), set(Object)) tiles;
+}
+
+export class Object : Root {
+    mutating this suggestion act() {}
+    string preinteract(Interaction interaction) {}
+    suggestion interact(array(tuple(Interaction, Interaction)) interactions) {}
+    mutating this suggestion react() {}
+
+    num x, y, z, bbx1, bbx2, bby1, bby2;
+}
+
+export class Interaction : Root {
+    Object from, to;
+    string type;
+    suggestion result;
+
+    // Initialize
+    mutating this void init(Object f, Object t) {
+        this.from = f;
+        this.to = t;
+    }
+
+    // Setters
+    mutating this void setType(string to) {
+        this.type = to;
+    }
+
+    mutating this void setResult(suggestion to) {
+        this.result = to;
+    }
+
+    // Get the direction of this interaction
+    string dir(num corner) {
+        num o1x1 = this.from.x + this.from.bbx1,
+            o1x2 = this.from.x + this.from.bbx2,
+            o1y1 = this.from.y + this.from.bby1,
+            o1y2 = this.from.y + this.from.bby2,
+            o2x1 = this.to.x + this.from.bbx1,
+            o2x2 = this.to.x + this.to.bbx2,
+            o2y1 = this.to.y + this.to.bby2,
+            o2y2 = this.to.y + this.to.bby2;
+
+        string rwe, rns, r;
+
+        /* Find what portion overlaps in each axis (NOTE: If one entirely
+         * overlaps the other, then this gives an incorrect result, but in a
+         * harmless way) */
+        num w = this.to.bbx2 - this.to.bbx1;
+        num xOverlap = Math.min(Math.abs(o1x2 - o2x1), Math.abs(o2x2 - o1x1)) / w;
+        num h = this.to.bby2 - this.to.bby1;
+        num yOverlap = Math.min(Math.abs(o1y2 - o2y1), Math.abs(o2y2 - o1y1)) / h;
+
+        // Find the direction of overlap in each axis
+        if (o1x2 < o2x2) {
+            if (o1x1 >= o2x1) {
+                // Partial overlap. Is it close enough to a corner?
+                if (o1x2 < o2x1 + w * corner)
+                    rwe = "w";
+                else if (o1x2 >= o2x1 + w - w * corner)
+                    rwe = "e";
+            } else
+                rwe = "w";
+        } else if (o1x1 >= o2x1)
+            rwe = "e";
+        if (o1y2 < o2y2) {
+            if (o1y1 >= o2y1) {
+                if (o1y2 < o2y2 + h * corner)
+                    rns = "n";
+                else if (o1y2 >= o2y1 + h - h * corner)
+                    rns = "s";
+            } else
+                rns = "n";
+        } else if (o1y1 >= o2y1)
+            rns = "s";
+
+        // Choose which parts we care about
+        if ((xOverlap < corner && yOverlap < corner) ||
+            (xOverlap >= corner && yOverlap >= corner)) {
+            // Corner or huge overlap
+            r = rns + rwe;
+        } else if (xOverlap >= corner) {
+            // Overlap in the X axis = touched in the Y axis
+            r = rns;
+        } else { // yOverlap >= corner
+            // Overlap in the Y axis = touched in the X axis
+            r = rwe;
+        }
+
+        // Now check if it was a central/all over overlap
+        if (r == "")
+            r = "o";
+
+        return r;
+    }
+
+}
+
+export class Motile : Object {
+    override mutating this suggestion act() {
+        suggestion ret = super();
+        this.x += this.vx;
+        this.y += this.vy;
+        return ret;
+    }
+
+    num vx, vy;
+}
+
+export class Player : Root {
+    suggestion tick(InputState input) {}
+    Playing controlling;
+}
+
+export class Playing : Object {
+    Player controlledBy;
+}
+
+export class InputState : Root {
+    bool up, down, left, right, north, south, east, west;
+}

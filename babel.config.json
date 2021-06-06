@@ -1,0 +1,10 @@
+{
+    "presets": [[
+        "@babel/preset-env",
+        {
+            "targets": "supports es5 and supports canvas and supports webworkers, node >= 10",
+            "useBuiltIns": "usage",
+            "corejs": 3
+        }
+    ]]
+}
