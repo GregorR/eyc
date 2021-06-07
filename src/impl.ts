@@ -773,8 +773,6 @@ export function eyc(
                     const step = <any> Object.create(mo);
                     step.proto = mo;
                     mo = step;
-                    for (const q of Object.keys(eyc.classes[t].methods))
-                        console.log("Manifesting " + t + ":" + q);
                     Object.assign(mo, eyc.classes[t].methods);
                 }
                 this.methods = eyc.methodTables[ms] = mo || Object.create(null);
