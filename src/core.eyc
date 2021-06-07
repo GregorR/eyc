@@ -1,4 +1,7 @@
 Copyright (c) 2020, 2021 Gregor Richards;
+
+/* The core EYC library */
+
 license (
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -71,10 +74,12 @@ export class Console : Root {
     }
 }
 
+// A basic one-shot "main" program (only used in testing)
 export class Basic : Root {
     mutating num main() {}
 }
 
+// A stage for a 2D game with object-object interactions
 export class Stage : Root {
     mutating void init() {
         this.extStage = @js (w=this.w, h=this.h, ex=this.ex) {
@@ -82,13 +87,17 @@ export class Stage : Root {
         } : string;
     }
 
+    // Perform a tick of game actions
     mutating void tick() {
         // Step 1: Actions
+        array(suggestion) sa = new;
         for reverse (Object o in this.objects) {
             this.remObjectMap(o);
-            this.enforce(o.act(), null);
+            sa += o.act();
             this.addObjectMap(o);
         }
+        for (suggestion s in sa)
+            this.enforce(s, null);
 
         // Step 2: Determine interactions
         map(Object, array(tuple(Interaction, Interaction))) interactions = new;
@@ -140,26 +149,31 @@ export class Stage : Root {
         // Step 3: Pre-interaction
         for (Object o, array(tuple(Interaction, Interaction)) i in interactions) {
             for (tuple(Interaction, Interaction) ti in i)
-                ti[0].setType(o.preinteract(ti[0]));
+                ti[0].type = o.preinteract(ti[0]);
         }
 
         // Step 4: Interaction
-        array(suggestion) sa = new;
+        sa = new;
         for (Object o, array(tuple(Interaction, Interaction)) i in interactions)
             sa += o.interact(i);
         for reverse (suggestion s in sa)
             this.enforce(s, null);
 
         // Step 5: Reaction
+        sa = new;
         for reverse (Object o in this.objects)
-            this.enforce(o.react(), null);
+            sa += o.react();
+        for (suggestion s in sa)
+            this.enforce(s, null);
     }
 
+    // Add an object to the stage
     mutating void addObject(Object o) {
         this.objects[o] = true;
         this.addObjectMap(o);
     }
 
+    // Add an object to the internal map used to look up interactions
     mutating void addObjectMap(Object o) {
         tuple(num, num, num, num) range = this.range(o);
         for (num y = range[0]; y <= range[1]; y++) {
@@ -172,6 +186,7 @@ export class Stage : Root {
         }
     }
 
+    // Remove an object from the internal map
     mutating void remObjectMap(Object o) {
         tuple(num, num, num, num) range = this.range(o);
         for (num y = range[0]; y <= range[1]; y++) {
@@ -185,6 +200,7 @@ export class Stage : Root {
         }
     }
 
+    // Utility: The range of map tiles an object occupies
     tuple(num, num, num, num) range(Object o) {
         return tuple (
             Math.floor((o.y+o.bby1)/8),
@@ -194,26 +210,41 @@ export class Stage : Root {
         );
     }
 
+    // The width and height of the stage
     num w = 1920, h = 1080;
-    string ex; // Extra properties for the stage
-    string extStage; // External stage ref
+    // Extra properties for the stage
+    string ex;
+    // External stage reference for display
+    string extStage;
+    // The objects on this stage
     set(Object) objects;
+    // And their locations, tiled
     map(tuple(num, num), set(Object)) tiles;
 }
 
+// An object, in the sense of a thing in 2D space
 export class Object : Root {
+    // 1: Act
     mutating this suggestion act() {}
+
+    // 2: Determine the kinds of interactions with other objects
     string preinteract(Interaction interaction) {}
+
+    // 3: Choose how to interact
     suggestion interact(array(tuple(Interaction, Interaction)) interactions) {}
+
+    // 4: React to interaction
     mutating this suggestion react() {}
 
     num x, y, z, bbx1, bbx2, bby1, bby2;
 }
 
 export class Interaction : Root {
+    // Every interaction comes as a pair, with swapped from-to
     Object from, to;
+
+    // Set by the *from* object
     string type;
-    suggestion result;
 
     // Initialize
     mutating this void init(Object f, Object t) {
@@ -221,16 +252,13 @@ export class Interaction : Root {
         this.to = t;
     }
 
-    // Setters
-    mutating this void setType(string to) {
-        this.type = to;
-    }
-
-    mutating this void setResult(suggestion to) {
-        this.result = to;
-    }
-
-    // Get the direction of this interaction
+    /* Get the direction of this interaction, one of:
+     * nw n ne
+     *  w o  e
+     * sw s se
+     *
+     * Note that this is the position of *from* relative to *to*, so if the
+     * direction is 'n', then from is above to. */
     string dir(num corner) {
         num o1x1 = this.from.x + this.from.bbx1,
             o1x2 = this.from.x + this.from.bbx2,
@@ -294,17 +322,6 @@ export class Interaction : Root {
         return r;
     }
 
-}
-
-export class Motile : Object {
-    override mutating this suggestion act() {
-        suggestion ret = super();
-        this.x += this.vx;
-        this.y += this.vy;
-        return ret;
-    }
-
-    num vx, vy;
 }
 
 export class Player : Root {

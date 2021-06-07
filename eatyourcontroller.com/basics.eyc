@@ -1,4 +1,9 @@
 Copyright (c) 2020, 2021 Gregor Richards;
+
+/*
+ * Basic components required for many 2D games
+ */
+
 license (
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -16,19 +21,46 @@ PERFORMANCE OF THIS SOFTWARE.
 import core;
 alias core.*;
 
-class Damage {
+// Objects that move with velocity
+export class Motile : Object {
+    override mutating this suggestion act() {
+        suggestion ret = super();
+        this.x += this.vx;
+        this.y += this.vy;
+        return ret;
+    }
+
+    num vx, vy;
+}
+
+/* A simple data type indicating damage that an object should in some way react
+ * to */
+export class Damage {
+    void init(Object from, string type, num amount) {
+        this.from = from;
+        this.type = type;
+        this.amount = amount;
+    }
+
     Object from;
     string type;
     num amount;
 }
 
-class Damageable extends Object {
+// A damageable object
+export class Damageable extends Object {
     array(Damage) damage;
 
-    mutating this suggestion takeDamage(array(Damage) damage) {}
+    // Call this to indicate that the object should receive damage
+    mutating void takeDamage(Damage damage) {
+        this.damage += damage;
+    }
+
+    // Override this to handle the damage received in this frame
+    mutating this suggestion handleDamage(array(Damage) damage) {}
 
     mutating this suggestion react() {
-        suggestion ret = this.takeDamage(this.damage);
+        suggestion ret = this.handleDamage(this.damage);
         this.damage = new;
         return ret;
     }
