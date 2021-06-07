@@ -65,14 +65,7 @@ the tuple.
 
 # Maps
 
-Maps are objects of the form
-
-```
-{
-    id: <unique ID>,
-    map: <JavaScript Map>
-}
-```
+Maps are stored as JavaScript Maps, with an `id`.
 
 The default map is `null`. Map fields in objects are initialized to a new map,
 not `null`.
@@ -80,14 +73,7 @@ not `null`.
 
 # Sets
 
-Sets are objects of the form
-
-```
-{
-    id: <unique ID>
-    set: <JavaScript Set>
-}
-```
+Sets are stored as JavaScript Sets, with an `id`.
 
 The default set is `null`. Set fields in objects are initialized to a new set,
 not `null`.

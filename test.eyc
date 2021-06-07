@@ -55,7 +55,7 @@ class TestObject : Object {
 
     override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
         for (tuple(Interaction, Interaction) i in interactions) {
-            //Console.log(i[0].dir(0x.4));
+            Console.log(i[0].dir(0x.4));
         }
         for (string l in Level) {
             //Console.log(l);
@@ -64,7 +64,17 @@ class TestObject : Object {
             }
         }
         return suggest {
-            extend this : Test;
+            extend this : TestObject2;
+        };
+    }
+}
+
+class TestObject2 : Object {
+    override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
+        suggestion ret = super(interactions);
+        Console.log("TestObject2");
+        return ret suggest {
+            retract this : TestObject2;
         };
     }
 }

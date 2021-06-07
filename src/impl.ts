@@ -838,18 +838,44 @@ export function eyc(
 
     // Suggestions
     Suggestion: function(prefix: string, suggestions: types.SuggestionStep[], append?: types.SuggestionStep[]) {
-        const ret = <types.Suggestion> suggestions.slice(0);
+        let ret: types.Suggestion;
+        if (append)
+            ret = <types.Suggestion> suggestions.concat(append);
+        else
+            ret = <types.Suggestion> suggestions.slice(0);
         ret.id = (prefix||"suggestion") + "$" + eyc.freshId();
         return ret;
     },
 
     /* Enforce a suggestion, possibly limiting it to only change certain
      * objects */
-    enforce: function(s, targets) {
-        if (s.length === 0) return;
-        console.log(s);
-        console.log(targets);
-        throw new Error;
+    enforce: function(ss, targets) {
+        if (ss.length === 0) return;
+
+        // 1: Expansions
+        for (const s of ss) {
+            if (s.action === "e") {
+                const se = <types.SuggestionStepExtendRetract> s;
+                // FIXME: Check targets
+                se.target.extend(se.type);
+            }
+        }
+
+        // 2: Methods
+        for (const s of ss) {
+            if (s.action === "m") {
+                throw new Error;
+            }
+        }
+
+        // 3: Retractions
+        for (const s of ss) {
+            if (s.action === "r") {
+                const sr = <types.SuggestionStepExtendRetract> s;
+                // FIXME: Check targets
+                sr.target.retract(sr.type);
+            }
+        }
     },
 
     // Convert a tuple to a string

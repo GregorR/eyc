@@ -1214,8 +1214,7 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
         case "SuggestionExtendExp":
             if (!subExpType.isSuggestion)
                 throw new EYCTypeError(exp, "Can only add suggestions to suggestions");
-            for (const s of exp.children.suggestions.children)
-                typeCheckExpression(eyc, methodDecl, ctx, symbols, s);
+            typeCheckSuggestions(eyc, methodDecl, ctx, symbols, exp.children.suggestions);
             resType = eyc.suggestionType;
             break;
 
@@ -2312,7 +2311,7 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
         case "SuggestionExtendExp":
         {
             const subExp = sub("expression");
-            const sug = compileSuggestions(eyc, state, symbols, exp.children.suggestions.children);
+            const sug = compileSuggestions(eyc, state, symbols, exp.children.suggestions);
             return "(eyc.Suggestion(self.prefix," + subExp + "," + sug + "))";
         }
 
@@ -2887,7 +2886,7 @@ function compileSuggestion(eyc: types.EYC, state: MethodCompilationState, symbol
             out += compileExpression(eyc, state, symbols, exp.children.expression);
 
             // And get the target type
-            out += ",type:" + JSON.stringify(exp.children.type.ctype.instanceOf.id) + "})";
+            out += ",type:" + JSON.stringify(exp.children.type.ctype.instanceOf.prefix) + "})";
             return out;
         }
 
