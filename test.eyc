@@ -58,10 +58,13 @@ class TestObject : Object {
             //Console.log(i[0].dir(0x.4));
         }
         for (string l in Level) {
-            Console.log(l);
+            //Console.log(l);
             for (num i, string c in l) {
-                Console.log(i : string + c);
+                //Console.log(i : string + c);
             }
         }
+        return suggest {
+            extend this : Test;
+        };
     }
 }

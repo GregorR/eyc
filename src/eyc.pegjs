@@ -203,8 +203,9 @@ returnStatement
  = return a:expression? ";" white { return new Tree("ReturnStatement", location(), {value: a}); }
 
 extendStatement
- = extend a:expression ":" white b:name ";" white { return new Tree("ExtendStatement", location(), {expression: a, type: b}); }
- / retract a:expression ":" white b:name ";" white { return new Tree("RetractStatement", location(), {expression: a, type: b}); }
+ // In practice, the expression must be a cast expression for the extend statement to be valid
+ = extend a:expression ";" white { return new Tree("ExtendStatement", location(), {expression: a}); }
+ / retract a:expression ";" white { return new Tree("RetractStatement", location(), {expression: a}); }
 
 expStatement
  = a:expression ";" white { return new Tree("ExpStatement", location(), {expression: a}); }
@@ -287,9 +288,9 @@ postExpPartNoType
  / "--" white { return new Tree("PostDecExp", location(), {op: "--"}); }
  / "(" white a:argList? ")" white { return new Tree("CallExp", location(), {args: a}); }
  / "[" white a:expression "]" white { return new Tree("IndexExp", location(), {index: a}); }
- / suggest "{" white a:suggestPart* "}" white { return new Tree("SuggestionExtendExp", location(), {
-                                                    suggestions: new Tree("Suggestions", location(), a)
-                                                }); }
+ / suggest "{" white a:statement* "}" white {
+     return new Tree("SuggestionExtendExp", location(), {suggestions: a});
+ }
  / "." white a:id { return new Tree("DotExp", location(), {id: a}); }
 
 argList
@@ -301,7 +302,7 @@ argListNext
 primary
  = literal
  / parenExp
- / suggest "{" white a:suggestPart* "}" white { return new Tree("SuggestionLiteral", location(), a); }
+ / suggest "{" white a:statement* "}" white { return new Tree("SuggestionLiteral", location(), a); }
  / new a:("[" white a:expression "]" white { return a; })? b:type? c:block? {
      return new Tree("NewExp", location(), {prefix: a, type: b, withBlock: c});
  }
@@ -315,22 +316,6 @@ primary
 
 parenExp
  = "(" white a:expression ")" white { return a; }
-
-suggestPart
- = a:postExpNoType ":" white b:suggestSuffix ";" white {
-     b.location = location();
-     b.children.target = a;
-     return b;
- }
-
-suggestSuffix
- = a:suggestionOp white b:unExp { return new Tree("Suggestion", location(), {op: a, expression: b}); }
- / "+" white "(" white a:expression "," white b:expression ")" white {
-     return new Tree("SuggestionMap", location(), {key: a, value: b});
- }
-
-suggestionOp
- = "+" / "-" / "*" / "/" / "="
 
 jsBlock
  = a:(a:[^{}]+ { return a.join(""); } / jsBlockBraces)* { return a.join(""); }

@@ -837,7 +837,7 @@ export function eyc(
     },
 
     // Suggestions
-    Suggestion: function(prefix: string, suggestions: types.SuggestionStep[]) {
+    Suggestion: function(prefix: string, suggestions: types.SuggestionStep[], append?: types.SuggestionStep[]) {
         const ret = <types.Suggestion> suggestions.slice(0);
         ret.id = (prefix||"suggestion") + "$" + eyc.freshId();
         return ret;

@@ -7,11 +7,13 @@ import * as types from "./types";
 Array.from("hello");
 
 class EYCTypeError extends Error {
+    isEYCTypeError: boolean;
     ctx: types.Tree;
     msg: string;
 
     constructor(ctx: types.Tree, msg: string) {
         super();
+        this.isEYCTypeError = true;
         this.ctx = ctx;
         this.msg = msg;
     }
@@ -38,7 +40,8 @@ export async function importModule(eyc: types.EYC, url: string,
     try {
         parsed = module.parsed = <types.ModuleNode> parser.parse(opts.text);
     } catch (ex) {
-        console.log(url + ":" + ex.location.start.line + ":" + ex.location.start.column + ": " + ex);
+        if (ex.isEYCTypeError)
+            console.log(url + ":" + ex.location.start.line + ":" + ex.location.start.column + ": " + ex);
         throw ex;
     }
 
@@ -898,6 +901,36 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
             }
             break;
 
+        case "ExtendStatement":
+        case "RetractStatement":
+        {
+            const exp = stmt.children.expression;
+            if (exp.type !== "CastExp")
+                throw new EYCTypeError(exp, "Invalid extension/retraction statement");
+
+            // The target has to be an object type
+            const targetType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
+            if (!targetType.isObject)
+                throw new EYCTypeError(exp, "Only objects can be extended/retracted");
+
+            // The type has to be a class
+            const type = typeNameToType(eyc, methodDecl.module.parsed, exp.children.type);
+            if (!type.isObject)
+                throw new EYCTypeError(exp, "Objects may only have classes added or removed");
+            exp.children.type.ctype = type;
+
+            // And the mutation has to be allowed
+            if (!ctx.mutatingThis)
+                throw new EYCTypeError(stmt, "Illegal mutation");
+            if (!ctx.mutating) {
+                // Can only mutate "this"
+                if (exp.children.expression.type !== "This")
+                    throw new EYCTypeError(exp, "Illegal mutation");
+            }
+
+            break;
+        }
+
         case "ExpStatement":
             typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.expression);
             break;
@@ -1222,6 +1255,16 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             break;
         }
 
+        case "SuggestionLiteral":
+        {
+            // The suggestion literal itself is always a suggestion
+            resType = eyc.suggestionType;
+
+            // But, the suggestion elements have to type check
+            typeCheckSuggestions(eyc, methodDecl, ctx, symbols, exp.children);
+            break;
+        }
+
         case "NewExp":
         {
             if (exp.children.type)
@@ -1340,10 +1383,6 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             if (!(name in symbols))
                 throw new EYCTypeError(exp, "Undefined variable " + name);
             resType = symbols[name];
-            /* ???
-            if (resType.type === "ClassDecl")
-                resType = resType.klass;
-            */
             break;
         }
 
@@ -1414,6 +1453,41 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
         throw new EYCTypeError(exp, "Not a valid L-value: " + ret.type);
     }
     return <types.Type> ret;
+}
+
+// Type check a list of suggestions
+function typeCheckSuggestions(eyc: types.EYC, methodDecl: types.MethodNode,
+        ctx: CheckCtx, symbols: Record<string, types.TypeLike>,
+        suggestions: types.Tree[]) {
+    for (const suggestion of suggestions) {
+        typeCheckSuggestion(eyc, methodDecl, ctx, symbols, suggestion);
+    }
+}
+
+// Type check a single suggestion
+function typeCheckSuggestion(eyc: types.EYC, methodDecl: types.MethodNode,
+        ctx: CheckCtx, symbols: Record<string, types.TypeLike>,
+        suggestion: types.Tree) {
+    switch (suggestion.type) {
+        case "ExtendStatement":
+        case "RetractStatement":
+        {
+            // It has to be a cast expression
+            const exp = suggestion.children.expression;
+            if (exp.type !== "CastExp")
+                throw new EYCTypeError(suggestion, "Invalid extension/retraction statement");
+
+            // The cast's subexpression has the same mutation restrictions as we do
+            typeCheckExpression(eyc, methodDecl, ctx, symbols, exp);
+
+            // But the whole statement can mutate
+            typeCheckStatement(eyc, methodDecl, {mutating: true, mutatingThis: true}, symbols, suggestion);
+            break;
+        }
+
+        default:
+            throw new EYCTypeError(suggestion, "Cannot type check suggestion " + suggestion.type);
+    }
 }
 
 // Given a type declaration, convert it into an EYC type, possibly doing typechecking to achieve this
@@ -1922,15 +1996,6 @@ function compileStatement(eyc: types.EYC, state: MethodCompilationState, symbols
             break;
         }
 
-        case "ExpStatement":
-        {
-            state.postExp = "";
-            const exp = compileExpression(eyc, state, symbols, stmt.children.expression);
-            state.outCode += exp + ";\n";
-            state.flushPost();
-            break;
-        }
-
         case "ReturnStatement":
             if (stmt.children.value) {
                 state.postExp = "";
@@ -1941,6 +2006,15 @@ function compileStatement(eyc: types.EYC, state: MethodCompilationState, symbols
                 state.outCode += "return;\n";
             }
             break;
+
+        case "ExpStatement":
+        {
+            state.postExp = "";
+            const exp = compileExpression(eyc, state, symbols, stmt.children.expression);
+            state.outCode += exp + ";\n";
+            state.flushPost();
+            break;
+        }
 
         default:
             throw new EYCTypeError(stmt, "No compiler for " + stmt.type);
@@ -2239,7 +2313,7 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
         {
             const subExp = sub("expression");
             const sug = compileSuggestions(eyc, state, symbols, exp.children.suggestions.children);
-            return "(new eyc.Suggestion(self.prefix,eyc.genSuggestions(" + subExp + ".suggestions," + sug + ")))";
+            return "(eyc.Suggestion(self.prefix," + subExp + "," + sug + "))";
         }
 
         case "DotExp":
@@ -2288,6 +2362,12 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
                 return "(" + leftExp + "." + iname + "||" + (<types.Type> exp.ctype).default() + ")";
 
             }
+        }
+
+        case "SuggestionLiteral":
+        {
+            const sug = compileSuggestions(eyc, state, symbols, exp.children);
+            return "(eyc.Suggestion(self.prefix," + sug + "))";
         }
 
         case "NewExp":
@@ -2793,28 +2873,25 @@ function compileSuggestion(eyc: types.EYC, state: MethodCompilationState, symbol
         return compileExpression(eyc, state, symbols, e);
     }
 
-    const left = suggestion.children.target;
-    const leftLeft = left.children.expression;
-    const right = suggestion.children.expression;
+    switch (suggestion.type) {
+        case "ExtendStatement":
+        case "RetractStatement":
+        {
+            let out = '({action:"' +
+                (suggestion.type==="ExtendStatement"?"e":"r") +
+                '",target:';
 
-    switch (suggestion.children.op) {
-        case "+":
-            switch (left.ctype.type) {
-                case "num":
-                    // Field addition to number
-                    return "{" +
-                        "target:" + sub(leftLeft) +
-                        ",type:" + JSON.stringify(leftLeft.ctype.type) +
-                        ",field:" + JSON.stringify(left.children.id.children.text) + // FIXME
-                        ',op:"+"' +
-                        ",value:" + sub(right) +
-                        "}";
+            // Compile the expression
+            const exp = suggestion.children.expression;
+            console.assert(exp.type === "CastExp");
+            out += compileExpression(eyc, state, symbols, exp.children.expression);
 
-                default:
-                    throw new EYCTypeError(suggestion, "No compiler for suggestion +" + left.ctype.type);
-            }
+            // And get the target type
+            out += ",type:" + JSON.stringify(exp.children.type.ctype.instanceOf.id) + "})";
+            return out;
+        }
 
         default:
-            throw new EYCTypeError(suggestion, "No compiler for suggestion op " + suggestion.children.op);
+            throw new EYCTypeError(suggestion, "No compiler for suggestion " + suggestion.type);
     }
 }

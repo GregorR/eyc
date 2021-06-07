@@ -93,7 +93,7 @@ export interface EYC {
     // Other heap types
     Map: {new (prefix: string): EYCMap};
     Set: {new (prefix: string): EYCSet};
-    Suggestion(prefix: string, suggestions: SuggestionStep[]): Suggestion;
+    Suggestion(prefix: string, suggestions: SuggestionStep[], append?: SuggestionStep[]): Suggestion;
 
     // Enforce suggestions
     enforce(s: Suggestion, targets: EYCObject[]): void;
