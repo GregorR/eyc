@@ -144,6 +144,7 @@ export function eyc(
         resources: Record<string, types.Resource>;
         spritesheets: Record<string, types.Spritesheet>;
         soundsets: Record<string, types.Soundset>;
+        fabrics: Record<string, types.Fabric>;
 
         constructor(url: string, ctx: types.ModuleCtx) {
             this.type = "module";
@@ -158,6 +159,7 @@ export function eyc(
             this.resources = Object.create(null);
             this.spritesheets = Object.create(null);
             this.soundsets = Object.create(null);
+            this.fabrics = Object.create(null);
             eyc.modules[url] = this;
         }
 
@@ -304,6 +306,69 @@ export function eyc(
             if (nm in this.sounds)
                 return this.sounds[nm];
             return null;
+        }
+    },
+
+    // Fabrics
+    fabricVals: Object.create(null),
+    fabrics: Object.create(null),
+    Fabric: class implements types.Fabric {
+        type: string;
+        isTypeLike: boolean;
+        isFabric: boolean;
+        name: string;
+        url: string;
+        text: string;
+        code: string;
+        id: string;
+
+        constructor(module: types.Module, name: string, url: string, text: string) {
+            this.name = name;
+            this.url = url;
+            this.text = text;
+            this.code = null;
+            const id = this.id = module.prefix + "$" + name;
+            eyc.fabrics[id] = this;
+            eyc.resources[id] = this;
+            module.fabrics[name] = this;
+            module.resources[name] = this;
+        }
+
+        equals(other: types.TypeLike): boolean {
+            return (this === other);
+        }
+
+        compile() {
+            if (this.code) return this.code;
+
+            let text = this.text;
+
+            // Remove any terminal newline
+            const last = text.length - 1;
+            if (text[last] === "\n")
+                text = text.slice(0, last);
+
+            // Remove any \r's entirely
+            text = text.replace(/\r/g, "");
+
+            // Split it by lines
+            const lines = <types.EYCArray & string[]> text.split("\n");
+            lines.id = this.id;
+
+            // Make sure they're all the same length
+            let max = 0;
+            for (const line of lines) {
+                if (line.length > max)
+                    max = line.length;
+            }
+            for (let li = 0; li < lines.length; li++)
+                lines[li] = lines[li].padEnd(max, " ");
+
+            // Put it in the fabrics map
+            eyc.fabricVals[this.id] = lines;
+
+            // And create the code
+            return this.code = "(eyc.fabricVals[" + JSON.stringify(this.id) + "])";
         }
     },
 
@@ -802,6 +867,11 @@ export function eyc(
         num: numCmp,
         string: valCmp,
         bool: valCmp
+    },
+
+    // User provided
+    ext: {
+        fetch: null
     }
 
     };

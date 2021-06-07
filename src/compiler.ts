@@ -25,8 +25,8 @@ class EYCTypeError extends Error {
 }
 
 // Import this module, with everything that implies
-export function importModule(eyc: types.EYC, url: string,
-        opts: types.ImportModuleOpts = {}): types.Module {
+export async function importModule(eyc: types.EYC, url: string,
+        opts: types.ImportModuleOpts = {}): Promise<types.Module> {
     if (!opts.text)
         throw new Error("No real import yet");
 
@@ -52,7 +52,7 @@ export function importModule(eyc: types.EYC, url: string,
     resolveSymbols(eyc, module);
 
     // Resolve all global types
-    resolveDeclTypes(eyc, module);
+    await resolveDeclTypes(eyc, module);
 
     // Type check
     typeCheckModule(eyc, module);
@@ -96,6 +96,12 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
                 break;
 
             case "SoundSetDecl":
+                if (!c.children.exportClause)
+                    break; // Not exported
+                exports[c.children.id.children.text] = c;
+                break;
+
+            case "FabricDecl":
                 if (!c.children.exportClause)
                     break; // Not exported
                 exports[c.children.id.children.text] = c;
@@ -201,6 +207,10 @@ function resolveSymbols(eyc: types.EYC, module: types.Module) {
                 defineSymbol(c, c.children.id.children.text, c, true);
                 break;
 
+            case "FabricDecl":
+                defineSymbol(c, c.children.id.children.text, c, true);
+                break;
+
             case "PrefixDecl":
                 // No symbols
                 break;
@@ -224,7 +234,7 @@ function resolveSymbols(eyc: types.EYC, module: types.Module) {
 }
 
 // Type check global declarations
-function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
+async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
     const symbolTypes = module.parsed.symbolTypes = <Record<string, types.TypeLike>> Object.create(null);
 
     for (const id of Object.keys(module.parsed.symbols).sort()) {
@@ -241,6 +251,10 @@ function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
 
             case "ClassDecl":
                 symbolTypes[id] = resolveClassDeclTypes(eyc, <types.ClassNode> c);
+                break;
+
+            case "FabricDecl":
+                symbolTypes[id] = await resolveFabricDeclTypes(eyc, <types.FabricNode> c);
                 break;
 
             case "Module":
@@ -494,6 +508,24 @@ function resolveSoundSetDeclTypes(eyc: types.EYC, soundsDecl: types.SoundsetNode
     return set;
 }
 
+/* Resolve a fabric declaration. Involves fetching the actual file defined by
+ * the fabric. */
+async function resolveFabricDeclTypes(eyc: types.EYC, fabricDecl: types.FabricNode) {
+    if (fabricDecl.fabric)
+        return fabricDecl.fabric;
+
+    const fabric = fabricDecl.fabric =
+        new eyc.Fabric(fabricDecl.module, fabricDecl.children.id.children.text,
+            fabricDecl.children.url,
+            await eyc.ext.fetch(fabricDecl.module.url,
+                fabricDecl.children.url));
+
+    // FIXME: Properties
+
+    // The actual type of a fabric in code is just an array of strings
+    return new eyc.ArrayType(eyc.stringType);
+}
+
 // Resolve the types of a class declaration (at a high level)
 function resolveClassDeclTypes(eyc: types.EYC, classDecl: types.ClassNode) {
     if (classDecl.klass)
@@ -649,7 +681,8 @@ function typeCheckModule(eyc: types.EYC, module: types.Module) {
             case "AliasStarDecl":
             case "SpriteSheetDecl":
             case "SoundSetDecl":
-                // No types
+            case "FabricDecl":
+                // No types or no possibility of type error
                 break;
 
             default:
@@ -813,8 +846,6 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
         case "ForInMapStatement":
         {
             const expType = <types.MapType> typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.collection);
-            if (!expType.isMap)
-                throw new EYCTypeError(stmt, "Two-variable for-in loop on non-map");
 
             let keyType;
             if (stmt.children.keyType) {
@@ -832,10 +863,20 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
                 valType = typeCheckLValue(eyc, methodDecl, ctx, symbols, stmt.children.value);
             }
 
-            if (!expType.keyType.equals(keyType, {subtype: true}))
-                throw new EYCTypeError(stmt, "Incorrect key iterator type");
-            if (!expType.valueType.equals(valType, {subtype: true}))
-                throw new EYCTypeError(stmt, "Incorrect value iterator type");
+            if (expType.isString) {
+                // index-string loop
+                if (!keyType.isNum || !valType.isString)
+                    throw new EYCTypeError(stmt, "Incorrect types for for-in loop over string");
+
+            } else if (expType.isMap) {
+                if (!expType.keyType.equals(keyType, {subtype: true}))
+                    throw new EYCTypeError(stmt, "Incorrect key iterator type");
+                if (!expType.valueType.equals(valType, {subtype: true}))
+                    throw new EYCTypeError(stmt, "Incorrect value iterator type");
+
+            } else {
+                throw new EYCTypeError(stmt, "Two-variable for-in loop on invalid type");
+            }
 
             symbols = Object.create(symbols);
             symbols[stmt.children.key.children.text] = keyType;
@@ -1124,6 +1165,12 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     throw new EYCTypeError(exp, "Invalid set index type");
                 resType = eyc.boolType;
 
+            } else if (subExpType.isString) {
+                if (!idxType.isNum)
+                    throw new EYCTypeError(exp, "String index must be a number");
+
+                resType = eyc.stringType;
+
             } else {
                 throw new EYCTypeError(exp, "Cannot type check index of " + subExpType.type);
 
@@ -1141,7 +1188,7 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "DotExp":
         {
-            if (subExpType.isArray || subExpType.isSet || subExpType.isMap) {
+            if (subExpType.isArray || subExpType.isSet || subExpType.isMap || subExpType.isString) {
                 // Collection types only accept "length"
                 if (exp.children.id.children.text !== "length")
                     throw new EYCTypeError(exp, "Collections do not have fields");
@@ -1447,10 +1494,18 @@ function resolveName(eyc: types.EYC, module: types.ModuleNode, name: types.Tree)
 
 // Compile this module
 function compileModule(eyc: types.EYC, module: types.Module) {
+    // There is only one kind of global variable that actually has a value: Fabrics
+    const symbols: Record<string, string> = Object.create(null);
+    for (const s in module.parsed.symbols) {
+        const v = module.parsed.symbols[s];
+        if (v.type === "FabricDecl")
+            symbols[s] = (<types.FabricNode> v).fabric.compile();
+    }
+
     for (const c of module.parsed.children) {
         switch (c.type) {
             case "ClassDecl":
-                compileClassDecl(eyc, c);
+                compileClassDecl(eyc, c, symbols);
                 break;
 
             case "CopyrightDecl":
@@ -1460,6 +1515,7 @@ function compileModule(eyc: types.EYC, module: types.Module) {
             case "AliasStarDecl":
             case "SpriteSheetDecl":
             case "SoundSetDecl":
+            case "FabricDecl":
                 // No code
                 break;
 
@@ -1470,11 +1526,11 @@ function compileModule(eyc: types.EYC, module: types.Module) {
 }
 
 // Compile this class
-function compileClassDecl(eyc: types.EYC, classDecl: types.Tree) {
+function compileClassDecl(eyc: types.EYC, classDecl: types.Tree, symbols: Record<string, string>) {
     for (const c of classDecl.children.members.children) {
         switch (c.type) {
             case "MethodDecl":
-                compileMethodDecl(eyc, c);
+                compileMethodDecl(eyc, c, symbols);
                 break;
 
             case "FieldDecl":
@@ -1537,9 +1593,9 @@ class MethodCompilationState {
 }
 
 // Compile this method
-function compileMethodDecl(eyc: types.EYC, methodDecl: types.MethodNode) {
+function compileMethodDecl(eyc: types.EYC, methodDecl: types.MethodNode, symbols: Record<string, string>) {
     const klass = methodDecl.parent.klass;
-    const symbols = Object.create(null);
+    symbols = Object.create(symbols);
 
     const state = new MethodCompilationState(methodDecl);
 
@@ -1753,12 +1809,50 @@ function compileStatement(eyc: types.EYC, state: MethodCompilationState, symbols
 
         case "ForInMapStatement":
         {
+            const collectionNode = stmt.children.collection;
+            if (collectionNode.ctype.isString) {
+                // Special form for strings
+
+                // Allocate variables
+                symbols = Object.create(symbols);
+                if (stmt.children.keyType)
+                    symbols[stmt.children.key.children.text] = state.allocateVar(stmt.children.key.children.text);
+                if (stmt.children.valueType)
+                    symbols[stmt.children.value.children.text] = state.allocateVar(stmt.children.value.children.text);
+
+                // Get the string itself
+                const stringTmp = state.allocateTmp();
+                state.postExp = "";
+                state.outCode +=
+                    stringTmp + "=" +
+                    compileExpression(eyc, state, symbols, collectionNode) +
+                    ";\n";
+                state.flushPost();
+
+                // Initializer
+                state.outCode += symbols[stmt.children.key.children.text] + "=0;\n";
+
+                // Loop
+                const lv = symbols[stmt.children.key.children.text];
+                const vv = symbols[stmt.children.value.children.text];
+                state.outCode += "for(" + lv + "=0;" + lv + "<" + stringTmp + ".length;" + lv + "++){\n" +
+                    vv + "=" + stringTmp + "[" + lv + ']||"";\n';
+
+                // Body
+                compileStatement(eyc, state, Object.create(symbols), stmt.children.body);
+
+                state.outCode += "}\n";
+                break;
+            }
+
+            console.assert(collectionNode.ctype.isMap);
+
             // FIXME: Maps with tuple keys
             symbols = Object.create(symbols);
 
             // Get the collection code
             state.postExp = "";
-            const collection = compileExpression(eyc, state, symbols, stmt.children.collection);
+            const collection = compileExpression(eyc, state, symbols, collectionNode);
 
             // Convert it to an iterable array
             const tmpCollection = state.allocateTmp(),
@@ -2129,6 +2223,13 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
 
                     }
 
+                case "string":
+                    return "(" +
+                        sub("expression") +
+                        "[" + sub("index") +
+                        ']||"")';
+                    break;
+
                 default:
                     throw new EYCTypeError(exp, "No compiler for indexing " + left.ctype.type);
             }
@@ -2159,6 +2260,10 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
                 case "set":
                     console.assert(name === "length");
                     return "(" + leftExp + ".size)";
+
+                case "string":
+                    console.assert(name === "length");
+                    return "(" + leftExp + ".length)";
 
                 default:
                     throw new EYCTypeError(exp, "No compiler for dot expression of " + left.ctype.type);

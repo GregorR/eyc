@@ -25,6 +25,8 @@ export sounds Sounds foob.opus {
     music;
 }
 
+export fabric Level foob.txt;
+
 export main class Test : Stage {
     override mutating void init() {
         num i;
@@ -53,7 +55,13 @@ class TestObject : Object {
 
     override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
         for (tuple(Interaction, Interaction) i in interactions) {
-            Console.log(i[0].dir(0x.4));
+            //Console.log(i[0].dir(0x.4));
+        }
+        for (string l in Level) {
+            Console.log(l);
+            for (num i, string c in l) {
+                Console.log(i : string + c);
+            }
         }
     }
 }

@@ -27,6 +27,7 @@ declaration
  / classDecl
  / spriteSheetDecl
  / soundDecl
+ / fabricDecl
  / prefixDecl
 
 copyrightDecl
@@ -78,6 +79,16 @@ spriteSheetDecl
 soundDecl
  = a:exportClause? b:idLike & {return b === "sounds";} c:id d:package "{" white e:sound* "}" white {
      return new Tree("SoundSetDecl", location(), {exportClause: a, id: c, url: d, sounds: e});
+ }
+
+fabricDecl
+// With properties
+ = a:exportClause? b:idLike & {return b === "fabric";} c:id d:package "{" white e:fabricProp* "}" white {
+     return new Tree("FabricDecl", location(), {exportClause: a, id: c, url: d, props: e});
+ }
+// Without properties
+ / a:exportClause? b:idLike & {return b === "fabric";} c:id d:package ";" white {
+     return new Tree("FabricDecl", location(), {exportClause: a, id: c, url: d, props: []});
  }
 
 prefixDecl
@@ -177,6 +188,7 @@ forStatement
  / for "(" white a:varDecl b:expression? ";" white c:expression? ")" white d:statement {
      return new Tree("ForStatement", location(), {initializer: a, condition: b, increment: c, body: d});
  }
+ // FIXME: Types don't work like this :(
  / for a:reverse? "(" white b:type? c:id in d:expression ")" white e:statement {
      return new Tree("ForInStatement", location(), {reverseClause: a, type: b, id: c, collection: d, body: e});
  }
@@ -394,6 +406,11 @@ sound
  // A property of this sound set
  / a:id "=" white b:literal ";" white { return new Tree("SoundSetProperty", location(), {key: a, value: b}); }
  // Copyright and license info
+ / copyrightDecl
+ / licenseDecl
+
+fabricProp
+ = a:id "=" white b:literal ";" white { return new Tree("FabricProperty", location(), {key: a, value: b}); }
  / copyrightDecl
  / licenseDecl
 

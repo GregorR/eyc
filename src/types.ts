@@ -30,7 +30,7 @@ export interface EYC {
     ts: number;
     core: string;
 
-    importModule: (a1: string, a2?: ImportModuleOpts) => Module;
+    importModule: (a1: string, a2?: ImportModuleOpts) => Promise<Module>;
     freshId: () => string;
     urlEncode: (a1: string) => string;
 
@@ -53,6 +53,10 @@ export interface EYC {
 
     soundsets: Record<string, Soundset>;
     Soundset: {new (module: Module, name: string, url: string): Soundset};
+
+    fabrics: Record<string, Fabric>;
+    fabricVals: Record<string, EYCArray>;
+    Fabric: {new (module: Module, name: string, url: string, text: string): Fabric};
 
     classes: Record<string, EYCClass>;
     Class: {new (module: Module, name: string): EYCClass};
@@ -108,6 +112,11 @@ export interface EYC {
         string: (l: string, r: string) => number;
         bool: (l: boolean, r: boolean) => number;
     };
+
+    // External features which must be provided by a user of EYC
+    ext: {
+        fetch: (rel: string, resource: string) => Promise<string>;
+    };
 }
 
 // A compiled EYC function
@@ -133,6 +142,7 @@ export interface Module extends TypeLike {
     resources: Record<string, Resource>;
     spritesheets: Record<string, Spritesheet>;
     soundsets: Record<string, Soundset>;
+    fabrics: Record<string, Fabric>;
 
     eycElement_?: boolean; // Just to nominalize the type
 }
@@ -180,6 +190,15 @@ export interface Soundset extends Resource {
     sounds: Record<string, Sound>;
 
     add(sound: Sound): void;
+}
+
+export interface Fabric extends Resource {
+    isFabric: boolean;
+    name: string;
+    url: string;
+    text: string;
+
+    compile(): string;
 }
 
 export interface TypeEqOpts {
@@ -366,4 +385,9 @@ export interface SpritesheetNode extends Tree {
 export interface SoundsetNode extends Tree {
     // The soundset this defines
     soundset: Soundset;
+}
+
+export interface FabricNode extends Tree {
+    // The fabric this defines
+    fabric: Fabric;
 }
