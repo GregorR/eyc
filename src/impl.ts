@@ -909,7 +909,7 @@ export async function eyc(
     eyc.nullType = new eyc.PrimitiveType("null", "eyc.nil");
 
     if (!opts.noImportCore)
-        await eyc.importModule("core", {text: eyc.core, ctx: {privileged: true}});
+        await eyc.importModule("/core", {text: eyc.core, ctx: {privileged: true}});
 
     return eyc;
 }

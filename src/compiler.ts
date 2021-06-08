@@ -164,8 +164,8 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
     // Start with core
     if (module.prefix !== "$$core" &&
         !("core" in symbols) &&
-        "core" in eyc.modules) {
-        symbols.core = eyc.modules.core.parsed;
+        "/core" in eyc.modules) {
+        symbols.core = eyc.modules["/core"].parsed;
         isLocal.core = false;
     }
 

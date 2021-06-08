@@ -13,7 +13,7 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE. 
 );
 
-import core as snore;
+import /core as snore;
 
 export main class Main : snore.Basic {
     override mutating num main() {

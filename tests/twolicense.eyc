@@ -2,4 +2,4 @@ Copyright (c) 2021 Gregor Richards;
 license a;
 license b;
 
-import core;
+import /core;
