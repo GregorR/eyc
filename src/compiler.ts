@@ -2676,6 +2676,7 @@ function compileAssignmentExpression(eyc: types.EYC, state: MethodCompilationSta
             }
 
             case "num":
+            case "string":
                 // Handled below
                 break;
 
@@ -2726,7 +2727,9 @@ function compileAssignmentExpression(eyc: types.EYC, state: MethodCompilationSta
         }
 
     } else if (exp.children.op !== "=") {
-        throw new EYCTypeError(exp, "No compiler for " + exp.children.op);
+        // Every other case is only valid for numbers
+        if (left.ctype.type !== "num")
+            throw new EYCTypeError(exp, exp.children.op + " is only valid on numbers");
 
     }
 
@@ -2748,7 +2751,7 @@ function compileAssignmentExpression(eyc: types.EYC, state: MethodCompilationSta
 
                     // If we're doing += or -=, do that now
                     if (exp.children.op !== "=") {
-                        // We must be num, because only that falls through to here
+                        // We must be num or string, because only that falls through to here
 
                         // Get the original value
                         const prevValueTmp = state.allocateTmp();
@@ -2852,7 +2855,7 @@ function compileAssignmentExpression(eyc: types.EYC, state: MethodCompilationSta
 
             // If we're doing += or -=, do that now
             if (exp.children.op !== "=") {
-                // We must be num, because only that falls through to here
+                // We must be num or string, because only that falls through to here
 
                 // Get the original value
                 const prevValueTmp = state.allocateTmp();
