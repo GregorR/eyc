@@ -22,18 +22,25 @@ export main class Main : Basic {
         t.foo();
         extend t : B;
         t.foo();
+        Console.log((t : B).bar);
+        (t : B).bar = "bar";
+        Console.log((t : B).bar);
         retract t : A;
         t.foo();
+        Console.log((t : B).bar);
         extend t : A;
         t.foo();
         extend t : C;
         t.foo();
+        Console.log((t : B).bar);
         retract t : B;
         t.foo();
+        Console.log((t : B).bar);
         retract t : A;
         t.foo();
         retract t : C;
         t.foo();
+        Console.log((t : B).bar);
         retract t : Test;
         Console.log("=");
         t.foo();
@@ -59,6 +66,8 @@ class B : Test {
         super();
         Console.log("B");
     }
+
+    string bar = "uninit";
 }
 
 class C : A, B {
