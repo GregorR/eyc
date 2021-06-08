@@ -62,7 +62,7 @@ package
  = a:[^ \t\r\n;]* white { return a.join(""); }
 
 versionClause
- = a:("@"/"^"/">="/">"/"<="/"<") white b:package { return new Tree("ExactVersion", location(), {comparator: a, version: b}); }
+ = a:("@"/"^"/">="/">"/"<="/"<") white b:package { return new Tree("Version", location(), {comparator: a, version: b}); }
 
 asClause
  = as a:id { return a; }
