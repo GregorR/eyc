@@ -2085,6 +2085,21 @@ function compileStatement(eyc: types.EYC, state: MethodCompilationState, symbols
             }
             break;
 
+        case "ExtendStatement":
+        case "RetractStatement":
+        {
+            state.postExp = "";
+            const exp = stmt.children.expression;
+            console.assert(exp.type === "CastExp");
+            const expCode = compileExpression(eyc, state, symbols, exp.children.expression);
+            const type = exp.children.type.ctype.instanceOf.prefix;
+            state.outCode += expCode + "." +
+                (stmt.type==="ExtendStatement"?"extend":"retract") +
+                "(" + JSON.stringify(type) + ");\n";
+            state.flushPost();
+            break;
+        }
+
         case "ExpStatement":
         {
             state.postExp = "";

@@ -1,0 +1,69 @@
+Copyright (c) 2021 Gregor Richards;
+license (
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE. 
+);
+
+alias core.*;
+
+export main class Main : Basic {
+    override mutating num main() {
+        Test t = new;
+        extend t : A;
+        t.foo();
+        extend t : B;
+        t.foo();
+        retract t : A;
+        t.foo();
+        extend t : A;
+        t.foo();
+        extend t : C;
+        t.foo();
+        retract t : B;
+        t.foo();
+        retract t : A;
+        t.foo();
+        retract t : C;
+        t.foo();
+        retract t : Test;
+        Console.log("=");
+        t.foo();
+        Console.log("==");
+    }
+}
+
+class Test {
+    void foo() {
+        Console.log("-");
+    }
+}
+
+class A : Test {
+    override void foo() {
+        super();
+        Console.log("A");
+    }
+}
+
+class B : Test {
+    override void foo() {
+        super();
+        Console.log("B");
+    }
+}
+
+class C : A, B {
+    override void foo() {
+        super();
+        Console.log("C");
+    }
+}

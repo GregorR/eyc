@@ -101,7 +101,7 @@ extendsClause
  = ":" white a:nameList { return a; }
 
 nameList
- = a:name b:nameListNext? { var ret = new Tree("NameList", location(), [a]); if (b) ret.children = ret.children.concat(b); return ret; }
+ = a:name b:nameListNext? { var ret = new Tree("NameList", location(), [a]); if (b) ret.children = ret.children.concat(b.children); return ret; }
 
 nameListNext
  = "," white a:nameList { return a; }
