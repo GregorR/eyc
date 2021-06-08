@@ -1,0 +1,1 @@
+Error: twolicense.eyc:3:1: Multiple license declarations
