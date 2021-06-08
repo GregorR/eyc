@@ -11,9 +11,10 @@ eyc.ext.fetch = async function(ignore, path) {
     let x = new eyc.Object();
     x.extend(emodule.main.klass.prefix);
     x.methods.$$core$Stage$init(eyc, x, eyc.nil);
+    return;
     for (let i = 0; i < 1024; i++) {
         let a = process.hrtime();
-        x.methods.$$core$Stage$tick(eyc, x);
+        x.methods.$$core$Stage$tick(eyc, x, eyc.nil);
         let b = process.hrtime(a);
         console.log(b);
     }

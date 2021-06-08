@@ -83,8 +83,8 @@ function tupleCmp(left: types.Tuple, right: types.Tuple) {
     return valCmp(tupleStr(left), tupleStr(right));
 }
 
-export function eyc(
-        opts: {noImportCore?: boolean} = {}): types.EYC {
+export async function eyc(
+        opts: {noImportCore?: boolean} = {}): Promise<types.EYC> {
     const eyc: types.EYC = {
     compiler: compiler,
     counter: [0],
@@ -909,7 +909,7 @@ export function eyc(
     eyc.nullType = new eyc.PrimitiveType("null", "eyc.nil");
 
     if (!opts.noImportCore)
-        eyc.importModule("core", {text: eyc.core, ctx: {privileged: true}});
+        await eyc.importModule("core", {text: eyc.core, ctx: {privileged: true}});
 
     return eyc;
 }

@@ -29,8 +29,14 @@ class EYCTypeError extends Error {
 // Import this module, with everything that implies
 export async function importModule(eyc: types.EYC, url: string,
         opts: types.ImportModuleOpts = {}): Promise<types.Module> {
-    if (!opts.text)
-        throw new Error("No real import yet");
+    let text: string;
+
+    if (!opts.text) {
+        // Get the actual content (FIXME: versioning somewhere)
+        text = await eyc.ext.fetch(null, url + ".eyc");
+    } else {
+        text = opts.text;
+    }
 
     // Make the output module for it
     const module = new eyc.Module(url, opts.ctx || {privileged: false});
@@ -38,9 +44,9 @@ export async function importModule(eyc: types.EYC, url: string,
     // Parse it
     let parsed;
     try {
-        parsed = module.parsed = <types.ModuleNode> parser.parse(opts.text);
+        parsed = module.parsed = <types.ModuleNode> parser.parse(text);
     } catch (ex) {
-        if (ex.isEYCTypeError)
+        if (ex.location)
             console.log(url + ":" + ex.location.start.line + ":" + ex.location.start.column + ": " + ex);
         throw ex;
     }
@@ -52,7 +58,7 @@ export async function importModule(eyc: types.EYC, url: string,
     parsed.exports = resolveExports(eyc, module);
 
     // Resolve all global names
-    resolveSymbols(eyc, module);
+    await resolveSymbols(eyc, module);
 
     // Resolve all global types
     await resolveDeclTypes(eyc, module);
@@ -88,9 +94,20 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
                 throw new EYCTypeError(c, "Cannot resolve exports of ImportDecl");
 
             case "AliasDecl":
+            {
                 if (!c.children.exportClause)
                     break; // Not exported
-                throw new EYCTypeError(c, "Cannot resolve exports of AliasDecl");
+                // We can't yet know *what* this is, until we resolve types
+                let nm: string;
+                if (c.children.asClause) {
+                    nm = c.children.asClause.children.text;
+                } else {
+                    const parts = c.children.name.children;
+                    nm = parts[parts.length - 1];
+                }
+                exports[nm] = c;
+                break;
+            }
 
             case "SpriteSheetDecl":
                 if (!c.children.exportClause)
@@ -140,9 +157,17 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
 }
 
 // Resolve global names
-function resolveSymbols(eyc: types.EYC, module: types.Module) {
+async function resolveSymbols(eyc: types.EYC, module: types.Module) {
     const symbols = module.parsed.symbols = <Record<string, types.Tree>> Object.create(null);
     const isLocal = <Record<string, boolean>> Object.create(null);
+
+    // Start with core
+    if (module.prefix !== "$$core" &&
+        !("core" in symbols) &&
+        "core" in eyc.modules) {
+        symbols.core = eyc.modules.core.parsed;
+        isLocal.core = false;
+    }
 
     function defineSymbol(ctx: types.Tree, nm: string, val: types.Tree, local: boolean) {
         if (nm in symbols) {
@@ -184,11 +209,41 @@ function resolveSymbols(eyc: types.EYC, module: types.Module) {
 
             case "ImportDecl":
             {
-                // FIXME: All the URL madness, importing, etc
                 const url = c.children.package;
-                if (!(url in eyc.modules))
-                    throw new EYCTypeError(c, "Importing modules not yet implemented");
-                defineSymbol(c, url, eyc.modules[url].parsed, true);
+                let nm = url.replace(/\/$/, "").replace(/^.*\//, "");
+                // FIXME: Check that the name is actually valid
+                if (c.children.asClause)
+                    nm = c.children.asClause.children.text;
+
+                // Load the module
+                if (!(url in eyc.modules)) {
+                    // Need to import it first
+                    await importModule(eyc, url);
+                }
+
+                defineSymbol(c, nm, eyc.modules[url].parsed, true);
+                break;
+            }
+
+            case "AliasDecl":
+            {
+                const target = <types.ModuleNode> resolveName(eyc, module.parsed, c.children.name);
+                let nm: string;
+                if (c.children.asClause) {
+                    nm = c.children.asClause.children.text;
+                } else {
+                    const parts = c.children.name.children;
+                    nm = parts[parts.length - 1];
+                }
+                defineSymbol(c, nm, target, true);
+
+                // Also fix up the export at this point
+                if (c.children.exportClause) {
+                    module.parsed.exports[nm] = target;
+
+                    if (c.children.exportClause.children.main)
+                        module.main = target;
+                }
                 break;
             }
 
@@ -276,7 +331,7 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
     if (spritesDecl.spritesheet)
         return spritesDecl.spritesheet;
 
-    const sheet = spritesDecl.spritesheet =
+    const sheet = spritesDecl.spritesheet = spritesDecl.ctype =
         new eyc.Spritesheet(spritesDecl.module,
             spritesDecl.children.id.children.text, spritesDecl.children.url);
 
@@ -404,7 +459,7 @@ function resolveSoundSetDeclTypes(eyc: types.EYC, soundsDecl: types.SoundsetNode
     if (soundsDecl.soundset)
         return soundsDecl.soundset;
 
-    const set = soundsDecl.soundset =
+    const set = soundsDecl.soundset = soundsDecl.ctype =
         new eyc.Soundset(soundsDecl.module,
             soundsDecl.children.id.children.text, soundsDecl.children.url);
 
@@ -517,7 +572,7 @@ async function resolveFabricDeclTypes(eyc: types.EYC, fabricDecl: types.FabricNo
     if (fabricDecl.fabric)
         return fabricDecl.fabric;
 
-    const fabric = fabricDecl.fabric =
+    const fabric = fabricDecl.fabric = fabricDecl.ctype =
         new eyc.Fabric(fabricDecl.module, fabricDecl.children.id.children.text,
             fabricDecl.children.url,
             await eyc.ext.fetch(fabricDecl.module.url,
@@ -534,7 +589,7 @@ function resolveClassDeclTypes(eyc: types.EYC, classDecl: types.ClassNode) {
     if (classDecl.klass)
         return classDecl.klass;
 
-    const klass = classDecl.klass =
+    const klass = classDecl.klass = classDecl.ctype =
         new eyc.Class(classDecl.module, classDecl.children.id.children.text);
 
     classDecl.itype = new eyc.ObjectType(klass);
@@ -681,6 +736,7 @@ function typeCheckModule(eyc: types.EYC, module: types.Module) {
             case "LicenseDecl":
             case "PrefixDecl":
             case "ImportDecl":
+            case "AliasDecl":
             case "AliasStarDecl":
             case "SpriteSheetDecl":
             case "SoundSetDecl":
@@ -1220,6 +1276,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "DotExp":
         {
+            const name = exp.children.id.children.text;
+
             if (subExpType.isArray || subExpType.isSet || subExpType.isMap || subExpType.isString) {
                 // Collection types only accept "length"
                 if (exp.children.id.children.text !== "length")
@@ -1227,11 +1285,19 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                 resType = eyc.numType;
                 break;
 
+            } else if (subExpType.isModule) {
+                const sModule = <types.Module> subExpType;
+
+                // Look for an export
+                if (!(name in sModule.parsed.exports))
+                    throw new EYCTypeError(exp, "No such export");
+                resType = sModule.parsed.exports[name].ctype; // FIXME: Always set?
+                break;
+
             } else if (subExpType.isClass) {
                 const klass = <types.EYCClass> subExpType;
 
                 // Allowed to use any method as a static method
-                const name = exp.children.id.children.text;
                 if (!(name in klass.methodTypes))
                     throw new EYCTypeError(exp, "No such method");
                 resType = klass.methodTypes[name];
@@ -1244,7 +1310,6 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
             // Try to find the member
             const klass = (<types.EYCObjectType> subExpType).instanceOf;
-            const name = exp.children.id.children.text;
             if (name in klass.methodTypes)
                 resType = klass.methodTypes[name];
             else if (name in klass.fieldTypes)
@@ -1558,8 +1623,21 @@ function resolveName(eyc: types.EYC, module: types.ModuleNode, name: types.Tree)
 
     // Step two: Take steps
     for (let ni = 1; ni < name.children.length; ni++) {
-        //const step = name.children[ni].children.text;
-        throw new Error;
+        const step = name.children[ni].children.text;
+        switch (cur.type) {
+            case "Module":
+            {
+                // Check its exports
+                const curM = <types.ModuleNode> cur;
+                if (!(step in curM.exports))
+                    throw new EYCTypeError(name.children[ni], "Name " + step + " not found in module");
+                cur = curM.exports[step];
+                break;
+            }
+
+            default:
+                throw new EYCTypeError(name.children[ni], "Cannot look up names in a " + cur.type);
+        }
     }
 
     return cur;
@@ -1585,6 +1663,7 @@ function compileModule(eyc: types.EYC, module: types.Module) {
             case "LicenseDecl":
             case "PrefixDecl":
             case "ImportDecl":
+            case "AliasDecl":
             case "AliasStarDecl":
             case "SpriteSheetDecl":
             case "SoundSetDecl":

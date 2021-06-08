@@ -76,6 +76,7 @@ export class Console : Root {
 
 // A basic one-shot "main" program (only used in testing)
 export class Basic : Root {
+    mutating void init() {}
     mutating num main() {}
 }
 
