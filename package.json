@@ -25,7 +25,8 @@
     "tinyify": "^3.0.0",
     "tsify": "^5.0.4",
     "typescript": "^4.3.2",
-    "url-polyfill": "^1.1.12"
+    "url-polyfill": "^1.1.12",
+    "whatwg-fetch": "^3.6.2"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.26.0",

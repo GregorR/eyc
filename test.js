@@ -5,7 +5,7 @@ const EYC = require("./eyc-dbg.js");
 (async function() {
 
     const eyc = await EYC.eyc();
-    eyc.ext.fetch = async function(ignore, path) {
+    eyc.ext.fetch = async function(path) {
         return fs.readFileSync(path, "utf8");
     };
 

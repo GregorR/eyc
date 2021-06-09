@@ -6,8 +6,8 @@ const EYC = require("./eyc-dbg.js");
     try {
         const eyc = await EYC.eyc();
 
-        eyc.ext.fetch = async function(ignore, path) {
-            return fs.readFileSync(path, "utf8");
+        eyc.ext.fetch = async function(path) {
+            return fs.readFileSync(path.replace(/^\/*/, ""), "utf8");
         };
 
         let emodule = await eyc.importModule(process.argv[2], {text: fs.readFileSync(process.argv[2], "utf8"), ctx: {privileged: true}});

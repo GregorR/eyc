@@ -114,9 +114,12 @@ export interface EYC {
     };
 
     // External features which must be provided by a user of EYC
-    ext: {
-        fetch: (rel: string, resource: string) => Promise<string>;
-    };
+    ext: EYCExt;
+}
+
+// External features
+export interface EYCExt {
+    fetch: (resource: string) => Promise<string>;
 }
 
 // A compiled EYC function

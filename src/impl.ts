@@ -1,4 +1,5 @@
-import "url-polyfill";
+// Polyfill
+import "whatwg-fetch";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const charenc = require("charenc");
@@ -84,7 +85,7 @@ function tupleCmp(left: types.Tuple, right: types.Tuple) {
 }
 
 export async function eyc(
-        opts: {noImportCore?: boolean} = {}): Promise<types.EYC> {
+        opts: {noImportCore?: boolean, ext?: types.EYCExt} = {}): Promise<types.EYC> {
     const eyc: types.EYC = {
     compiler: compiler,
     counter: [0],
@@ -911,5 +912,19 @@ export async function eyc(
     if (!opts.noImportCore)
         await eyc.importModule("/core", {text: eyc.core, ctx: {privileged: true}});
 
+    if (opts.ext)
+        eyc.ext = opts.ext;
+
     return eyc;
 }
+
+// An ext for web (including workers)
+export const eycExtWeb: types.EYCExt = {
+    fetch: async function(url: string) {
+        return fetch("https:/" + url).then(response => {
+            if (response.status !== 200)
+                throw new Error("Status code " + response.status);
+            return response.text();
+        });
+    }
+};

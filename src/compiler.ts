@@ -33,7 +33,7 @@ export async function importModule(eyc: types.EYC, url: string,
 
     if (!opts.text) {
         // Get the actual content (FIXME: versioning somewhere)
-        text = await eyc.ext.fetch(null, url + ".eyc");
+        text = await eyc.ext.fetch(url + ".eyc");
     } else {
         text = opts.text;
     }
@@ -575,8 +575,8 @@ async function resolveFabricDeclTypes(eyc: types.EYC, fabricDecl: types.FabricNo
     const fabric = fabricDecl.fabric = fabricDecl.ctype =
         new eyc.Fabric(fabricDecl.module, fabricDecl.children.id.children.text,
             fabricDecl.children.url,
-            await eyc.ext.fetch(fabricDecl.module.url,
-                fabricDecl.children.url));
+            // FIXME: Relative path
+            await eyc.ext.fetch(fabricDecl.children.url));
 
     // FIXME: Properties
 
