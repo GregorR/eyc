@@ -18,7 +18,9 @@ alias core.*;
 export main class Main : Basic {
     override mutating num main() {
         for (num i = 0; i < 1024; i++) {
-            if (this.rand() > 0.5) {
+            num r = this.rand();
+            Console.log(r : string);
+            if (r > 0.5) {
                 A a = new;
                 a.foo();
             } else {
