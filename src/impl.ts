@@ -1,6 +1,3 @@
-// Polyfill
-import "whatwg-fetch";
-
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const charenc = require("charenc");
 // eslint-disable-next-line @typescript-eslint/no-var-requires

@@ -5,8 +5,7 @@ imgs/
 node_modules/
 package-lock.json
 
-be-license.js
-fe-license.js
+*-license.js
 eyc.js
 eyc-*.js
 src/core.json
