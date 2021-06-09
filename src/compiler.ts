@@ -19,7 +19,7 @@ class EYCTypeError extends Error {
     }
 
     get message() {
-        return this.ctx.module.url + ":" +
+        return this.ctx.module.absoluteUrl + ":" +
                this.ctx.location.start.line + ":" +
                this.ctx.location.start.column + ": " +
                this.msg;
@@ -39,7 +39,7 @@ export async function importModule(eyc: types.EYC, url: string,
     }
 
     // Make the output module for it
-    const module = new eyc.Module(url, opts.ctx || {privileged: false});
+    const module = new eyc.Module(url, url + ".eyc", opts.ctx || {privileged: false});
 
     // Parse it
     let parsed;
@@ -209,7 +209,7 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
 
             case "ImportDecl":
             {
-                const url = c.children.package;
+                const url = eyc.urlAbsolute(module.url, c.children.package);
                 let nm = url.replace(/\/$/, "").replace(/^.*\//, "");
                 // FIXME: Check that the name is actually valid
                 if (c.children.asClause)
@@ -572,11 +572,11 @@ async function resolveFabricDeclTypes(eyc: types.EYC, fabricDecl: types.FabricNo
     if (fabricDecl.fabric)
         return fabricDecl.fabric;
 
+    const url = eyc.urlAbsolute(fabricDecl.module.url, fabricDecl.children.url);
     const fabric = fabricDecl.fabric = fabricDecl.ctype =
         new eyc.Fabric(fabricDecl.module, fabricDecl.children.id.children.text,
             fabricDecl.children.url,
-            // FIXME: Relative path
-            await eyc.ext.fetch(fabricDecl.children.url));
+            await eyc.ext.fetch(url));
 
     // FIXME: Properties
 

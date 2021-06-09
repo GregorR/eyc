@@ -1,1 +1,1 @@
-Error: doubledecl.eyc:20:9: Invalid assignment
+Error: /doubledecl.eyc:20:9: Invalid assignment

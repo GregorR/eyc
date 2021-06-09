@@ -1,1 +1,1 @@
-Error: nocopyright.eyc:1:1: No copyright declaration
+Error: /nocopyright.eyc:1:1: No copyright declaration

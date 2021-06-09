@@ -81,6 +81,35 @@ function tupleCmp(left: types.Tuple, right: types.Tuple) {
     return valCmp(tupleStr(left), tupleStr(right));
 }
 
+// Encode a URL into a prefix for a JS variable name
+function urlEncode(x: string) {
+    return crypt.bytesToBase64(charenc.utf8.stringToBytes(x)).replace(/\+/g, "\u00b5").replace(/\//g, "\u00df").replace(/=/g, "_");
+}
+
+// Get an absolute URL from a relative base and relative URL
+function urlAbsolute(rel: string, path: string) {
+    const absolute = (path[0] === "/");
+
+    // Normalize
+    const pathParts = path.split("/");
+    const normParts: string[] = [];
+    for (const part of pathParts) {
+        if (part === "" || part === ".")
+            continue;
+        else if (part === "..")
+            normParts.pop();
+        else
+            normParts.push(part);
+    }
+
+    // Restructure
+    if (absolute)
+        return "/" + normParts.join("/");
+
+    else
+        return rel.replace(/\/[^\/]*$/, "") + "/" + normParts.join("/");
+}
+
 export async function eyc(
         opts: {noImportCore?: boolean, ext?: types.EYCExt} = {}): Promise<types.EYC> {
     const eyc: types.EYC = {
@@ -122,10 +151,8 @@ export async function eyc(
         return id;
     },
 
-    // Encode a URL into a prefix for a JS variable name
-    urlEncode: function(x) {
-        return crypt.bytesToBase64(charenc.utf8.stringToBytes(x)).replace(/\+/g, "\u00b5").replace(/\//g, "\u00df").replace(/=/g, "_");
-    },
+    urlEncode: urlEncode,
+    urlAbsolute: urlAbsolute,
 
     // Modules in the runtime
     modules: Object.create(null),
@@ -134,6 +161,7 @@ export async function eyc(
         isTypeLike: boolean;
         isModule: boolean;
         url: string;
+        absoluteUrl: string;
         prefix: string;
         ctx: types.ModuleCtx;
         parsed: types.ModuleNode;
@@ -144,11 +172,12 @@ export async function eyc(
         soundsets: Record<string, types.Soundset>;
         fabrics: Record<string, types.Fabric>;
 
-        constructor(url: string, ctx: types.ModuleCtx) {
+        constructor(url: string, absoluteUrl: string, ctx: types.ModuleCtx) {
             this.type = "module";
             this.isTypeLike = true;
             this.isModule = true;
             this.url = url;
+            this.absoluteUrl = absoluteUrl;
             this.prefix = "$" + eyc.urlEncode(url);
             this.ctx = ctx;
             this.parsed = null;

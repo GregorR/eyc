@@ -32,10 +32,11 @@ export interface EYC {
 
     importModule: (a1: string, a2?: ImportModuleOpts) => Promise<Module>;
     freshId: () => string;
+    urlAbsolute: (rel: string, path: string) => string;
     urlEncode: (a1: string) => string;
 
     modules: Record<string, Module>;
-    Module: {new (url: string, ctx: ModuleCtx): Module};
+    Module: {new (url: string, absoluteUrl: string, ctx: ModuleCtx): Module};
 
     resources: Record<string, Resource>;
 
@@ -136,7 +137,13 @@ export interface ModuleCtx {
 
 export interface Module extends TypeLike {
     isModule: boolean;
+
+    // The URL used to identify this module
     url: string;
+
+    // The actual full URL fetched
+    absoluteUrl: string;
+
     prefix: string;
     ctx: ModuleCtx;
     parsed: ModuleNode;

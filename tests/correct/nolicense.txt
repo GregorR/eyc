@@ -1,1 +1,1 @@
-Error: nolicense.eyc:1:1: No license declaration
+Error: /nolicense.eyc:1:1: No license declaration
