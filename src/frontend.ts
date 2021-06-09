@@ -17,7 +17,7 @@ if (typeof HTMLCanvasElement === "undefined" ||
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const useAdvanced = (function() {
     try {
-        eval("async function x() { for (let x of []) {} }");
+        Function("async function x() { for (let x of []) {} }");
         return true;
     } catch (ex) {
         return false;
@@ -49,7 +49,6 @@ async function loadPixiApp(opts: any = {}) {
     });
     loading.innerText = "Loading...";
     document.body.appendChild(loading);
-    return;
 
     // Load PIXI
     if (typeof PIXI === "undefined") {

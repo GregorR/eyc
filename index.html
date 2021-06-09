@@ -16,8 +16,8 @@
             var scr = document.createElement("script");
             scr.src = (function() {
                 try {
-                    eval("async function x() { for (let y of []) {} }");
-                    return "eyc-fe-adv.js";
+                    Function("async function x() { for (let y of []) {} }");
+                    return "eyc-fe-dbg.js";
                 } catch (ex) {
                     return "eyc-fe.js";
                 }
