@@ -114,13 +114,20 @@ export interface EYC {
         bool: (l: boolean, r: boolean) => number;
     };
 
+    // Frontend interaction
+    newStage(w: number, h: number, ex: any): string;
+
     // External features which must be provided by a user of EYC
     ext: EYCExt;
 }
 
 // External features
 export interface EYCExt {
+    // Fetch a remote resource, presumably via the web
     fetch: (resource: string) => Promise<string>;
+
+    // Create a new frontend stage
+    newStage: (w: number, h: number, ex: unknown) => Promise<string>;
 }
 
 // A compiled EYC function

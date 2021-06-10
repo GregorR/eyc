@@ -84,7 +84,7 @@ export class Basic : Root {
 export class Stage : Root {
     mutating void init() {
         this.extStage = @js (w=this.w, h=this.h, ex=this.ex) {
-            return eyc.ext.newStage(w, h, ex);
+            return eyc.newStage(w, h, ex);
         } : string;
     }
 

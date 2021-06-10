@@ -112,6 +112,13 @@ function urlAbsolute(rel: string, path: string) {
 
 export async function eyc(
         opts: {noImportCore?: boolean, ext?: types.EYCExt} = {}): Promise<types.EYC> {
+
+    // A promise for actions coming from the frontend
+    let frontendP: Promise<unknown> = Promise.all([]);
+
+    // Map of our invented stage names to what the frontend tells us
+    const stages: Record<string, string> = Object.create(null);
+
     const eyc: types.EYC = {
     compiler: compiler,
     counter: [0],
@@ -920,9 +927,21 @@ export async function eyc(
         bool: valCmp
     },
 
+    // Frontend indirector
+    newStage: function(w: number, h: number, ex: any) {
+        const beId = this.freshId();
+        frontendP = frontendP.then(() => {
+            return this.ext.newStage(w, h, ex);
+        }).then(feId => {
+            stages[beId] = feId;
+        }).catch(console.error);
+        return beId;
+    },
+
     // User provided
     ext: {
-        fetch: null
+        fetch: null,
+        newStage: null
     }
 
     };
@@ -944,13 +963,3 @@ export async function eyc(
     return eyc;
 }
 
-// An ext for web (including workers)
-export const eycExtWeb: types.EYCExt = {
-    fetch: async function(url: string) {
-        return fetch("https:/" + url).then(response => {
-            if (response.status !== 200)
-                throw new Error("Status code " + response.status);
-            return response.text();
-        });
-    }
-};
