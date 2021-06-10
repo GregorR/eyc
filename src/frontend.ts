@@ -55,7 +55,7 @@ async function loadPixiApp(opts: any = {}) {
         // Load it first
         const scr = document.createElement("script");
         scr.async = scr.defer = true;
-        scr.src = "https://unpkg.com/pixi.js@^5.3.3/dist/pixi.min.js";
+        scr.src = "https://unpkg.com/pixi.js@^6.0.4/dist/browser/pixi.min.js";
 
         await new Promise((res, rej) => {
             scr.onload = res;
