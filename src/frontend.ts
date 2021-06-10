@@ -24,9 +24,7 @@ const useAdvanced = (function() {
     }
 })();
 
-/* Load the Pixi.JS application with the given options, and make its view front
- * and center */
-async function loadPixiApp(opts: any = {}) {
+function loadingScreen(opts: any = {}) {
     opts.bg = opts.bg || {};
 
     // Loading "screen"
@@ -49,7 +47,11 @@ async function loadPixiApp(opts: any = {}) {
     });
     loading.innerText = "Loading...";
     document.body.appendChild(loading);
+}
 
+/* Load the Pixi.JS application with the given options, and make its view front
+ * and center */
+async function loadPixiApp(opts: any = {}) {
     // Load PIXI
     if (typeof PIXI === "undefined") {
         // Load it first
@@ -92,12 +94,28 @@ async function loadPixiApp(opts: any = {}) {
     centerView();
     window.addEventListener("resize", centerView);
 
+    document.body.innerHTML = "";
     document.body.appendChild(app.view);
-    document.body.removeChild(loading);
     pixiApp = app;
 }
 
 export async function go(): Promise<void> {
+    loadingScreen();
+
+    const w = new Worker("eyc-w" + (useAdvanced?"-dbg":"") + ".js");
+    let id = 0;
+
+    w.onmessage = ev => {
+        const msg = ev.data;
+        switch (msg.c) {
+            default:
+                console.error("Unrecognized command " + msg.c);
+        }
+    };
+
+    w.postMessage({c: "setting", k: "local", v: true});
+    w.postMessage({c: "go", url: "/eatyourcontroller.com/test"});
+    /*
     await loadPixiApp();
     const loader = PIXI.Loader.shared;
     await new Promise(res => loader.add("images/cat.png").load(res));
@@ -107,4 +125,5 @@ export async function go(): Promise<void> {
     sprite.x = 42;
     sprite.y = 42;
     sprite.scale.set(4);
+    */
 }
