@@ -1527,9 +1527,12 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
         case "ID":
         {
             if (opts.mutating) {
-                // We're mutating the object in this L-Value, rather than changing the variable itself
-                if (!ctx.mutating)
-                    throw new EYCTypeError(exp, "Illegal mutation");
+                const retType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp);
+                if (!retType.isPrimitive) {
+                    // We're mutating the object in this L-Value, rather than changing the variable itself
+                    if (!ctx.mutating)
+                        throw new EYCTypeError(exp, "Illegal mutation");
+                }
             }
 
             const name = exp.children.text;
@@ -1956,6 +1959,7 @@ function compileStatement(eyc: types.EYC, state: MethodCompilationState, symbols
                 tmpLength = state.allocateTmp();
             let arrayCode;
             switch (stmt.children.collection.ctype.type) {
+                case "string":
                 case "array":
                     arrayCode = collection;
                     break;
@@ -2435,6 +2439,9 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
                         return out;
 
                     }
+
+                case "set":
+                    return "(" + sub("expression") + ".has(" + sub("index") + "))";
 
                 case "string":
                     return "(" +
