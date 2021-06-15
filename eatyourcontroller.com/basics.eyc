@@ -42,6 +42,19 @@ export class Motile : Object {
 
 // Impassable walls
 export class Wall : ObjectSprite {
+    // Set blocking based on a string
+    mutating this void setBlocking(string blocking) {
+        this.blocking = new {
+            if (blocking == "") {
+                // All directions
+                this["n"] = this["s"] = this["e"] = this["w"] = true;
+            } else {
+                for (string b in blocking)
+                    this[b] = true;
+            }
+        };
+    }
+
     // Initialize with full bounding box details
     mutating this void initFull(string sprite, num bbx, num bbw, num bby, num bbh) {
         this.staticSprite = sprite;
@@ -52,10 +65,22 @@ export class Wall : ObjectSprite {
     }
 
     // Initialize with a simple scale and 1 pixel flop
-    mutating this void init(string sprite, num scale) {
-        num x = 1/scale;
-        num w = (scale-2)/scale;
-        this.initFull(sprite, x, w, x, w);
+    mutating this void init(string sprite, string blocking, num scale) {
+        num x = 0, w = 1, y = 0, h = 1, u = 1/scale;
+        this.setBlocking(blocking);
+        if (this.blocking["n"]) {
+            y = u;
+            h -= u;
+        }
+        if (this.blocking["e"])
+            w -= u;
+        if (this.blocking["s"])
+            h -= u;
+        if (this.blocking["w"]) {
+            x = u;
+            w -= u;
+        }
+        this.initFull(sprite, x, w, y, h);
     }
 
     override string preinteract(Interaction interaction) {
@@ -68,42 +93,48 @@ export class Wall : ObjectSprite {
         for (tuple(Interaction, Interaction) ip in interactions) {
             Interaction i = ip[0];
             Motile other = i.from : Motile;
-            string dir = i.dir(0x.2);
+            string dirs = i.dir(0x.4);
 
-            /* Prefer to bump them north or south instead of east or west,
-             * since (FIXME) most games involve north-south gravity */
-            if (dir == "n" || dir == "ne" || dir == "nw") {
-                num over = this.y + this.bby1 - other.y - other.bby2;
-                ret = ret suggest {
-                    other.moveY(-over);
-                    other.accelerateY(-other.vy);
-                };
+            // Bump them in the appropriate direction(s)
+            for (string dir in dirs) {
+                if (this.blocking[dir]) {
+                    if (dir == "n") {
+                        num over = this.y + this.bby1 - other.y - other.bby2;
+                        ret = ret suggest {
+                            other.moveY(-over);
+                            other.accelerateY(-other.vy);
+                        };
 
-            } else if (dir == "e") {
-                num over = other.x + other.bbx1 - this.x - this.bbx2;
-                ret = ret suggest {
-                    other.moveX(over);
-                    other.accelerateX(-other.vx);
-                };
+                    } else if (dir == "e") {
+                        num over = other.x + other.bbx1 - this.x - this.bbx2;
+                        ret = ret suggest {
+                            other.moveX(over);
+                            other.accelerateX(-other.vx);
+                        };
 
-            } else if (dir == "se" || dir == "s" || dir == "sw") {
-                num over = other.y + other.bby1 - this.y - this.bby2;
-                ret = ret suggest {
-                    other.moveY(over);
-                    other.accelerateY(-other.vy);
-                };
+                    } else if (dir == "s") {
+                        num over = other.y + other.bby1 - this.y - this.bby2;
+                        ret = ret suggest {
+                            other.moveY(over);
+                            other.accelerateY(-other.vy);
+                        };
 
-            } else if (dir == "w") {
-                num over = this.x + this.bbx1 - other.x - other.bbx2;
-                ret = ret suggest {
-                    other.moveX(-over);
-                    other.accelerateX(-other.vx);
-                };
+                    } else if (dir == "w") {
+                        num over = this.x + this.bbx1 - other.x - other.bbx2;
+                        ret = ret suggest {
+                            other.moveX(-over);
+                            other.accelerateX(-other.vx);
+                        };
 
+                    }
+                }
             }
         }
         return ret;
     }
+
+    // Directions that this wall is meant to block
+    set(string) blocking;
 }
 
 /* A simple data type indicating damage that an object should in some way react
