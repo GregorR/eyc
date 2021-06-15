@@ -6,10 +6,10 @@ const EYC = require("./eyc-dbg.js");
 
     const eyc = await EYC.eyc();
     eyc.ext.fetch = async function(path) {
-        return fs.readFileSync(path, "utf8");
+        return fs.readFileSync("." + path, "utf8");
     };
 
-    let emodule = await eyc.importModule(process.argv[2], {text: fs.readFileSync(process.argv[2], "utf8"), ctx: {privileged: true}});
+    let emodule = await eyc.importModule("/" + process.argv[2], {ctx: {privileged: true}});
     let x = new eyc.Object();
     x.extend(emodule.main.klass.prefix);
     x.methods.$$core$Stage$init(eyc, x, eyc.nil);

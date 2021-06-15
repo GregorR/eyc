@@ -953,6 +953,7 @@ export async function eyc(
     eyc.suggestionType.isNullable = true;
     eyc.voidType = new eyc.PrimitiveType("void", "void 0");
     eyc.nullType = new eyc.PrimitiveType("null", "eyc.nil");
+    eyc.nullType.isNullable = true;
 
     if (!opts.noImportCore)
         await eyc.importModule("/core", {text: eyc.core, ctx: {privileged: true}});

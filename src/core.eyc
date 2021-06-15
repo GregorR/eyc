@@ -170,7 +170,11 @@ export class Stage : Root {
 
     // Add an object to the stage
     mutating void addObject(Object o) {
-        this.objects[o] = true;
+        if (o.stage != null) {
+            o.stage.remObject(o);
+        }
+        this.objects += o;
+        o.addedToStage(this);
         this.addObjectMap(o);
     }
 
@@ -185,6 +189,15 @@ export class Stage : Root {
                 this.tiles[xy][o] = true;
             }
         }
+    }
+
+    // Remove an object from this stage
+    mutating void remObject(Object o) {
+        this.objects -= o;
+        if (o.stage == this) {
+            o.removedFromStage(this);
+        }
+        this.remObjectMap(o);
     }
 
     // Remove an object from the internal map
@@ -209,6 +222,27 @@ export class Stage : Root {
             Math.floor((o.x+o.bbx1)/8),
             Math.floor((o.x+o.bbx2)/8)
         );
+    }
+
+    // Create a sprite
+    mutating string addSprite(string sprite, num x, num y) {
+        return @js (extStage=this.extStage, sprite, x, y) {
+            return eyc.addSprite(extStage, sprite, x, y);
+        } : string;
+    }
+
+    // Remove a sprite
+    mutating string removeSprite(string sprite) {
+        @js (extStage=this.extStage, sprite) {
+            eyc.removeSprite(extStage, sprite);
+        } : void;
+    }
+
+    // Move a sprite on the stage
+    mutating void moveSprite(string sprite, num x, num y) {
+        @js (extStage=this.extStage, sprite, x, y) {
+            eyc.moveSprite(extStage, sprite, x, y);
+        } : void;
     }
 
     // The width and height of the stage
@@ -237,7 +271,60 @@ export class Object : Root {
     // 4: React to interaction
     mutating this suggestion react() {}
 
+    /* Called when this object is added to a stage (usually for sprite
+     * management) */
+    mutating void addedToStage(Stage stage) {
+        this.stage = stage;
+    }
+
+    /* Called when this object is removed from a stage (usually for sprite
+     * management) */
+    mutating void removedFromStage(Stage stage) {
+        this.stage = stage;
+    }
+
+    // Move this object in X
+    mutating this void moveX(num by) {
+        this.x += by;
+    }
+
+    // Move this object in Y
+    mutating this void moveY(num by) {
+        this.y += by;
+    }
+
+    // The stage to which this object belongs
+    Stage stage;
+
     num x, y, z, bbx1, bbx2, bby1, bby2;
+}
+
+// An object with a sprite
+export class ObjectSprite : Object {
+    override mutating this suggestion react() {
+        return super() suggest {
+            this.stage.moveSprite(this.dynamicSprite, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY);
+        };
+    }
+
+    override mutating void addedToStage(Stage stage) {
+        super(stage);
+        this.dynamicSprite = stage.addSprite(this.staticSprite, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY);
+    }
+
+    override mutating void removedFromStage(Stage stage) {
+        super(stage);
+        stage.removeSprite(this.dynamicSprite);
+    }
+
+    // The (static) sprite to use to display this object
+    string staticSprite;
+
+    // The dynamic sprite currently used to display this object
+    string dynamicSprite;
+
+    // An optional (and usually unwanted) sprite offset
+    num spriteOffsetX, spriteOffsetY;
 }
 
 export class Interaction : Root {

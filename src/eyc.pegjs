@@ -302,7 +302,7 @@ argListNext
 primary
  = literal
  / parenExp
- / suggest "{" white a:statement* "}" white { return new Tree("SuggestionLiteral", location(), a); }
+ / suggest "{" white a:statement* "}" white { return new Tree("SuggestionLiteral", location(), {suggestions: a}); }
  / new a:("[" white a:expression "]" white { return a; })? b:type? c:block? {
      return new Tree("NewExp", location(), {prefix: a, type: b, withBlock: c});
  }

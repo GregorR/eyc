@@ -13,8 +13,9 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE. 
 );
 
-import core;
 alias core.*;
+
+import /eatyourcontroller.com/basics;
 
 export sprites Sprites foob.png {
     default (w=16, h=16, s=16);

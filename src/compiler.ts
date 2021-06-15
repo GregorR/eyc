@@ -77,8 +77,16 @@ function linkParseTree(tree: types.Tree, module: types.Module) {
     tree.module = module;
     for (let c in tree.children) {
         c = tree.children[c];
-        if (typeof c === "object" && c !== null)
-            linkParseTree(c, module);
+        if (typeof c === "object" && c !== null) {
+            if ((<Object> c) instanceof Array) {
+                for (let i of (<types.Tree[]> c)) {
+                    if (typeof i === "object" && i !== null)
+                        linkParseTree(i, module);
+                }
+            } else {
+                linkParseTree(c, module);
+            }
+        }
     }
 }
 
@@ -440,6 +448,9 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
 
                     // This is a new sprite
                     sheet.add(new eyc.Sprite(sheet, nm, vals.x, vals.y, vals.w, vals.h, vals.scale));
+
+                    // Now bump the default x
+                    defaults.x++;
 
                 }
 
@@ -880,6 +891,8 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
             let elType;
             if (expType.isArray || expType.isSet)
                 elType = (<types.ArrayType & types.SetType> expType).valueType;
+            else if (expType.isString)
+                elType = eyc.stringType;
             else if (expType.isMap)
                 elType = (<types.MapType> expType).keyType;
             else
@@ -1027,6 +1040,11 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                             throw new EYCTypeError(exp, "Invalid array expansion");
                         break;
 
+                    case "set":
+                        if (!rightType.equals((<types.SetType> leftType).valueType, {subtype: true}))
+                            throw new EYCTypeError(exp, "Invalid set addition");
+                        break;
+
                     case "num":
                     case "string":
                         if (!leftType.equals(rightType))
@@ -1042,6 +1060,11 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     case "map":
                         if (!rightType.equals((<types.MapType> leftType).keyType, {subtype: true}))
                             throw new EYCTypeError(exp, "Invalid map removal");
+                        break;
+
+                    case "set":
+                        if (!rightType.equals((<types.SetType> leftType).valueType, {subtype: true}))
+                            throw new EYCTypeError(exp, "Invalid set removal");
                         break;
 
                     case "num":
@@ -1066,8 +1089,12 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             break;
 
         case "EqExp":
-            if (!leftType.equals(rightType, {castable: true}))
-                throw new EYCTypeError(exp, "Incomparable types");
+            if (!leftType.equals(rightType, {castable: true})) {
+                // Special case if the left or right type *is* null
+                if (!(leftType.isNullable && rightType.isNull) &&
+                    !(leftType.isNull && rightType.isNullable))
+                    throw new EYCTypeError(exp, "Incomparable types");
+            }
             resType = eyc.boolType;
             break;
 
@@ -1174,8 +1201,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             if (exp.type === "CallExp" && exp.children.expression.type !== "DotExp")
                 throw new EYCTypeError(exp, "Methods are only accessible through .x syntax");
 
-            if (!methodDecl.signature.mutating) {
-                if (!methodDecl.signature.mutatingThis) {
+            if (!ctx.mutating) {
+                if (!ctx.mutatingThis) {
                     // No mutation allowed
                     if (signature.mutatingThis)
                         throw new EYCTypeError(exp, "Attempt to call mutating method from non-mutating context");
@@ -1325,7 +1352,7 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             resType = eyc.suggestionType;
 
             // But, the suggestion elements have to type check
-            typeCheckSuggestions(eyc, methodDecl, ctx, symbols, exp.children);
+            typeCheckSuggestions(eyc, methodDecl, ctx, symbols, exp.children.suggestions);
             break;
         }
 
@@ -1465,9 +1492,16 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
         opts: {mutating?: boolean} = {}): types.Type {
     switch (exp.type) {
         case "IndexExp":
-            if (!ctx.mutating)
+        {
+            if (!ctx.mutatingThis)
                 throw new EYCTypeError(exp, "Illegal mutation");
+
+            // Only this[...] = ... is allowed
+            if (opts.mutating || (!ctx.mutating && exp.children.expression.type !== "This"))
+                throw new EYCTypeError(exp, "Illegal mutation");
+
             break;
+        }
 
         case "DotExp":
         {
@@ -1545,6 +1579,23 @@ function typeCheckSuggestion(eyc: types.EYC, methodDecl: types.MethodNode,
             typeCheckExpression(eyc, methodDecl, ctx, symbols, exp);
 
             // But the whole statement can mutate
+            typeCheckStatement(eyc, methodDecl, {mutating: true, mutatingThis: true}, symbols, suggestion);
+            break;
+        }
+
+        case "ExpStatement":
+        {
+            // It has to be a method call
+            const exp = suggestion.children.expression;
+            if (exp.type !== "CallExp")
+                throw new EYCTypeError(suggestion, "Only method calls and extensions/retractions may be suggestions");
+
+            // We have to type-check each of the children with normal mutation rules
+            typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
+            for (const arg of (exp.children.args ? exp.children.args.children : []))
+                typeCheckExpression(eyc, methodDecl, ctx, symbols, arg);
+
+            // But the whole expression is allowed to mutate
             typeCheckStatement(eyc, methodDecl, {mutating: true, mutatingThis: true}, symbols, suggestion);
             break;
         }
@@ -2206,12 +2257,7 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
 
                 case "suggestion:suggestion":
                     console.assert(exp.children.op === "+");
-                    throw new Error("Unimplemented");
-                    /*
-                    return "(new eyc.Suggestion(self.prefix, eyc.addSuggestions(" +
-                        sub("left") + ".suggestions," +
-                        sub("right") + ".suggestions)))";
-                    */
+                    return "(eyc.Suggestion(self.prefix," + sub("left") + "," + sub("right") + "))";
 
                 default:
                     throw new EYCTypeError(exp, "No compiler for AddExp(" + types + ")");
@@ -2459,7 +2505,7 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
 
         case "SuggestionLiteral":
         {
-            const sug = compileSuggestions(eyc, state, symbols, exp.children);
+            const sug = compileSuggestions(eyc, state, symbols, exp.children.suggestions);
             return "(eyc.Suggestion(self.prefix," + sug + "))";
         }
 
@@ -2675,6 +2721,18 @@ function compileAssignmentExpression(eyc: types.EYC, state: MethodCompilationSta
                 return out;
             }
 
+            case "set":
+            {
+                const setTmp = state.allocateTmp();
+                const out = "(" +
+                    setTmp + "=" + sub(left) + "," +
+                    setTmp + ".add(" + sub(right) + ")," +
+                    setTmp + ")";
+                state.postExp += setTmp + "=0;\n";
+                state.freeTmp(setTmp);
+                return out;
+            }
+
             case "num":
             case "string":
                 // Handled below
@@ -2716,6 +2774,18 @@ function compileAssignmentExpression(eyc: types.EYC, state: MethodCompilationSta
 
                 return out;
 
+            }
+
+            case "set":
+            {
+                const setTmp = state.allocateTmp();
+                const out = "(" +
+                    setTmp + "=" + sub(left) + "," +
+                    setTmp + ".delete(" + sub(right) + ")," +
+                    setTmp + ")";
+                state.postExp += setTmp + "=0;\n";
+                state.freeTmp(setTmp);
+                return out;
             }
 
             case "num":
@@ -2985,6 +3055,31 @@ function compileSuggestion(eyc: types.EYC, state: MethodCompilationState, symbol
             // And get the target type
             out += ",type:" + JSON.stringify(exp.children.type.ctype.instanceOf.prefix) + "})";
             return out;
+        }
+
+        case "ExpStatement":
+        {
+            let out = '({action:"m"';
+
+            const exp = suggestion.children.expression;
+            console.assert(exp.type === "CallExp");
+
+            // FIXME: Static methods?
+
+            out +=
+                ",target:" + compileExpression(eyc, state, symbols, exp.children.expression.children.expression) +
+                ",source:self" +
+                ",method:" + JSON.stringify(exp.children.expression.ctype.id) +
+                ",args:[";
+
+            const outArgs = [];
+            for (const arg of (exp.children.args ? exp.children.args.children : [])) {
+                outArgs.push(compileExpression(eyc, state, symbols, arg));
+            }
+
+            out += outArgs.join(",") +
+                "]})";
+            break;
         }
 
         default:
