@@ -29,13 +29,87 @@ export class Motile : Object {
         return ret;
     }
 
+    mutating this void accelerateX(num by) {
+        this.vx += by;
+    }
+
+    mutating this void accelerateY(num by) {
+        this.vy += by;
+    }
+
     num vx, vy;
+}
+
+// Impassable walls
+export class Wall : ObjectSprite {
+    // Initialize with full bounding box details
+    mutating this void initFull(string sprite, num bbx, num bbw, num bby, num bbh) {
+        this.staticSprite = sprite;
+        this.bbx1 = bbx;
+        this.bbx2 = bbw - bbx;
+        this.bby1 = bby;
+        this.bby2 = bbh - bby;
+    }
+
+    // Initialize with a simple scale and 1 pixel flop
+    mutating this void init(string sprite, num scale) {
+        num x = 1/scale;
+        num w = (scale-2)/scale;
+        this.initFull(sprite, x, w, x, w);
+    }
+
+    override string preinteract(Interaction interaction) {
+        super(interaction);
+        return "solid";
+    }
+
+    override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
+        suggestion ret = super(interactions);
+        for (tuple(Interaction, Interaction) ip in interactions) {
+            Interaction i = ip[0];
+            Motile other = i.from : Motile;
+            string dir = i.dir(0x.2);
+
+            /* Prefer to bump them north or south instead of east or west,
+             * since (FIXME) most games involve north-south gravity */
+            if (dir == "n" || dir == "ne" || dir == "nw") {
+                num over = this.y + this.bby1 - other.y - other.bby2;
+                ret = ret suggest {
+                    other.moveY(-over);
+                    other.accelerateY(-other.vy);
+                };
+
+            } else if (dir == "e") {
+                num over = other.x + other.bbx1 - this.x - this.bbx2;
+                ret = ret suggest {
+                    other.moveX(over);
+                    other.accelerateX(-other.vx);
+                };
+
+            } else if (dir == "se" || dir == "s" || dir == "sw") {
+                num over = other.y + other.bby1 - this.y - this.bby2;
+                ret = ret suggest {
+                    other.moveY(over);
+                    other.accelerateY(-other.vy);
+                };
+
+            } else if (dir == "w") {
+                num over = this.x + this.bbx1 - other.x - other.bbx2;
+                ret = ret suggest {
+                    other.moveX(-over);
+                    other.accelerateX(-other.vx);
+                };
+
+            }
+        }
+        return ret;
+    }
 }
 
 /* A simple data type indicating damage that an object should in some way react
  * to */
 export class Damage {
-    void init(Object from, string type, num amount) {
+    mutating this void init(Object from, string type, num amount) {
         this.from = from;
         this.type = type;
         this.amount = amount;
@@ -58,8 +132,8 @@ export class Damageable : Object {
     // Override this to handle the damage received in this frame
     mutating this suggestion handleDamage(array(Damage) damage) {}
 
-    mutating this suggestion react() {
-        suggestion ret = this.handleDamage(this.damage);
+    override mutating this suggestion react() {
+        suggestion ret = super() + this.handleDamage(this.damage);
         this.damage = new;
         return ret;
     }
