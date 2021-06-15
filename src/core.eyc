@@ -225,9 +225,9 @@ export class Stage : Root {
     }
 
     // Create a sprite
-    mutating string addSprite(string sprite, num x, num y) {
-        return @js (extStage=this.extStage, sprite, x, y) {
-            return eyc.addSprite(extStage, sprite, x, y);
+    mutating string addSprite(string sprite, num x, num y, string ex) {
+        return @js (extStage=this.extStage, sprite, x, y, ex) {
+            return eyc.addSprite(extStage, sprite, x, y, ex);
         } : string;
     }
 
@@ -309,7 +309,7 @@ export class ObjectSprite : Object {
 
     override mutating void addedToStage(Stage stage) {
         super(stage);
-        this.dynamicSprite = stage.addSprite(this.staticSprite, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY);
+        this.dynamicSprite = stage.addSprite(this.staticSprite, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY, this.spriteEx);
     }
 
     override mutating void removedFromStage(Stage stage) {
@@ -319,6 +319,9 @@ export class ObjectSprite : Object {
 
     // The (static) sprite to use to display this object
     string staticSprite;
+
+    // Extra properties of the sprite
+    string spriteEx;
 
     // The dynamic sprite currently used to display this object
     string dynamicSprite;
