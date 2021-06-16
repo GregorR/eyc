@@ -922,6 +922,8 @@ export async function eyc(
     // Cloners
     clone: {
         object: function(o, caller) {
+            if (o === eyc.nil) return o;
+
             // Clone the type
             const ret = new eyc.Object(o.prefix);
             ret.types = o.types.slice(0);
@@ -935,16 +937,19 @@ export async function eyc(
         },
 
         array: function(a, caller) {
+            if (a === eyc.nil) return a;
             const ret = <types.EYCArray> a.slice(0);
             ret.id = caller.prefix + "$" + eyc.freshId();
             return ret;
         },
 
         map: function(m, caller) {
+            if (m === eyc.nil) return m;
             return new eyc.Map(caller.prefix, m);
         },
 
         set: function(s, caller) {
+            if (s === eyc.nil) return s;
             return new eyc.Set(caller.prefix, s);
         }
     },
