@@ -940,6 +940,13 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
                 if (!keyType.isNum || !valType.isString)
                     throw new EYCTypeError(stmt, "Incorrect types for for-in loop over string");
 
+            } else if (expType.isArray) {
+                // index-element loop
+                if (!keyType.isNum)
+                    throw new EYCTypeError(stmt, "Incorrect key iterator type");
+                if (!expType.valueType.equals(valType, {subtype: true}))
+                    throw new EYCTypeError(stmt, "Incorrect value iterator type");
+
             } else if (expType.isMap) {
                 if (!expType.keyType.equals(keyType, {subtype: true}))
                     throw new EYCTypeError(stmt, "Incorrect key iterator type");
@@ -2057,8 +2064,9 @@ function compileStatement(eyc: types.EYC, state: MethodCompilationState, symbols
         case "ForInMapStatement":
         {
             const collectionNode = stmt.children.collection;
-            if (collectionNode.ctype.isString) {
-                // Special form for strings
+
+            if (collectionNode.ctype.isString || collectionNode.ctype.isArray) {
+                // Special form for strings and arrays
 
                 // Allocate variables
                 symbols = Object.create(symbols);
@@ -2067,23 +2075,25 @@ function compileStatement(eyc: types.EYC, state: MethodCompilationState, symbols
                 if (stmt.children.valueType)
                     symbols[stmt.children.value.children.text] = state.allocateVar(stmt.children.value.children.text);
 
-                // Get the string itself
-                const stringTmp = state.allocateTmp();
+                // Get the thing we're iterating over
+                const arrayTmp = state.allocateTmp();
                 state.postExp = "";
                 state.outCode +=
-                    stringTmp + "=" +
+                    arrayTmp + "=" +
                     compileExpression(eyc, state, symbols, collectionNode) +
                     ";\n";
                 state.flushPost();
 
                 // Initializer
-                state.outCode += symbols[stmt.children.key.children.text] + "=0;\n";
+                state.outCode +=
+                    symbols[stmt.children.key.children.text] + "=0;\n" +
+                    symbols[stmt.children.value.children.text] + "=0;\n";
 
                 // Loop
                 const lv = symbols[stmt.children.key.children.text];
                 const vv = symbols[stmt.children.value.children.text];
-                state.outCode += "for(" + lv + "=0;" + lv + "<" + stringTmp + ".length;" + lv + "++){\n" +
-                    vv + "=" + stringTmp + "[" + lv + ']||"";\n';
+                state.outCode += "for(" + lv + "=0;" + lv + "<" + arrayTmp + ".length;" + lv + "++){\n" +
+                    vv + "=" + arrayTmp + "[" + lv + ']||"";\n';
 
                 // Body
                 compileStatement(eyc, state, Object.create(symbols), stmt.children.body);
