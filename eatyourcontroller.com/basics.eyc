@@ -64,7 +64,7 @@ export class Wall : ObjectSprite, Clonable {
         this.bby2 = bbh - bby;
     }
 
-    // Initialize with a simple scale and 1 pixel flop
+    // Initialize with a simple scale and 1 pixel slop
     mutating this void init(string sprite, string blocking, num scale) {
         num x = 0, w = 1, y = 0, h = 1, u = 1/scale;
         this.setBlocking(blocking);
@@ -91,11 +91,13 @@ export class Wall : ObjectSprite, Clonable {
         this.blocking = clone other.blocking;
     }
 
+    // Walls are solid
     override string preinteract(Interaction interaction) {
         super(interaction);
         return "solid";
     }
 
+    // Interaction = "get outta my way!"
     override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
         suggestion ret = super(interactions);
         for (tuple(Interaction, Interaction) ip in interactions) {
@@ -176,4 +178,35 @@ export class Damageable : Object {
         this.damage = new;
         return ret;
     }
+}
+
+// Stages defined by fabrics
+export class FabricStage : Stage {
+    // Initialize the mapping (override this)
+    mutating void initMapping() {}
+
+    // Initialize by loading a fabric
+    mutating void initFabric(array(string) layout) {
+        // First, figure out the width and height of the layout
+        this.w = layout[0].length;
+        this.h = layout.length; // FIXME: layers
+        this.init();
+
+        // Now add the objects
+        for (num y, string line in layout) {
+            for (num x, string el in line) {
+                Clonable c = this.mapping[el];
+                if (c != null) {
+                    c = clone c;
+                    Object o = c : Object;
+                    o.x = x;
+                    o.y = y;
+                    this.addObject(o);
+                }
+            }
+        }
+    }
+
+    // The mapping of fabric characters to objects
+    map(string, Clonable) mapping;
 }
