@@ -350,13 +350,18 @@ export async function eyc(
         type: string;
         isTypeLike: boolean;
         isFabric: boolean;
+        isGarment: boolean;
         name: string;
         url: string;
         text: string;
         code: string;
         id: string;
 
-        constructor(module: types.Module, name: string, url: string, text: string) {
+        constructor(module: types.Module, isGarment: boolean, name: string, url: string, text: string) {
+            this.type = isGarment ? "garment" : "fabric";
+            this.isTypeLike = true;
+            this.isFabric = true;
+            this.isGarment = isGarment;
             this.name = name;
             this.url = url;
             this.text = text;
@@ -392,17 +397,58 @@ export async function eyc(
             // Make sure they're all the same length
             let max = 0;
             for (const line of lines) {
+                if (this.isGarment && line[0] === "@")
+                    continue;
                 if (line.length > max)
                     max = line.length;
             }
             for (let li = 0; li < lines.length; li++)
                 lines[li] = lines[li].padEnd(max, " ");
 
-            // Put it in the fabrics map
-            eyc.fabricVals[this.id] = lines;
+            if (this.isGarment) {
+                // Split the lines into layers
+                const layers = <types.EYCArray & (types.EYCArray & string[])[]> [[]];
+                layers.id = this.id;
+                let layer = layers[0];
+                let li = 0;
+                layer.id = this.id + "$" + li;
+
+                // FIXME: Settable delimiter
+                for (const line of lines) {
+                    if (line[0] === "@") {
+                        // Move on to another layer
+                        layer = <types.EYCArray & string[]> [];
+                        layer.id = this.id + "$" + (++li);
+                        layers.push(layer);
+                    } else {
+                        layer.push(line);
+                    }
+                }
+
+                // Make sure *they're* all the same length
+                let maxStr = ("").padEnd(max, " ");
+                let ymax = 0;
+                for (const layer of layers) {
+                    if (layer.length > ymax)
+                        ymax = layer.length;
+                }
+                for (let li = 0; li < layers.length; li++) {
+                    const layer = layers[li];
+                    while (layer.length < ymax)
+                        layer.push(maxStr);
+                }
+
+                // Put it in the fabrics map
+                eyc.fabricVals[this.id] = layers;
+
+            } else {
+                // Put the lines in the fabrics map
+                eyc.fabricVals[this.id] = lines;
+
+            }
 
             // And create the code
-            return this.code = "(eyc.fabricVals[" + JSON.stringify(this.id) + "])";
+            return this.code = "(eyc.fabricVals." + this.id + ")";
         }
     },
 

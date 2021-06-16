@@ -83,12 +83,12 @@ soundDecl
 
 fabricDecl
 // With properties
- = a:exportClause? b:idLike & {return b === "fabric";} c:id d:package "{" white e:fabricProp* "}" white {
-     return new Tree("FabricDecl", location(), {exportClause: a, id: c, url: d, props: e});
+ = a:exportClause? b:idLike & {return b === "fabric" || b === "garment";} c:id d:package "{" white e:fabricProp* "}" white {
+     return new Tree("FabricDecl", location(), {exportClause: a, kind: b, id: c, url: d, props: e});
  }
 // Without properties
- / a:exportClause? b:idLike & {return b === "fabric";} c:id d:package ";" white {
-     return new Tree("FabricDecl", location(), {exportClause: a, id: c, url: d, props: []});
+ / a:exportClause? b:idLike & {return b === "fabric" || b == "garment";} c:id d:package ";" white {
+     return new Tree("FabricDecl", location(), {exportClause: a, kind: b, id: c, url: d, props: []});
  }
 
 prefixDecl

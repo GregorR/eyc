@@ -585,14 +585,21 @@ async function resolveFabricDeclTypes(eyc: types.EYC, fabricDecl: types.FabricNo
 
     const url = eyc.urlAbsolute(fabricDecl.module.url, fabricDecl.children.url);
     const fabric = fabricDecl.fabric = fabricDecl.ctype =
-        new eyc.Fabric(fabricDecl.module, fabricDecl.children.id.children.text,
-            fabricDecl.children.url,
+        new eyc.Fabric(fabricDecl.module,
+            fabricDecl.children.kind === "garment",
+            fabricDecl.children.id.children.text, fabricDecl.children.url,
             await eyc.ext.fetch(url));
 
     // FIXME: Properties
+    if (fabricDecl.children.props.length)
+        throw new EYCTypeError(fabricDecl, "Fabric properties are not yet supported");
 
-    // The actual type of a fabric in code is just an array of strings
-    return new eyc.ArrayType(eyc.stringType);
+    /* The actual type is an array(string) (fabric) or array(array(string))
+     * (garment) */
+    if (fabricDecl.children.kind === "garment")
+        return new eyc.ArrayType(new eyc.ArrayType(eyc.stringType));
+    else
+        return new eyc.ArrayType(eyc.stringType);
 }
 
 // Resolve the types of a class declaration (at a high level)

@@ -57,7 +57,7 @@ export interface EYC {
 
     fabrics: Record<string, Fabric>;
     fabricVals: Record<string, EYCArray>;
-    Fabric: {new (module: Module, name: string, url: string, text: string): Fabric};
+    Fabric: {new (module: Module, isGarment: boolean, name: string, url: string, text: string): Fabric};
 
     classes: Record<string, EYCClass>;
     Class: {new (module: Module, name: string): EYCClass};
@@ -219,6 +219,7 @@ export interface Soundset extends Resource {
 
 export interface Fabric extends Resource {
     isFabric: boolean;
+    isGarment: boolean;
     name: string;
     url: string;
     text: string;
