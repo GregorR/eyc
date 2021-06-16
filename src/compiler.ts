@@ -360,7 +360,7 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
             {
                 // The natural content, a sprite
                 const nm = sprite.children.id.children.text;
-                const args = sprite.children.args.children;
+                const args = sprite.children.args ? sprite.children.args.children : [];
 
                 // Get the values associated with the sprite
                 const vals = {
@@ -1294,6 +1294,11 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
                 resType = eyc.stringType;
 
+            } else if (subExpType.isSpritesheet) {
+                if (!idxType.isString)
+                    throw new EYCTypeError(exp, "Spritesheet index must be a string");
+                resType = eyc.stringType;
+
             } else {
                 throw new EYCTypeError(exp, "Cannot type check index of " + subExpType.type);
 
@@ -1507,6 +1512,21 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
         case "BoolLiteral":
             resType = eyc.boolType;
             break;
+
+        case "ArrayLiteral":
+        {
+            const elTypes = exp.children.elements.children.map((c: types.Tree) => typeCheckExpression(eyc, methodDecl, ctx, symbols, c));
+            if (elTypes.length === 0)
+                throw new EYCTypeError(exp, "Empty array literals do not have a type. Use 'new'.");
+            const elType = elTypes[0];
+            for (let ei = 1; ei < elTypes.length; ei++) {
+                // FIXME: mutual supertype
+                if (!elType.equals(elTypes[ei]))
+                    throw new EYCTypeError(exp, "Inconsistent element types");
+            }
+            resType = new eyc.ArrayType(elType);
+            break;
+        }
 
         case "TupleLiteral":
         {
@@ -2500,6 +2520,10 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
                         ']||"")';
                     break;
 
+                case "sprites":
+                    return "(" + JSON.stringify((<types.Spritesheet> left.ctype).prefix + "$") +
+                        "+" + sub("index") + ")";
+
                 default:
                     throw new EYCTypeError(exp, "No compiler for indexing " + left.ctype.type);
             }
@@ -2748,6 +2772,20 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
 
         case "StringLiteral":
             return "(" + exp.children.text + ")";
+
+        case "ArrayLiteral":
+        {
+            const arrayTmp = state.allocateTmp();
+            const out = "(" +
+                arrayTmp + "=[" +
+                exp.children.elements.children.map((c: types.Tree) => compileExpression(eyc, state, symbols, c)).join(",") +
+                "]," +
+                arrayTmp + '.id=self.prefix+"$"+eyc.freshId(),' +
+                arrayTmp + ")";
+            state.postExp += arrayTmp + "=0;\n";
+            state.freeTmp(arrayTmp);
+            return out;
+        }
 
         case "TupleLiteral":
             return "([" +

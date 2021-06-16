@@ -384,7 +384,8 @@ typeListNext
  = "," white a:typeList { return a; }
 
 sprite
- = a:id "(" white b:argList? ")" white ";" white { return new Tree("Sprite", location(), {id: a, args: b}); }
+ = a:id ";" white { return new Tree("Sprite", location(), {id: a, args: null}); }
+ / a:id "(" white b:argList? ")" white ";" white { return new Tree("Sprite", location(), {id: a, args: b}); }
  / copyrightDecl
  / licenseDecl
 
