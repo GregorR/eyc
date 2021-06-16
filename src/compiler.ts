@@ -1384,6 +1384,46 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             break;
         }
 
+        case "CloneExp":
+        {
+            resType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
+
+            // Only certain types are clonable
+            let isClonable = false;
+            switch (resType.type) {
+                case "object":
+                {
+                    // Needs to be a subclass of $$core$Clonable
+                    const klass = (<types.EYCObjectType> resType).instanceOf;
+                    if (!klass.subtypeOf(eyc.classes["$$core$Clonable"]))
+                        throw new EYCTypeError(exp, "Only subclasses of core.Clonable are clonable");
+                    isClonable = true;
+                    break;
+                }
+
+                case "array":
+                case "map":
+                case "set":
+                    isClonable = true;
+                    break;
+            }
+
+            if (!isClonable)
+                throw new EYCTypeError(exp, "The type " + resType.type + " is not clonable");
+
+            if (exp.children.withBlock) {
+                const withSymbols = Object.create(symbols);
+                const withCtx = {
+                    mutating: ctx.mutating,
+                    mutatingThis: true
+                };
+                withSymbols["this"] = resType;
+                typeCheckStatement(eyc, methodDecl, withCtx, withSymbols, exp.children.withBlock);
+            }
+
+            break;
+        }
+
         case "This":
             resType = <types.Type> symbols["this"]; // this is always the instance type of the class
             break;
@@ -2586,6 +2626,42 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
             return out;
         }
 
+        case "CloneExp":
+        {
+            let out = "(eyc.clone." + exp.ctype.type + "(self, " + sub("expression") + "))";
+
+            if (exp.children.withBlock) {
+                // FIXME: duplication
+
+                // Perform this with-block action
+                const tmpV = state.allocateTmp(),
+                    tmpF = "$" + (state.varCt++);
+
+                out = "(" +
+                    tmpV + "=" + out + "," +
+                    tmpF + "(" + tmpV + ")," +
+                    tmpV +
+                    ")";
+
+                state.postExp += tmpV + "=0;\n";
+                state.freeTmp(tmpV);
+
+                // Compile the with-block action
+                state.outCode += "function " + tmpF + "(self){\n";
+                const postExp = state.postExp;
+                state.postExp = "";
+                const halfFreeTmps = state.halfFreeTmps;
+                state.halfFreeTmps = [];
+                compileStatement(eyc, state, symbols, exp.children.withBlock);
+                state.postExp = postExp;
+                state.halfFreeTmps = halfFreeTmps;
+
+                state.outCode += "}\n";
+            }
+
+            return out;
+        }
+
         case "SuperCall":
         {
             let out = "(this.proto." + state.method.signature.id + "(eyc,self,self";
@@ -3086,7 +3162,7 @@ function compileSuggestion(eyc: types.EYC, state: MethodCompilationState, symbol
 
             out += outArgs.join(",") +
                 "]})";
-            break;
+            return out;
         }
 
         default:

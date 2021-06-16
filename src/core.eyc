@@ -40,6 +40,10 @@ export class Root {
     }
 }
 
+export class Clonable : Root {
+    mutating this void clone(Clonable from) {}
+}
+
 export class Math : Root {
     num floor(num x) {
         return @js (x) { return Math.floor(x); } : num;
@@ -91,9 +95,9 @@ export class Stage : Root {
     // Perform a tick of game actions
     mutating void tick() {
         // Step 1: Actions
+        this.tiles = new;
         array(suggestion) sa = new;
         for reverse (Object o in this.objects) {
-            this.remObjectMap(o);
             sa += o.act();
             this.addObjectMap(o);
         }
@@ -175,7 +179,6 @@ export class Stage : Root {
         }
         this.objects += o;
         o.addedToStage(this);
-        this.addObjectMap(o);
     }
 
     // Add an object to the internal map used to look up interactions
@@ -196,21 +199,6 @@ export class Stage : Root {
         this.objects -= o;
         if (o.stage == this) {
             o.removedFromStage(this);
-        }
-        this.remObjectMap(o);
-    }
-
-    // Remove an object from the internal map
-    mutating void remObjectMap(Object o) {
-        tuple(num, num, num, num) range = this.range(o);
-        for (num y = range[0]; y <= range[1]; y++) {
-            for (num x = range[2]; x <= range[3]; x++) {
-                tuple(num, num) xy = tuple(x, y);
-                set(Object) tset = this.tiles[xy];
-                tset[o] = false;
-                if (tset.length == 0)
-                    this.tiles -= xy;
-            }
         }
     }
 
@@ -293,6 +281,17 @@ export class Object : Root {
         this.y += by;
     }
 
+    /* Objects aren't inherently clonable, but this helper method is provided
+     * for clonable objects */
+    mutating this void cloneObject(Object other) {
+        this.x = other.x;
+        this.y = other.y;
+        this.bbx1 = other.bbx1;
+        this.bbx2 = other.bbx2;
+        this.bby1 = other.bby1;
+        this.bby2 = other.bby2;
+    }
+
     // The stage to which this object belongs
     Stage stage;
 
@@ -315,6 +314,15 @@ export class ObjectSprite : Object {
     override mutating void removedFromStage(Stage stage) {
         super(stage);
         stage.removeSprite(this.dynamicSprite);
+    }
+
+    /* ObjectSprites aren't inherently clonable, but this helper method is
+     * provided for clonable ObjectSprites */
+    mutating this void cloneSprite(ObjectSprite other) {
+        this.cloneObject(other);
+        this.staticSprite = other.staticSprite;
+        this.spriteOffsetX = other.spriteOffsetX;
+        this.spriteOffsetY = other.spriteOffsetY;
     }
 
     // The (static) sprite to use to display this object

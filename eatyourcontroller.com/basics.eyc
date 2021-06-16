@@ -41,7 +41,7 @@ export class Motile : Object {
 }
 
 // Impassable walls
-export class Wall : ObjectSprite {
+export class Wall : ObjectSprite, Clonable {
     // Set blocking based on a string
     mutating this void setBlocking(string blocking) {
         this.blocking = new {
@@ -81,6 +81,14 @@ export class Wall : ObjectSprite {
             w -= u;
         }
         this.initFull(sprite, x, w, y, h);
+    }
+
+    // Clone from another wall
+    override mutating this void clone(Clonable from) {
+        super(from);
+        Wall other = from : Wall;
+        this.cloneSprite(other);
+        this.blocking = clone other.blocking;
     }
 
     override string preinteract(Interaction interaction) {

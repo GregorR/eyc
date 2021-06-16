@@ -851,21 +851,21 @@ export async function eyc(
     methodTables: Object.create(null),
 
     // Maps with an ID
-    Map: class extends Map implements types.EYCMap {
+    Map: class extends Map<unknown, unknown> implements types.EYCMap {
         id: string;
 
-        constructor(prefix: string) {
-            super();
+        constructor(prefix: string, copy?: Iterable<[unknown, unknown]>) {
+            super(copy);
             this.id = (prefix||"map") + "$" + eyc.freshId();
         }
     },
 
     // Sets with an ID
-    Set: class extends Set implements types.EYCSet {
+    Set: class extends Set<unknown> implements types.EYCSet {
         id: string;
 
-        constructor(prefix: string) {
-            super();
+        constructor(prefix: string, copy?: Iterable<unknown>) {
+            super(copy);
             this.id = (prefix||"set") + "$" + eyc.freshId();
         }
     },
@@ -898,7 +898,11 @@ export async function eyc(
         // 2: Methods
         for (const s of ss) {
             if (s.action === "m") {
-                throw new Error;
+                const sm = <types.SuggestionStepMethod> s;
+                const target = sm.target;
+                const method = sm.method;
+                if (target.methods[method])
+                    target.methods[method].apply(target.methods, (<unknown[]> [eyc, target, sm.source]).concat(sm.args));
             }
         }
 
@@ -914,6 +918,36 @@ export async function eyc(
 
     // Convert a tuple to a string
     tupleStr,
+
+    // Cloners
+    clone: {
+        object: function(o, caller) {
+            // Clone the type
+            const ret = new eyc.Object(o.prefix);
+            ret.types = o.types.slice(0);
+            ret.manifestType();
+
+            // Then caller the cloner
+            if (ret.methods.$$core$Clonable$clone)
+                (<any> ret.methods).$$core$Clonable$clone(eyc, ret, caller, o);
+
+            return ret;
+        },
+
+        array: function(a, caller) {
+            const ret = <types.EYCArray> a.slice(0);
+            ret.id = caller.prefix + "$" + eyc.freshId();
+            return ret;
+        },
+
+        map: function(m, caller) {
+            return new eyc.Map(caller.prefix, m);
+        },
+
+        set: function(s, caller) {
+            return new eyc.Set(caller.prefix, s);
+        }
+    },
 
     // Comparitors for sorting
     cmp: {

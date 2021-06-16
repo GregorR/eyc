@@ -92,8 +92,8 @@ export interface EYC {
     methodTables: Record<string, Record<string, CompiledFunction>>;
 
     // Other heap types
-    Map: {new (prefix: string): EYCMap};
-    Set: {new (prefix: string): EYCSet};
+    Map: {new (prefix: string, copy?: Iterable<[unknown, unknown]>): EYCMap};
+    Set: {new (prefix: string, copy?: Iterable<unknown>): EYCSet};
     Suggestion(prefix: string, suggestions: SuggestionStep[], append?: SuggestionStep[]): Suggestion;
 
     // Enforce suggestions
@@ -101,6 +101,14 @@ export interface EYC {
 
     // Convert a tuple to a string
     tupleStr(tuple: Tuple): string;
+
+    // Cloners
+    clone: {
+        object: (c: EYCObject, caller: EYCObject) => EYCObject;
+        array: (c: EYCArray, caller: EYCObject) => EYCArray;
+        map: (c: EYCMap, caller: EYCObject) => EYCMap;
+        set: (c: EYCSet, caller: EYCObject) => EYCSet;
+    },
 
     // Comparators
     cmp: {
@@ -315,6 +323,7 @@ export interface EYCObject extends EYCHeapThing {
     rand(): number;
     extend(type: string): EYCObject;
     retract(type: string): EYCObject;
+    manifestType(): void;
 
     // Objects also have fields, mangled so they can't possibly interfere
 }
