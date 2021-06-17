@@ -147,6 +147,70 @@ export class Wall : ObjectSprite, Clonable {
     set(string) blocking;
 }
 
+/* N-way walls are similar to walls, but only prevent movement of motile
+ * objects, and only if they're moving in the wall's blocking direction */
+export class NWayWall : Wall {
+    // Check for momentum before blocking
+    override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
+        suggestion ret = super(interactions);
+        for (tuple(Interaction, Interaction) ip in interactions) {
+            Interaction i = ip[0];
+            Motile other = i.from : Motile;
+            if (other is Motile) {
+                string dirs = i.dir(0x.4);
+
+                // Bump them in the appropriate direction(s)
+                for (string dir in dirs) {
+                    if (this.blocking[dir]) {
+                        if (dir == "n" && other.vy > 0) {
+                            num over = this.y + this.bby1 - other.y - other.bby2;
+                            ret = ret suggest {
+                                other.moveY(-over);
+                                other.accelerateY(-other.vy);
+                            };
+
+                        } else if (dir == "e" && other.vx < 0) {
+                            num over = other.x + other.bbx1 - this.x - this.bbx2;
+                            ret = ret suggest {
+                                other.moveX(over);
+                                other.accelerateX(-other.vx);
+                            };
+
+                        } else if (dir == "s" && other.vy < 0) {
+                            num over = other.y + other.bby1 - this.y - this.bby2;
+                            ret = ret suggest {
+                                other.moveY(over);
+                                other.accelerateY(-other.vy);
+                            };
+
+                        } else if (dir == "w" && other.vx > 0) {
+                            num over = this.x + this.bbx1 - other.x - other.bbx2;
+                            ret = ret suggest {
+                                other.moveX(-over);
+                                other.accelerateX(-other.vx);
+                            };
+
+                        }
+                    }
+                }
+            }
+        }
+        return ret;
+    }
+}
+
+// Non-interactive background sprites
+export class Background : ObjectSprite, Clonable {
+    mutating this void init(string sprite) {
+        this.staticSprite = sprite;
+    }
+
+    override mutating this void clone(Clonable other) {
+        super(other);
+        this.cloneSprite(other : ObjectSprite);
+    }
+}
+
 /* A simple data type indicating damage that an object should in some way react
  * to */
 export class Damage {
@@ -180,28 +244,31 @@ export class Damageable : Object {
     }
 }
 
-// Stages defined by fabrics
-export class FabricStage : Stage {
+// Stages defined by garments
+export class GarmentStage : Stage {
     // Initialize the mapping (override this)
     mutating void initMapping() {}
 
-    // Initialize by loading a fabric
-    mutating void initFabric(array(string) layout) {
+    // Initialize by loading a garment
+    mutating void initGarment(array(array(string)) layout) {
         // First, figure out the width and height of the layout
         this.w = layout[0].length;
         this.h = layout.length; // FIXME: layers
         this.init();
 
         // Now add the objects
-        for (num y, string line in layout) {
-            for (num x, string el in line) {
-                Clonable c = this.mapping[el];
-                if (c != null) {
-                    c = clone c;
-                    Object o = c : Object;
-                    o.x = x;
-                    o.y = y;
-                    this.addObject(o);
+        for (num z, array(string) layer in layout) {
+            for (num y, string row in layer) {
+                for (num x, string el in row) {
+                    Clonable c = this.mapping[el];
+                    if (c != null) {
+                        c = clone c;
+                        Object o = c : Object;
+                        o.x = x;
+                        o.y = y;
+                        o.z = layout.length - z;
+                        this.addObject(o);
+                    }
                 }
             }
         }
