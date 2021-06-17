@@ -99,7 +99,8 @@ export class Stage : Root {
         array(suggestion) sa = new;
         for reverse (Object o in this.objects) {
             sa += o.act();
-            this.addObjectMap(o);
+            if (!o.free)
+                this.addObjectMap(o);
         }
         for (suggestion s in sa)
             this.enforce(s, null);
@@ -284,6 +285,7 @@ export class Object : Root {
     /* Objects aren't inherently clonable, but this helper method is provided
      * for clonable objects */
     mutating this void cloneObject(Object other) {
+        this.free = other.free;
         this.x = other.x;
         this.y = other.y;
         this.bbx1 = other.bbx1;
@@ -294,6 +296,9 @@ export class Object : Root {
 
     // The stage to which this object belongs
     Stage stage;
+
+    // A free object never interacts
+    bool free;
 
     num x, y, z, bbx1, bbx2, bby1, bby2;
 }
