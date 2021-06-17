@@ -350,7 +350,9 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
         w: 1,
         h: 1,
         scale: 1,
-        factor: 1
+        factor: 1,
+        frames: 1,
+        speed: 1
     };
 
     // Loop over the sprites...
@@ -363,14 +365,7 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
                 const args = sprite.children.args ? sprite.children.args.children : [];
 
                 // Get the values associated with the sprite
-                const vals = {
-                    x: defaults.x,
-                    y: defaults.y,
-                    w: defaults.w,
-                    h: defaults.h,
-                    scale: defaults.scale,
-                    factor: defaults.factor
-                };
+                const vals = Object.assign({}, defaults);
 
                 for (let i = 0; i < args.length; i++) {
                     const a = args[i];
@@ -389,6 +384,8 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
                             }
                             an = l.children.text;
                             av = r;
+                            if (!(an in defaults))
+                                throw new EYCTypeError(a, "Unrecognized sprite property " + an);
                             break;
                         }
 
@@ -442,15 +439,18 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
                     defaults = vals;
 
                 } else {
-                    // Adjust x and y to be relative to the grid size
+                    // Bump the default x
+                    defaults.x = vals.x + vals.w;
+
+                    // Scale
                     vals.x *= vals.factor;
                     vals.y *= vals.factor;
+                    vals.w *= vals.factor;
+                    vals.h *= vals.factor;
+                    delete vals.factor;
 
                     // This is a new sprite
-                    sheet.add(new eyc.Sprite(sheet, nm, vals.x, vals.y, vals.w, vals.h, vals.scale));
-
-                    // Now bump the default x
-                    defaults.x++;
+                    sheet.add(new eyc.Sprite(sheet, nm, vals));
 
                 }
 

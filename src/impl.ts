@@ -211,25 +211,17 @@ export async function eyc(
         isSprite: boolean;
         name: string;
         sheet: types.Spritesheet;
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-        scale: number;
+        props: types.SpriteProperties;
         id: string;
         prefix: string;
 
-        constructor(sheet: types.Spritesheet, name: string, x: number, y: number, w: number, h: number, scale: number) {
+        constructor(sheet: types.Spritesheet, name: string, props: types.SpriteProperties) {
             this.type = "sprite";
             this.isSprite = true;
             this.name = name;
             this.sheet = sheet;
             sheet.add(this);
-            this.x = x;
-            this.y = y;
-            this.w = w;
-            this.h = h;
-            this.scale = scale;
+            this.props = props;
             this.id = sheet.prefix + "$" + name;
             this.prefix = sheet.prefix;
         }

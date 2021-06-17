@@ -41,8 +41,7 @@ export interface EYC {
     resources: Record<string, Resource>;
 
     Sprite: {
-        new (sheet: Spritesheet, name: string, x: number, y: number, w: number,
-             h: number, scale: number): Sprite
+        new (sheet: Spritesheet, name: string, props: SpriteProperties): Sprite
     };
 
     spritesheets: Record<string, Spritesheet>;
@@ -178,13 +177,19 @@ export interface Sprite extends EYCElement {
     isSprite: boolean;
     name: string;
     sheet: Spritesheet;
+    props: SpriteProperties;
+    id: string;
+    prefix: string;
+}
+
+export interface SpriteProperties {
     x: number;
     y: number;
     w: number;
     h: number;
     scale: number;
-    id: string;
-    prefix: string;
+    frames: number;
+    speed: number;
 }
 
 export interface Spritesheet extends Resource {
