@@ -41,7 +41,7 @@ export class Motile : Object {
 }
 
 // Impassable walls
-export class Wall : ObjectSprite, Clonable {
+export class Wall : ObjectSprite {
     // Set blocking based on a string
     mutating this void setBlocking(string blocking) {
         this.blocking = new {
@@ -62,14 +62,6 @@ export class Wall : ObjectSprite, Clonable {
         this.bbx2 = 1;
         this.bby1 = 0;
         this.bby2 = 1;
-    }
-
-    // Clone from another wall
-    override mutating this void clone(Clonable from) {
-        super(from);
-        Wall other = from : Wall;
-        this.cloneSprite(other);
-        this.blocking = clone other.blocking;
     }
 
     // Walls are solid
@@ -181,14 +173,9 @@ export class NWayWall : Wall {
 }
 
 // Non-interactive background sprites
-export class Background : ObjectSprite, Clonable {
+export class Background : ObjectSprite {
     mutating this void init(string sprite) {
         this.staticSprite = sprite;
-    }
-
-    override mutating this void clone(Clonable other) {
-        super(other);
-        this.cloneSprite(other : ObjectSprite);
     }
 }
 
@@ -233,18 +220,17 @@ export class GarmentStage : Stage {
     // Initialize by loading a garment
     mutating void initGarment(array(array(string)) layout) {
         // First, figure out the width and height of the layout
-        this.w = layout[0].length;
-        this.h = layout.length; // FIXME: layers
+        this.w = layout[0][0].length;
+        this.h = layout[0].length;
         this.init();
 
         // Now add the objects
         for (num z, array(string) layer in layout) {
             for (num y, string row in layer) {
                 for (num x, string el in row) {
-                    Clonable c = this.mapping[el];
-                    if (c != null) {
-                        c = clone c;
-                        Object o = c : Object;
+                    Object o = this.mapping[el];
+                    if (o != null) {
+                        o = Serialize.clone(o) : Object;
                         o.x = x;
                         o.y = y;
                         o.z = layout.length - z;
@@ -256,5 +242,5 @@ export class GarmentStage : Stage {
     }
 
     // The mapping of fabric characters to objects
-    map(string, Clonable) mapping;
+    map(string, Object) mapping;
 }

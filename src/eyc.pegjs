@@ -306,10 +306,6 @@ primary
  / new a:("[" white a:expression "]" white { return a; })? b:type? c:block? {
      return new Tree("NewExp", location(), {prefix: a, type: b, withBlock: c});
  }
-    // This has to come before ID so that we'll try this form first
- / a:idLike && {return a === "clone";} b:expression c:block? {
-     return new Tree("CloneExp", location(), {expression: b, withBlock: c});
- }
  / super "(" white a:argList? ")" white { return new Tree("SuperCall", location(), {args: a}); }
  / this { return new Tree("This", location(), {}); }
  / caller { return new tree("Caller", location(), {}); }

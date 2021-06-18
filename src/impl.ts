@@ -1045,41 +1045,6 @@ export async function eyc(
         return ser.deserialize(eyc, val, loadModules);
     },
 
-    // Cloners
-    clone: {
-        object: function(o, caller) {
-            if (o === eyc.nil) return o;
-
-            // Clone the type
-            const ret = new eyc.Object(o.prefix);
-            ret.types = o.types.slice(0);
-            ret.manifestType();
-
-            // Then caller the cloner
-            if (ret.methods.$$core$Clonable$clone)
-                (<any> ret.methods).$$core$Clonable$clone(eyc, ret, caller, o);
-
-            return ret;
-        },
-
-        array: function(a, caller) {
-            if (a === eyc.nil) return a;
-            const ret = <types.EYCArray> a.slice(0);
-            ret.id = caller.prefix + "$" + eyc.freshId();
-            return ret;
-        },
-
-        map: function(m, caller) {
-            if (m === eyc.nil) return m;
-            return new eyc.Map(caller.prefix, m.keyType, m.valueType, m);
-        },
-
-        set: function(s, caller) {
-            if (s === eyc.nil) return s;
-            return new eyc.Set(caller.prefix, s.valueType, s);
-        }
-    },
-
     // Comparitors for sorting
     cmp: {
         object: idCmp,

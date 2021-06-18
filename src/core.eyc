@@ -40,10 +40,6 @@ export class Root {
     }
 }
 
-export class Clonable : Root {
-    mutating this void clone(Clonable from) {}
-}
-
 export class Math : Root {
     num floor(num x) {
         return @js (x) { return Math.floor(x); } : num;
@@ -84,6 +80,10 @@ export class Serialize : Root {
                 return eyc.nil;
             return ret;
         } : Root;
+    }
+
+    Root clone(Root x) {
+        return this.deserialize(this.serialize(x));
     }
 }
 

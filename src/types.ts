@@ -106,14 +106,6 @@ export interface EYC {
     serialize(val: any): string;
     deserialize(val: string, loadModules: boolean): any;
 
-    // Cloners
-    clone: {
-        object: (c: EYCObject, caller: EYCObject) => EYCObject;
-        array: (c: EYCArray, caller: EYCObject) => EYCArray;
-        map: (c: EYCMap, caller: EYCObject) => EYCMap;
-        set: (c: EYCSet, caller: EYCObject) => EYCSet;
-    },
-
     // Comparators
     cmp: {
         object: (l: EYCObject, r: EYCObject) => number;
