@@ -109,9 +109,17 @@ export class Stage : Root {
 
     // Perform a tick of game actions
     mutating void tick() {
-        // Step 1: Actions
-        this.tiles = new;
         array(suggestion) sa = new;
+
+        // Step 1: Players
+        for (Player p in this.players)
+            sa += p.tick();
+        for (suggestion s in sa)
+            this.enforce(s, null);
+
+        // Step 2: Actions
+        this.tiles = new;
+        sa = new;
         for reverse (Object o in this.objects) {
             sa += o.act();
             if (!o.free)
@@ -120,7 +128,7 @@ export class Stage : Root {
         for (suggestion s in sa)
             this.enforce(s, null);
 
-        // Step 2: Determine interactions
+        // Step 3: Determine interactions
         map(Object, array(tuple(Interaction, Interaction))) interactions = new;
         for (Object o1 in this.objects) {
             tuple(num, num, num, num) range = this.range(o1);
@@ -167,20 +175,20 @@ export class Stage : Root {
             }
         }
 
-        // Step 3: Pre-interaction
+        // Step 4: Pre-interaction
         for (Object o, array(tuple(Interaction, Interaction)) i in interactions) {
             for (tuple(Interaction, Interaction) ti in i)
                 ti[0].type = o.preinteract(ti[0]);
         }
 
-        // Step 4: Interaction
+        // Step 5: Interaction
         sa = new;
         for (Object o, array(tuple(Interaction, Interaction)) i in interactions)
             sa += o.interact(i);
         for reverse (suggestion s in sa)
             this.enforce(s, null);
 
-        // Step 5: Reaction
+        // Step 6: Reaction
         sa = new;
         for reverse (Object o in this.objects)
             sa += o.react();
@@ -251,28 +259,38 @@ export class Stage : Root {
 
     // The width and height of the stage
     num w = 1920, h = 1080;
+
     // Extra properties for the stage
     string ex;
+
     // External stage reference for display
     string extStage;
+
+    // Players
+    array(Player) players;
+
     // The objects on this stage
     set(Object) objects;
+
     // And their locations, tiled
     map(tuple(num, num), set(Object)) tiles;
 }
 
 // An object, in the sense of a thing in 2D space
 export class Object : Root {
-    // 1: Act
+    // 1: Play
+    suggestion takeInput(InputState input) {}
+
+    // 2: Act
     mutating this suggestion act() {}
 
-    // 2: Determine the kinds of interactions with other objects
+    // 3: Determine the kinds of interactions with other objects
     string preinteract(Interaction interaction) {}
 
-    // 3: Choose how to interact
+    // 4: Choose how to interact
     suggestion interact(array(tuple(Interaction, Interaction)) interactions) {}
 
-    // 4: React to interaction
+    // 5: React to interaction
     mutating this suggestion react() {}
 
     /* Called when this object is added to a stage (usually for sprite
@@ -444,8 +462,12 @@ export class Interaction : Root {
 }
 
 export class Player : Root {
-    suggestion tick(InputState input) {}
+    suggestion tick() {
+        return this.controlling.takeInput(this.input);
+    }
+
     Playing controlling;
+    InputState input;
 }
 
 export class Playing : Object {
