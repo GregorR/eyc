@@ -639,8 +639,8 @@ export async function eyc(
         default(opts?: types.DefaultValueOpts) {
             if (opts && opts.build)
                 return "new eyc.Map(self.prefix," +
-                    JSON.stringify(this.keyType.type) + "," +
-                    JSON.stringify(this.valueType.type) + ")";
+                    JSON.stringify(this.keyType.basicType()) + "," +
+                    JSON.stringify(this.valueType.basicType()) + ")";
             else
                 return "eyc.nil";
         }
@@ -676,10 +676,11 @@ export async function eyc(
         default(opts?: types.DefaultValueOpts) {
             if (opts && opts.build) {
                 if (this.valueType.isTuple)
-                    return 'new eyc.Map(self.prefix,"set","tuple")';
+                    return 'new eyc.Map(self.prefix,"-set",' +
+                        JSON.stringify(this.valueType.basicType()) + ")";
                 else
                     return "new eyc.Set(self.prefix," +
-                        JSON.stringify(this.valueType.type) + ")";
+                        JSON.stringify(this.valueType.basicType()) + ")";
             } else {
                 return "eyc.nil";
             }
