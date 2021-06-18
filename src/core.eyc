@@ -87,6 +87,84 @@ export class Serialize : Root {
     }
 }
 
+export class JSON : Root {
+    JSON parse(string json) {
+        JSON ret = new JSON;
+        return @js (ret, json) {
+            try {
+                ret.json = JSON.parse(json);
+            } catch (ex) {
+                return eyc.nil;
+            }
+            return ret;
+        } : JSON;
+    }
+
+    string type() {
+        return @js () {
+            if (typeof self.json === "object") {
+                if (self.json === null)
+                    return "null";
+                else if (self.json instanceof Array)
+                    return "array";
+                else
+                    return "object";
+            } else
+                return typeof self.json;
+        } : string;
+    }
+
+    JSON field(string field) {
+        JSON ret = new JSON;
+        return @js (ret, field) {
+            try {
+                ret.json = self.json[field];
+            } catch (ex) {
+                return eyc.nil;
+            }
+            return ret;
+        } : JSON;
+    }
+
+    JSON index(num idx) {
+        JSON ret = new JSON;
+        return @js (ret, idx) {
+            try {
+                ret.json = self.json[idx];
+            } catch (ex) {
+                return eyc.nil;
+            }
+            return ret;
+        } : JSON;
+    }
+
+    num asNum() {
+        return @js () {
+            return +self.json;
+        } : num;
+    }
+
+    string asString() {
+        return @js () {
+            return "" + self.json;
+        } : string;
+    }
+
+    bool asBool() {
+        return @js () {
+            return !!self.json;
+        } : bool;
+    }
+
+    // shorthand
+    string t() { return this.type(); }
+    JSON f(string f) { return this.field(f); }
+    JSON i(num i) { return this.index(i); }
+    num n() { return this.asNum(); }
+    string s() { return this.asString(); }
+    bool b() { return this.asBool(); }
+}
+
 export class Console : Root {
     void log(string x) {
         @js (x) { console.log(x); } : void;
