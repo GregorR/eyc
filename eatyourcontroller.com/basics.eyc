@@ -55,32 +55,13 @@ export class Wall : ObjectSprite, Clonable {
         };
     }
 
-    // Initialize with full bounding box details
-    mutating this void initFull(string sprite, num bbx, num bbw, num bby, num bbh) {
+    mutating this void init(string sprite, string blocking) {
         this.staticSprite = sprite;
-        this.bbx1 = bbx;
-        this.bbx2 = bbw - bbx;
-        this.bby1 = bby;
-        this.bby2 = bbh - bby;
-    }
-
-    // Initialize with a simple scale and 1 pixel slop
-    mutating this void init(string sprite, string blocking, num scale) {
-        num x = 0, w = 1, y = 0, h = 1, u = 1/scale;
         this.setBlocking(blocking);
-        if (this.blocking["n"]) {
-            y = u;
-            h -= u;
-        }
-        if (this.blocking["e"])
-            w -= u;
-        if (this.blocking["s"])
-            h -= u;
-        if (this.blocking["w"]) {
-            x = u;
-            w -= u;
-        }
-        this.initFull(sprite, x, w, y, h);
+        this.bbx1 = 0;
+        this.bbx2 = 1;
+        this.bby1 = 0;
+        this.bby2 = 1;
     }
 
     // Clone from another wall
