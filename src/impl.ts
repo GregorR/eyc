@@ -563,11 +563,8 @@ export async function eyc(
                    this.valueType.equals((<types.ArrayType> other).valueType, opts);
         }
 
-        default(opts?: types.DefaultValueOpts) {
-            if (opts && opts.build)
-                return "eyc.newArray(self.prefix)";
-            else
-                return "eyc.nil";
+        default() {
+            return "eyc.nil";
         }
 
         basicType() {
