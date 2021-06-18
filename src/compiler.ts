@@ -440,7 +440,7 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
 
                 } else {
                     // Bump the default x
-                    defaults.x = vals.x + vals.w;
+                    defaults.x = vals.x + vals.w * vals.frames;
 
                     // Scale
                     vals.x *= vals.factor;
