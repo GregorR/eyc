@@ -3,6 +3,7 @@ BE_SRC=\
 	src/core.json \
 	src/impl.ts \
 	src/parser.js \
+	src/serialize.ts \
 	src/types.ts \
 	be-license.js
 

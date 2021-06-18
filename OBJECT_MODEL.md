@@ -37,7 +37,9 @@ The default object is `null`, which is `eyc.nil`, not JavaScript's `null`.
 
 # Array
 
-Arrays are JavaScript Arrays. In addition, they have an `id` field, like objects.
+Arrays are JavaScript Arrays. In addition, they have an `id` field, like
+objects, and a `valueType` field, which stores the basic type of the array's
+elements as a string.
 
 The default array is `null`. Array fields in objects are initialzed to a new
 array, not `null`.
@@ -65,7 +67,10 @@ the tuple.
 
 # Maps
 
-Maps are stored as JavaScript Maps, with an `id`.
+Maps are stored as JavaScript Maps, with an `id`. For serializability, maps
+store the basic type of their keys and values as strings in the fields
+`keyType` and `valueType`. If the map is actually a set of tuples, then
+`keyType` is `"-set"` and `valueType` is the tuple type.
 
 The default map is `null`. Map fields in objects are initialized to a new map,
 not `null`.
@@ -73,7 +78,8 @@ not `null`.
 
 # Sets
 
-Sets are stored as JavaScript Sets, with an `id`.
+Sets are stored as JavaScript Sets, with an `id`. For serializability, maps
+store the basic type of their values as strings in the field `valueType`.
 
 The default set is `null`. Set fields in objects are initialized to a new set,
 not `null`.

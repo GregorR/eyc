@@ -72,6 +72,21 @@ export class Math : Root {
     }
 }
 
+export class Serialize : Root {
+    string serialize(Root x) {
+        return @js (x) { return eyc.serialize(x); } : string;
+    }
+
+    Root deserialize(string x) {
+        return @js (x) {
+            var ret = eyc.deserialize(x);
+            if (typeof ret !== "object" || !ret.types)
+                return eyc.nil;
+            return ret;
+        } : Root;
+    }
+}
+
 export class Console : Root {
     void log(string x) {
         @js (x) { console.log(x); } : void;

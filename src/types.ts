@@ -36,7 +36,7 @@ export interface EYC {
     urlEncode: (a1: string) => string;
 
     modules: Record<string, Module>;
-    Module: {new (url: string, absoluteUrl: string, ctx: ModuleCtx): Module};
+    Module: {new (url: string, version: string, absoluteUrl: string, ctx: ModuleCtx): Module};
 
     resources: Record<string, Resource>;
 
@@ -67,6 +67,7 @@ export interface EYC {
     TupleType: {new (of: Type[]): TupleType};
     MapType: {new (keyType: Type, valueType: Type): MapType};
     SetType: {new (valueType: Type): SetType};
+    NullType: {new (): NullType};
     PrimitiveType: {new (of: string, defaultVal: string): PrimitiveType};
 
     // Singletons for singleton types
@@ -75,7 +76,7 @@ export interface EYC {
     boolType: PrimitiveType;
     suggestionType: PrimitiveType;
     voidType: PrimitiveType;
-    nullType: PrimitiveType;
+    nullType: NullType;
 
     Method: {
         new (klass: EYCClass, name: string, mutating: boolean,
@@ -91,8 +92,8 @@ export interface EYC {
     methodTables: Record<string, Record<string, CompiledFunction>>;
 
     // Other heap types
-    Map: {new (prefix: string, copy?: Iterable<[unknown, unknown]>): EYCMap};
-    Set: {new (prefix: string, copy?: Iterable<unknown>): EYCSet};
+    Map: {new (prefix: string, keyType: string, valueType: string, copy?: Iterable<[unknown, unknown]>): EYCMap};
+    Set: {new (prefix: string, valueType: string, copy?: Iterable<unknown>): EYCSet};
     Suggestion(prefix: string, suggestions: SuggestionStep[], append?: SuggestionStep[]): Suggestion;
 
     // Enforce suggestions
@@ -100,6 +101,10 @@ export interface EYC {
 
     // Convert a tuple to a string
     tupleStr(tuple: Tuple): string;
+
+    // Serialization
+    serialize(val: any): string;
+    deserialize(val: string, loadModules: boolean): any;
 
     // Cloners
     clone: {
@@ -154,6 +159,9 @@ export interface Module extends TypeLike {
 
     // The URL used to identify this module
     url: string;
+
+    // The version loaded
+    version: string;
 
     // The actual full URL fetched
     absoluteUrl: string;
@@ -252,11 +260,16 @@ export interface EYCClass extends TypeLike {
     name: string;
     prefix: string;
     parents: EYCClass[];
+
+    // All methods/fields
     methodTypes: Record<string, Method>;
     fieldTypes: Record<string, Type>;
+
+    // Own methods/fields
     methods: Record<string, CompiledFunction>;
     fieldNames: Record<string, string>;
     fieldInits: Record<string, CompiledFunction>;
+    ownFieldTypes: Record<string, Type>;
 
     subtypeOf(other: EYCClass): boolean;
 }
@@ -279,6 +292,7 @@ export interface Type extends TypeLike {
     isType: boolean;
     isNullable: boolean;
     default(opts?: DefaultValueOpts): string;
+    basicType(): string;
 }
 
 export interface EYCObjectType extends Type {
@@ -307,6 +321,10 @@ export interface SetType extends Type {
     valueType: Type;
 }
 
+export interface NullType extends Type {
+    isNull: boolean;
+}
+
 export interface PrimitiveType extends Type {
     isPrimitive: boolean;
     defaultVal: string;
@@ -317,11 +335,11 @@ export interface PrimitiveType extends Type {
  * actually objects, but are immutable and don't have ID's, so don't fit into
  * this category */
 export interface EYCHeapThing {
+    prefix: string;
     id: string;
 }
 
 export interface EYCObject extends EYCHeapThing {
-    prefix: string;
     type: Record<string, boolean>;
     types: string[];
     methods: Record<string, CompiledFunction>; // Manifested object with methods on it
@@ -334,11 +352,22 @@ export interface EYCObject extends EYCHeapThing {
     // Objects also have fields, mangled so they can't possibly interfere
 }
 
-export type EYCArray = EYCHeapThing & unknown[];
-export type EYCMap = EYCHeapThing & Map<unknown, unknown>;
-export type EYCSet = EYCHeapThing & Set<unknown>;
+export interface EYCArray extends EYCHeapThing, Array<unknown> {
+    valueType: string;
+}
 
-export type Suggestion = EYCHeapThing & SuggestionStep[];
+export interface EYCMap extends EYCHeapThing, Map<unknown, unknown> {
+    keyType: string;
+    valueType: string;
+}
+
+export interface EYCSet extends EYCHeapThing, Set<unknown> {
+    valueType: string;
+}
+
+export interface Suggestion extends EYCHeapThing, Array<SuggestionStep> {
+    suggestion: boolean;
+}
 
 export interface SuggestionStep {
     action: string; // e for extend, r for retract, m for method call

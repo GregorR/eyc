@@ -8,6 +8,7 @@ const sha1 = require("sha1");
 import * as compiler from "./compiler";
 import * as coreJSON from "./core.json";
 import * as lexNum from "./lexnum";
+import * as ser from "./serialize";
 import * as types from "./types";
 
 function idCmp(left: types.EYCHeapThing, right: types.EYCHeapThing) {
@@ -168,6 +169,7 @@ export async function eyc(
         isTypeLike: boolean;
         isModule: boolean;
         url: string;
+        version: string;
         absoluteUrl: string;
         prefix: string;
         ctx: types.ModuleCtx;
@@ -179,11 +181,12 @@ export async function eyc(
         soundsets: Record<string, types.Soundset>;
         fabrics: Record<string, types.Fabric>;
 
-        constructor(url: string, absoluteUrl: string, ctx: types.ModuleCtx) {
+        constructor(url: string, version: string, absoluteUrl: string, ctx: types.ModuleCtx) {
             this.type = "module";
             this.isTypeLike = true;
             this.isModule = true;
             this.url = url;
+            this.version = version;
             this.absoluteUrl = absoluteUrl;
             this.prefix = "$" + eyc.urlEncode(url);
             this.ctx = ctx;
@@ -458,6 +461,7 @@ export async function eyc(
         methods: Record<string, types.CompiledFunction>;
         fieldNames: Record<string, string>;
         fieldInits: Record<string, types.CompiledFunction>;
+        ownFieldTypes: Record<string, types.Type>;
 
         constructor(module: types.Module, name: string) {
             this.type = "class";
@@ -470,11 +474,12 @@ export async function eyc(
             // Types of all methods and fields
             this.methodTypes = Object.create(null);
             this.fieldTypes = Object.create(null);
+            this.fieldNames = Object.create(null);
 
             // Own methods and fields
             this.methods = Object.create(null);
-            this.fieldNames = Object.create(null);
             this.fieldInits = Object.create(null);
+            this.ownFieldTypes = Object.create(null);
 
             eyc.classes[this.prefix] = this;
             module.classes[name] = this;
@@ -514,6 +519,8 @@ export async function eyc(
         }
 
         equals(other: types.TypeLike, opts: types.TypeEqOpts = {}) {
+            if (opts.castable && other.isNull)
+                return true;
             if (!other.isObject)
                 return false;
             if (opts.castable)
@@ -526,6 +533,10 @@ export async function eyc(
 
         default() {
             return "eyc.nil";
+        }
+
+        basicType() {
+            return "object";
         }
     },
     ArrayType: class implements types.ArrayType {
@@ -546,6 +557,8 @@ export async function eyc(
         }
 
         equals(other: types.TypeLike, opts: types.TypeEqOpts = {}) {
+            if (opts.castable && other.isNull)
+                return true;
             return other.isArray &&
                    this.valueType.equals((<types.ArrayType> other).valueType, opts);
         }
@@ -555,6 +568,10 @@ export async function eyc(
                 return "eyc.newArray(self.prefix)";
             else
                 return "eyc.nil";
+        }
+
+        basicType() {
+            return "array(" + this.valueType.basicType() + ")";
         }
     },
     TupleType: class implements types.TupleType {
@@ -589,6 +606,10 @@ export async function eyc(
         default(opts?: types.DefaultValueOpts) {
             return "[" + this.valueTypes.map(x => x.default(opts)).join(",") + "]";
         }
+
+        basicType() {
+            return "tuple(" + this.valueTypes.map(x => x.basicType()).join(",") + ")";
+        }
     },
     MapType: class implements types.MapType {
         type: string;
@@ -610,6 +631,8 @@ export async function eyc(
         }
 
         equals(other: types.TypeLike, opts: types.TypeEqOpts = {}) {
+            if (opts.castable && other.isNull)
+                return true;
             if (!other.isMap) return false;
             const otherMap = <types.MapType> other;
             return this.keyType.equals(otherMap.keyType, opts) &&
@@ -618,9 +641,15 @@ export async function eyc(
 
         default(opts?: types.DefaultValueOpts) {
             if (opts && opts.build)
-                return "new eyc.Map(self.prefix)";
+                return "new eyc.Map(self.prefix," +
+                    JSON.stringify(this.keyType.type) + "," +
+                    JSON.stringify(this.valueType.type) + ")";
             else
                 return "eyc.nil";
+        }
+
+        basicType() {
+            return "map(" + this.keyType.basicType() + "," + this.valueType.basicType() + ")";
         }
     },
     SetType: class implements types.SetType {
@@ -641,6 +670,8 @@ export async function eyc(
         }
 
         equals(other: types.TypeLike, opts: types.TypeEqOpts = {}) {
+            if (opts.castable && other.isNull)
+                return true;
             return other.isSet &&
                    this.valueType.equals((<types.SetType> other).valueType, opts);
         }
@@ -648,12 +679,46 @@ export async function eyc(
         default(opts?: types.DefaultValueOpts) {
             if (opts && opts.build) {
                 if (this.valueType.isTuple)
-                    return "new eyc.Map(self.prefix)";
+                    return 'new eyc.Map(self.prefix,"set","tuple")';
                 else
-                    return "new eyc.Set(self.prefix)";
+                    return "new eyc.Set(self.prefix," +
+                        JSON.stringify(this.valueType.type) + ")";
             } else {
                 return "eyc.nil";
             }
+        }
+
+        basicType() {
+            return "set(" + this.valueType.basicType() + ")";
+        }
+    },
+    NullType: class implements types.NullType {
+        type: string;
+        isTypeLike: boolean;
+        isType: boolean;
+        isNull: boolean;
+        isNullable: boolean;
+
+        constructor() {
+            this.type = "null";
+            this.isTypeLike = true;
+            this.isType = true;
+            this.isNull = true;
+            this.isNullable = true;
+        }
+
+        equals(other: types.TypeLike, opts: types.TypeEqOpts = {}) {
+            if (opts.castable || opts.subtype)
+                return other.isType && (<types.Type> other).isNullable;
+            return (this === other);
+        }
+
+        default() {
+            return "eyc.nil";
+        }
+
+        basicType() {
+            return "null";
         }
     },
     PrimitiveType: class implements types.PrimitiveType {
@@ -681,6 +746,10 @@ export async function eyc(
 
         default() {
             return this.defaultVal;
+        }
+
+        basicType() {
+            return this.type;
         }
     },
 
@@ -890,21 +959,31 @@ export async function eyc(
 
     // Maps with an ID
     Map: class extends Map<unknown, unknown> implements types.EYCMap {
+        prefix: string;
         id: string;
+        keyType: string;
+        valueType: string;
 
-        constructor(prefix: string, copy?: Iterable<[unknown, unknown]>) {
+        constructor(prefix: string, keyType: string, valueType: string, copy?: Iterable<[unknown, unknown]>) {
             super(copy);
-            this.id = (prefix||"map") + "$" + eyc.freshId();
+            this.prefix = prefix = prefix || "map";
+            this.id = prefix + "$" + eyc.freshId();
+            this.keyType = keyType;
+            this.valueType = valueType;
         }
     },
 
     // Sets with an ID
     Set: class extends Set<unknown> implements types.EYCSet {
+        prefix: string;
         id: string;
+        valueType: string;
 
-        constructor(prefix: string, copy?: Iterable<unknown>) {
+        constructor(prefix: string, valueType: string, copy?: Iterable<unknown>) {
             super(copy);
-            this.id = (prefix||"set") + "$" + eyc.freshId();
+            this.prefix = prefix = prefix || "set";
+            this.id = prefix + "$" + eyc.freshId();
+            this.valueType = valueType;
         }
     },
 
@@ -915,7 +994,9 @@ export async function eyc(
             ret = <types.Suggestion> suggestions.concat(append);
         else
             ret = <types.Suggestion> suggestions.slice(0);
-        ret.id = (prefix||"suggestion") + "$" + eyc.freshId();
+        ret.prefix = prefix = prefix || "suggestion";
+        ret.id = prefix + "$" + eyc.freshId();
+        ret.suggestion = true;
         return ret;
     },
 
@@ -957,6 +1038,15 @@ export async function eyc(
     // Convert a tuple to a string
     tupleStr,
 
+    // Serialization
+    serialize: function(val) {
+        return ser.serialize(eyc, val);
+    },
+
+    deserialize: function(val, loadModules) {
+        return ser.deserialize(eyc, val, loadModules);
+    },
+
     // Cloners
     clone: {
         object: function(o, caller) {
@@ -983,12 +1073,12 @@ export async function eyc(
 
         map: function(m, caller) {
             if (m === eyc.nil) return m;
-            return new eyc.Map(caller.prefix, m);
+            return new eyc.Map(caller.prefix, m.keyType, m.valueType, m);
         },
 
         set: function(s, caller) {
             if (s === eyc.nil) return s;
-            return new eyc.Set(caller.prefix, s);
+            return new eyc.Set(caller.prefix, s.valueType, s);
         }
     },
 
@@ -1023,14 +1113,13 @@ export async function eyc(
 
     };
 
+    eyc.nullType = new eyc.NullType();
     eyc.numType = new eyc.PrimitiveType("num", "0");
     eyc.stringType = new eyc.PrimitiveType("string", '""');
     eyc.boolType = new eyc.PrimitiveType("bool", "false");
     eyc.suggestionType = new eyc.PrimitiveType("suggestion", "eyc.nil");
     eyc.suggestionType.isNullable = true;
     eyc.voidType = new eyc.PrimitiveType("void", "void 0");
-    eyc.nullType = new eyc.PrimitiveType("null", "eyc.nil");
-    eyc.nullType.isNullable = true;
 
     if (!opts.noImportCore)
         await eyc.importModule("/core", {text: eyc.core, ctx: {privileged: true}});

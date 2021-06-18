@@ -39,7 +39,7 @@ export async function importModule(eyc: types.EYC, url: string,
     }
 
     // Make the output module for it
-    const module = new eyc.Module(url, url + ".eyc", opts.ctx || {privileged: false});
+    const module = new eyc.Module(url, "1.0", url + ".eyc", opts.ctx || {privileged: false});
 
     // Parse it
     let parsed;
@@ -733,11 +733,12 @@ function resolveFieldDeclTypes(eyc: types.EYC, classType: types.EYCClass, fieldD
     // Then assign that type to each declaration
     for (const decl of fieldDecl.children.decls.children) {
         const name = decl.children.id.children.text;
+        const iname = classType.prefix + "$" + name;
         if (name in classType.methodTypes || name in classType.fieldTypes) {
             // Invalid declaration!
             throw new EYCTypeError(fieldDecl, "Declaration of name that already exists in this type");
         }
-        classType.fieldTypes[name] = decl.ctype = fieldType;
+        classType.fieldTypes[name] = classType.ownFieldTypes[iname] = decl.ctype = fieldType;
         classType.fieldNames[name] = classType.prefix + "$" + name;
     }
 }
@@ -1103,12 +1104,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             break;
 
         case "EqExp":
-            if (!leftType.equals(rightType, {castable: true})) {
-                // Special case if the left or right type *is* null
-                if (!(leftType.isNullable && rightType.isNull) &&
-                    !(leftType.isNull && rightType.isNullable))
-                    throw new EYCTypeError(exp, "Incomparable types");
-            }
+            if (!leftType.equals(rightType, {castable: true}))
+                throw new EYCTypeError(exp, "Incomparable types");
             resType = eyc.boolType;
             break;
 
@@ -2607,11 +2604,14 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
 
                 case "array":
                 {
+                    const arrayType = <types.ArrayType> exp.ctype;
                     const tmp = state.allocateTmp();
 
                     out = "(" +
                         tmp + "=[]," +
+                        tmp + ".prefix=self.prefix," +
                         tmp + '.id=self.prefix+"$"+eyc.freshId(),' +
+                        tmp + ".valueType=" + JSON.stringify(arrayType.valueType.basicType()) + "," +
                         tmp + ")";
 
                     state.postExp += tmp + "=0;\n";
@@ -2621,17 +2621,27 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
                 }
 
                 case "map":
-                    out = "(new eyc.Map(self.prefix))";
+                {
+                    const mapType = <types.MapType> exp.ctype;
+                    out = "(new eyc.Map(self.prefix," +
+                        JSON.stringify(mapType.keyType.basicType()) + "," +
+                        JSON.stringify(mapType.valueType.basicType()) + "))";
                     break;
+                }
 
                 case "set":
-                    if ((<types.SetType> exp.ctype).valueType.isTuple) {
+                {
+                    const setType = <types.SetType> exp.ctype;
+                    if (setType.valueType.isTuple) {
                         // Sets of tuples are stored as maps
-                        out = "(new eyc.Map(self.prefix))";
+                        out = '(new eyc.Map(self.prefix,"-set",' +
+                            JSON.stringify(setType.valueType.basicType()) + "))";
                     } else {
-                        out = "(new eyc.Set(self.prefix))";
+                        out = "(new eyc.Set(self.prefix," +
+                            JSON.stringify(setType.valueType.basicType()) + "))";
                     }
                     break;
+                }
 
                 default:
                     throw new EYCTypeError(exp, "No compiler for new " + exp.ctype.type);
@@ -2782,12 +2792,15 @@ function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbol
 
         case "ArrayLiteral":
         {
+            const arrayType = <types.ArrayType> exp.ctype;
             const arrayTmp = state.allocateTmp();
             const out = "(" +
                 arrayTmp + "=[" +
                 exp.children.elements.children.map((c: types.Tree) => compileExpression(eyc, state, symbols, c)).join(",") +
                 "]," +
+                arrayTmp + ".prefix=self.prefix," +
                 arrayTmp + '.id=self.prefix+"$"+eyc.freshId(),' +
+                arrayTmp + ".valueType=" + JSON.stringify(arrayType.valueType.basicType()) + "," +
                 arrayTmp + ")";
             state.postExp += arrayTmp + "=0;\n";
             state.freeTmp(arrayTmp);
