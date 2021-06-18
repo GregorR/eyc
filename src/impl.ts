@@ -453,6 +453,7 @@ export async function eyc(
         type: string;
         isTypeLike: boolean;
         isClass: boolean;
+        module: types.Module;
         name: string;
         prefix: string;
         parents: types.EYCClass[];
@@ -467,6 +468,7 @@ export async function eyc(
             this.type = "class";
             this.isTypeLike = true;
             this.isClass = true;
+            this.module = module;
             this.name = name;
             this.prefix = module.prefix + "$" + name;
             this.parents = [];

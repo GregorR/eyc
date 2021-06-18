@@ -249,6 +249,7 @@ export interface TypeLike extends EYCElement {
 
 export interface EYCClass extends TypeLike {
     isClass: boolean;
+    module: Module;
     name: string;
     prefix: string;
     parents: EYCClass[];

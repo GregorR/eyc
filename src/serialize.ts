@@ -5,19 +5,23 @@ import * as types from "./types";
 export function serialize(eyc: types.EYC, val: any) {
     const szd = <any[]> [];
 
-    // First element of the serialization array is metadata
-    const moduleIds = Object.keys(eyc.modules).sort();
-    szd.push([
-        "M",
-        ["modules", moduleIds.map(id => {
-            const module = eyc.modules[id];
-            return [module.url, module.version];
-        })]
-    ]);
+    /* First element of the serialization array is metadata. We'll replace it
+     * with its serialized form at the end */
+    szd.push({"modules": Object.create(null)});
 
     // Then the objects
     const mapping = <Record<string, number>> Object.create(null);
     ser(eyc, szd, mapping, val);
+
+    // Serialize the metadata
+    const meta = szd[0];
+    szd[0] = [
+        "M",
+        ["modules", Object.keys(meta.modules).sort().map(id => {
+            const module = eyc.modules[id];
+            return [module.url, module.version];
+        })]
+    ];
 
     return "@EYCSer\n" + JSON.stringify(szd);
 }
@@ -113,10 +117,11 @@ function serializeObject(eyc: types.EYC, szd: any[], mapping: Record<string, num
     const ret: any[] = ["o", val.prefix, val.types];
     szd.push(ret);
 
-    // Get all the fields
+    // Get all the modules and fields
     let fields: string[] = [];
     for (const klassId in val.type) {
         const klass = eyc.classes[klassId];
+        szd[0].modules[klass.module.url] = true;
         fields = fields.concat(Object.keys(klass.fieldInits));
     }
     fields = fields.sort();
