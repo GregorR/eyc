@@ -153,18 +153,21 @@ function serializeTuple(eyc: types.EYC, szd: any[], mapping: Record<string, numb
 function serializeMap(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCMap) {
     const ret: any[] = ["m"];
     szd.push(ret);
-    
     ret.push(ser(eyc, szd, mapping, val.prefix));
-    ret.push(ser(eyc, szd, mapping, val.keyType));
-    ret.push(ser(eyc, szd, mapping, val.valueType));
 
     if (val.keyType === "-set") {
         // Special case for sets of tuples
+        ret[0] = "s";
+        ret.push(ser(eyc, szd, mapping, val.valueType));
+
         let values: any[] = Array.from(val.values()).sort(eyc.cmp.tuple);
         for (const v of values)
             ret.push(ser(eyc, szd, mapping, v));
         return;
     }
+
+    ret.push(ser(eyc, szd, mapping, val.keyType));
+    ret.push(ser(eyc, szd, mapping, val.valueType));
 
     // Add each element
     const keys: any[] = Array.from(val.keys()).sort(eyc.cmp[val.keyType]);
@@ -267,23 +270,16 @@ function resolveType(eyc: types.EYC, szd: any[], types: string[], idx: number) {
             return types[idx] = "object";
 
         case "a":
-            return types[idx] = "array(" + (szd[el[2]] + "") + ")";
+            return types[idx] = "array(" + szd[el[2]] + ")";
 
         case "t":
             return resolveTuple(eyc, szd, types, idx);
 
         case "m":
-        {
-            const keyType = szd[el[2]] + "";
-            const valueType = szd[el[3]] + "";
-            if (keyType === "-set")
-                return types[idx] = "set(" + valueType + ")";
-            else
-                return types[idx] = "map(" + keyType + "," + valueType + ")";
-        }
+            return types[idx] = "map(" + szd[el[2]] + "," + szd[el[3]] + ")";
 
         case "s":
-            return types[idx] = "set(" + (szd[el[2]] + "") + ")";
+            return types[idx] = "set(" + szd[el[2]] + ")";
 
         default:
             throw new Error;
@@ -418,18 +414,6 @@ function manifestMap(eyc: types.EYC, szd: any[], ret: any[], types: string[], id
     const valueType = manifest(eyc, szd, ret, types, el[3]) + "";
     const map = ret[idx] = new eyc.Map(prefix, keyType, valueType);
 
-    // Special case for sets of tuples
-    if (keyType === "-set") {
-        for (let i = 4; i < el.length; i++) {
-            const vidx = el[i];
-            if (!equiv(resolveType(eyc, szd, types, vidx), valueType))
-                throw new Error;
-            const v = manifest(eyc, szd, ret, types, vidx);
-            map.set(eyc.tupleStr(v), v);
-        }
-        return map;
-    }
-
     for (let i = 4; i < el.length; i++) {
         const kv = el[i];
         const kidx = kv[0];
@@ -448,6 +432,20 @@ function manifestSet(eyc: types.EYC, szd: any[], ret: any[], types: string[], id
     const el = szd[idx];
     const prefix = szd[el[1]] + "";
     const valueType = szd[el[2]] + "";
+
+    // Special case for sets of tuples
+    if (valueType.slice(0, 5) === "tuple") {
+        const map = ret[idx] = new eyc.Map(prefix, "-set", valueType);
+        for (let i = 3; i < el.length; i++) {
+            const vidx = el[i];
+            if (!equiv(resolveType(eyc, szd, types, vidx), valueType))
+                throw new Error;
+            const v = manifest(eyc, szd, ret, types, vidx);
+            map.set(eyc.tupleStr(v), v);
+        }
+        return map;
+    }
+
     const set = ret[idx] = new eyc.Set(prefix, valueType);
 
     for (let i = 3; i < el.length; i++) {
