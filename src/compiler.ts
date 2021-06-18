@@ -2799,10 +2799,18 @@ function compileAssignmentExpression(eyc: types.EYC, state: MethodCompilationSta
             case "set":
             {
                 const setTmp = state.allocateTmp();
-                const out = "(" +
-                    setTmp + "=" + sub(left) + "," +
-                    setTmp + ".add(" + sub(right) + ")," +
-                    setTmp + ")";
+                let out = "(" +
+                    setTmp + "=" + sub(left) + ",";
+
+                // Special case for sets of tuples
+                if (left.ctype.valueType.isTuple) {
+                    const valTmp = state.allocateTmp();
+                    out += valTmp + "=" + sub(right) + "," +
+                        setTmp + ".set(eyc.tupleStr(" + valTmp + ")," + valTmp + "),";
+                } else {
+                    out += setTmp + ".add(" + sub(right) + "),";
+                }
+                out += setTmp + ")";
                 state.postExp += setTmp + "=0;\n";
                 state.freeTmp(setTmp);
                 return out;
