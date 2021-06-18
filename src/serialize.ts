@@ -323,11 +323,17 @@ function manifest(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: 
         case "a":
             return manifestArray(eyc, szd, ret, types, idx);
 
+        case "t":
+            return manifestTuple(eyc, szd, ret, types, idx);
+
         case "m":
             return manifestMap(eyc, szd, ret, types, idx);
 
         case "s":
             return manifestSet(eyc, szd, ret, types, idx);
+
+        default:
+            throw new Error;
     }
 }
 
@@ -394,6 +400,15 @@ function manifestArray(eyc: types.EYC, szd: any[], ret: any[], types: string[], 
     }
 
     return arr;
+}
+
+function manifestTuple(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
+    const el = szd[idx];
+    const tup = ret[idx] = new Array(el.length - 1);
+
+    for (let i = 0; i < tup.length; i++)
+        tup[i] = manifest(eyc, szd, ret, types, el[i+1]);
+    return tup;
 }
 
 function manifestMap(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
