@@ -307,8 +307,8 @@ primary
      return new Tree("NewExp", location(), {prefix: a, type: b, withBlock: c});
  }
     // This has to come before ID so that we'll try this form first
- / clone a:expression b:block? {
-     return new Tree("CloneExp", location(), {expression: a, withBlock: b});
+ / a:idLike && {return a === "clone";} b:expression c:block? {
+     return new Tree("CloneExp", location(), {expression: b, withBlock: c});
  }
  / super "(" white a:argList? ")" white { return new Tree("SuperCall", location(), {args: a}); }
  / this { return new Tree("This", location(), {}); }
@@ -454,7 +454,6 @@ as = a:idLike & {return a === "as";}
 bool = a:idLike & {return a === "bool";}
 caller = a:idLike & {return a === "caller";}
 class = a:idLike & {return a === "class";}
-clone = a:idLike & {return a === "clone";}
 else = a:idLike & {return a === "else";}
 export = a:idLike & {return a === "export";}
 extend = a:idLike & {return a === "extend";}
