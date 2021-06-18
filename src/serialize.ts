@@ -114,8 +114,11 @@ function ser(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: a
 }
 
 function serializeObject(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCObject) {
-    const ret: any[] = ["o", val.prefix, val.types];
+    const ret: any[] = ["o"];
     szd.push(ret);
+
+    ret.push(ser(eyc, szd, mapping, val.prefix));
+    ret.push(val.types.map(x => ser(eyc, szd, mapping, x)));
 
     // Get all the modules and fields
     let fields: string[] = [];
@@ -128,13 +131,14 @@ function serializeObject(eyc: types.EYC, szd: any[], mapping: Record<string, num
 
     // Serialize them
     for (const field of fields)
-        ret.push([field, ser(eyc, szd, mapping, val[field])]);
+        ret.push([ser(eyc, szd, mapping, field), ser(eyc, szd, mapping, val[field])]);
 }
 
 function serializeArray(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCArray) {
-    const ret: any[] = ["a", val.prefix, val.valueType];
+    const ret: any[] = ["a"];
     szd.push(ret);
-
+    ret.push(ser(eyc, szd, mapping, val.prefix));
+    ret.push(ser(eyc, szd, mapping, val.valueType));
     for (const v of val)
         ret.push(ser(eyc, szd, mapping, v));
 }
@@ -142,14 +146,17 @@ function serializeArray(eyc: types.EYC, szd: any[], mapping: Record<string, numb
 function serializeTuple(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.Tuple) {
     const ret: any[] = ["t"];
     szd.push(ret);
-
     for (const v of val)
         ret.push(ser(eyc, szd, mapping, v));
 }
 
 function serializeMap(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCMap) {
-    const ret: any[] = ["m", val.prefix, val.keyType, val.valueType];
+    const ret: any[] = ["m"];
     szd.push(ret);
+    
+    ret.push(ser(eyc, szd, mapping, val.prefix));
+    ret.push(ser(eyc, szd, mapping, val.keyType));
+    ret.push(ser(eyc, szd, mapping, val.valueType));
 
     if (val.keyType === "-set") {
         // Special case for sets of tuples
@@ -171,9 +178,10 @@ function serializeMap(eyc: types.EYC, szd: any[], mapping: Record<string, number
 }
 
 function serializeSet(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCSet) {
-    const ret: any[] = ["s", val.prefix, val.valueType];
+    const ret: any[] = ["s"];
     szd.push(ret);
-
+    ret.push(ser(eyc, szd, mapping, val.prefix));
+    ret.push(ser(eyc, szd, mapping, val.valueType));
     const values: any[] = Array.from(val.values()).sort(eyc.cmp[val.valueType]);
     for (const v of values)
         ret.push(ser(eyc, szd, mapping, v));
@@ -259,19 +267,23 @@ function resolveType(eyc: types.EYC, szd: any[], types: string[], idx: number) {
             return types[idx] = "object";
 
         case "a":
-            return types[idx] = "array(" + szd[idx][2] + ")";
+            return types[idx] = "array(" + (szd[el[2]] + "") + ")";
 
         case "t":
             return resolveTuple(eyc, szd, types, idx);
 
         case "m":
-            if (el[2] === "-set")
-                return types[idx] = "set(" + el[3] + ")";
+        {
+            const keyType = szd[el[2]] + "";
+            const valueType = szd[el[3]] + "";
+            if (keyType === "-set")
+                return types[idx] = "set(" + valueType + ")";
             else
-                return types[idx] = "map(" + el[2] + "," + el[3] + ")";
+                return types[idx] = "map(" + keyType + "," + valueType + ")";
+        }
 
         case "s":
-            return types[idx] = "set(" + el[2] + ")";
+            return types[idx] = "set(" + (szd[el[2]] + "") + ")";
 
         default:
             throw new Error;
@@ -323,10 +335,11 @@ function manifestObject(eyc: types.EYC, szd: any[], ret: any[], types: string[],
     const el = szd[idx];
 
     // 1: Create the object base
-    const obj = ret[idx] = new eyc.Object(el[1]);
+    const obj = ret[idx] = new eyc.Object(manifest(eyc, szd, ret, types, el[1]) + "");
 
     // 2: Get as much of its type as we're aware of
-    for (const type of el[2]) {
+    for (const typeIdx of el[2]) {
+        const type = szd[typeIdx] + "";
         if (eyc.classes[type])
             obj.types.push(type);
     }
@@ -343,7 +356,7 @@ function manifestObject(eyc: types.EYC, szd: any[], ret: any[], types: string[],
 
     // 5: Set fields
     for (const pair of el.slice(3)) {
-        const fid = pair[0];
+        const fid = szd[pair[0]] + "";
         const vidx = pair[1];
 
         if (!(fid in fieldTypes)) {
@@ -366,10 +379,10 @@ function manifestObject(eyc: types.EYC, szd: any[], ret: any[], types: string[],
 
 function manifestArray(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
     const el = szd[idx];
-    const subType = el[2];
+    const subType = szd[el[2]];
     const arr = ret[idx] = <types.EYCArray> new Array(el.length - 3);
-    arr.prefix = el[1];
-    arr.id = el[1] + "$" + eyc.freshId();
+    const prefix = arr.prefix = szd[el[1]] + "";
+    arr.id = prefix + "$" + eyc.freshId();
     arr.valueType = subType;
 
     // Manifest each value in the array
@@ -385,9 +398,10 @@ function manifestArray(eyc: types.EYC, szd: any[], ret: any[], types: string[], 
 
 function manifestMap(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
     const el = szd[idx];
-    const keyType = el[2];
-    const valueType = el[3];
-    const map = ret[idx] = new eyc.Map(el[1], keyType, valueType);
+    const prefix = manifest(eyc, szd, ret, types, el[1]) + "";
+    const keyType = manifest(eyc, szd, ret, types, el[2]) + "";
+    const valueType = manifest(eyc, szd, ret, types, el[3]) + "";
+    const map = ret[idx] = new eyc.Map(prefix, keyType, valueType);
 
     // Special case for sets of tuples
     if (keyType === "-set") {
@@ -417,8 +431,9 @@ function manifestMap(eyc: types.EYC, szd: any[], ret: any[], types: string[], id
 
 function manifestSet(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
     const el = szd[idx];
-    const valueType = el[2];
-    const set = ret[idx] = new eyc.Set(el[1], valueType);
+    const prefix = szd[el[1]] + "";
+    const valueType = szd[el[2]] + "";
+    const set = ret[idx] = new eyc.Set(prefix, valueType);
 
     for (let i = 3; i < el.length; i++) {
         const vidx = el[i];
