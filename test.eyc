@@ -17,20 +17,16 @@ alias core.*;
 
 import /eatyourcontroller.com/basics;
 
-export sprites Sprites foob.png {
-    default (w=16, h=16, s=16);
-    murryo (0, 0, h=32);
-}
+export sprites foob.png as Sprites;
 
-export sounds Sounds foob.opus {
-    music;
-}
+export sounds foob.opus as Sounds;
 
 export fabric Level foob.txt;
 
 export main class Test : Stage {
     override mutating void init() {
         //super();
+
         num i;
         for (i = 0; i < 10; i++) {
             Object o = new TestObject {

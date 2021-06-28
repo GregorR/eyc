@@ -553,5 +553,6 @@ export class Playing : Object {
 }
 
 export class InputState : Root {
+    set(string) pressed;
     bool up, down, left, right, north, south, east, west;
 }

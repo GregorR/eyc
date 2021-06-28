@@ -14,9 +14,11 @@ const EYC = require("./eyc-dbg.js");
     x.extend(emodule.main.klass.prefix);
     x.methods.$$core$Stage$init(eyc, x, eyc.nil);
     for (let i = 0; i < 1024; i++) {
-        let a = process.hrtime();
+        //let a = process.hrtime();
         x.methods.$$core$Stage$tick(eyc, x, eyc.nil);
+        /*
         let b = process.hrtime(a);
         console.log(b);
+        */
     }
 })();

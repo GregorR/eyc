@@ -25,8 +25,7 @@ declaration
  / importDecl
  / aliasDecl
  / classDecl
- / spriteSheetDecl
- / soundDecl
+ / dataDecl
  / fabricDecl
  / prefixDecl
 
@@ -70,6 +69,14 @@ asClause
 aliasDecl
  = a:exportClause? alias b:name c:asClause? ";" white { return new Tree("AliasDecl", location(), {exportClause: a, name: b, asClause: c}); }
  / alias a:name ".*" white ";" white { return new Tree("AliasStarDecl", location(), {name: a}); }
+
+dataDecl
+ = a:exportClause? b:idLike & {return b === "sprites" || b === "sounds";} c:package d:asClause? ";" white {
+     return new Tree("ExternDataDecl", location(), {exportClause: a, kind: b, url: c, asClause: d});
+ }
+ / a:exportClause? b:idLike & {return b === "data";} c:name d:id e:block {
+     return new Tree("DataDecl", location(), {exportClause: a, type: c, id: d, withBlock: e});
+ }
 
 spriteSheetDecl
  = a:exportClause? b:idLike & {return b === "sprites";} c:id d:package "{" white e:sprite* "}" white {
