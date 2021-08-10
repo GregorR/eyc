@@ -4,7 +4,7 @@ Copyright (c) 2020, 2021 Gregor Richards;
  * Basic components required for many 2D games
  */
 
-license (
+license ISC (
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
 copyright notice and this permission notice appear in all copies.
@@ -47,10 +47,13 @@ export class Wall : ObjectSprite {
         this.blocking = new {
             if (blocking == "") {
                 // All directions
-                this["n"] = this["s"] = this["e"] = this["w"] = true;
+                this += "n";
+                this += "e";
+                this += "s";
+                this += "w";
             } else {
                 for (string b in blocking)
-                    this[b] = true;
+                    this += b;
             }
         };
     }

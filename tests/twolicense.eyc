@@ -1,5 +1,5 @@
 Copyright (c) 2021 Gregor Richards;
-license a;
-license b;
+license a a;
+license b b;
 
 import /core;

@@ -1,5 +1,5 @@
 Copyright (c) 2020, 2021 Gregor Richards;
-license (
+license ISC (
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
 copyright notice and this permission notice appear in all copies.
@@ -17,9 +17,11 @@ alias core.*;
 
 import /eatyourcontroller.com/basics;
 
+/*
 export sprites foob.png as Sprites;
 
 export sounds foob.opus as Sounds;
+*/
 
 export fabric Level foob.txt;
 

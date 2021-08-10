@@ -106,7 +106,8 @@ Booleans are JavaScript booleans. The default boolean is `false`.
 Suggestions are the most unique and sophisticated type in EYC.
 
 A suggestion is an array of actions, each of which comes in one of three forms:
-an extension, a retraction, or a method call. Suggestions are stored as arrays.
+an extension, a retraction, or a method call. Suggestions are stored as arrays,
+with an additional `id` field.
 
 Each suggestion action is an object, with a form dependent on which type of
 action.

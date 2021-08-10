@@ -2,7 +2,7 @@ Copyright (c) 2020, 2021 Gregor Richards;
 
 /* The core EYC library */
 
-license (
+license ISC (
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
 copyright notice and this permission notice appear in all copies.
@@ -291,7 +291,7 @@ export class Stage : Root {
                 tuple(num, num) xy = tuple(x, y);
                 if (!(xy in this.tiles))
                     this.tiles[xy] = new;
-                this.tiles[xy][o] = true;
+                this.tiles[xy] += o;
             }
         }
     }

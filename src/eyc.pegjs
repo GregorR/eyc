@@ -36,7 +36,7 @@ copyrightDecl
    { return new Tree("CopyrightDecl", location(), {not: a, text: c}); }
 
 licenseDecl
- = a:idLike & {return a === "license";} b:textBlock ";" white { return new Tree("LicenseDecl", location(), {text: b}); }
+ = a:idLike & {return a === "license";} b:idLike c:textBlock ";" white { return new Tree("LicenseDecl", location(), {id: b, text: c}); }
 
 textBlock
  = a:(a:[^();]+ { return a.join(""); } / textBlockParens)* { return a.join(""); }

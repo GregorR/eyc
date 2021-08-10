@@ -429,7 +429,8 @@ function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.Spritesh
                     }
 
                     // Now get the actual value out of the value
-                    av = Function("return " + compileExpression(eyc, null, {}, av))();
+                    //av = Function("return " + compileExpression(eyc, null, {}, av))();
+                    throw new Error;
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     (<any> vals)[an] = av;
                 }
@@ -545,7 +546,8 @@ function resolveSoundSetDeclTypes(eyc: types.EYC, soundsDecl: types.SoundsetNode
                     }
 
                     // Now get the actual value out of the value
-                    av = Function("return " + compileExpression(eyc, null, {}, av))();
+                    //av = Function("return " + compileExpression(eyc, null, {}, av))();
+                    throw new Error;
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     (<any> vals)[an] = av;
 
@@ -1527,9 +1529,16 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
             if (!ctx.mutatingThis)
                 throw new EYCTypeError(exp, "Illegal mutation");
 
-            // Only this[...] = ... is allowed
-            if (opts.mutating || (!ctx.mutating && exp.children.expression.type !== "This"))
-                throw new EYCTypeError(exp, "Illegal mutation");
+            if (!ctx.mutating) {
+                // Only this[...] = ... is allowed
+                if (opts.mutating || exp.children.expression.type !== "This")
+                    throw new EYCTypeError(exp, "Illegal mutation");
+            }
+
+            // Set elements aren't really things, so they're not mutable
+            const subExpType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
+            if (subExpType.isSet)
+                throw new EYCTypeError(exp, "Sets cannot be modified with assignment");
 
             break;
         }
@@ -1552,6 +1561,22 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
                     throw new EYCTypeError(exp, "Illegal mutation");
             }
 
+            break;
+        }
+
+        case "This":
+        {
+            if (!opts.mutating)
+                throw new EYCTypeError(exp, "Illegal mutation");
+
+            const thisType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp);
+            if (thisType.isPrimitive)
+                throw new EYCTypeError(exp, "Illegal mutating");
+
+            /* This is the only circumstance under which modifying 'this' is
+             * valid: this is a set, and this += or this -= */
+            if (!ctx.mutatingThis)
+                throw new EYCTypeError(exp, "Illegal mutation");
             break;
         }
 
@@ -1741,7 +1766,7 @@ function compileModule(eyc: types.EYC, module: types.Module) {
     for (const c of module.parsed.children) {
         switch (c.type) {
             case "ClassDecl":
-                compileClassDecl(eyc, c, symbols);
+                new ClassCompilationState(eyc, symbols, c).go();
                 break;
 
             case "CopyrightDecl":
@@ -1762,1410 +1787,1698 @@ function compileModule(eyc: types.EYC, module: types.Module) {
     }
 }
 
-// Compile this class
-function compileClassDecl(eyc: types.EYC, classDecl: types.Tree, symbols: Record<string, string>) {
-    for (const c of classDecl.children.members.children) {
-        switch (c.type) {
-            case "MethodDecl":
-                compileMethodDecl(eyc, c, symbols);
-                break;
+// State while compiling a class
+class ClassCompilationState {
+    klass: types.EYCClass;
 
-            case "FieldDecl":
-                compileFieldDecl(eyc, c);
-                break;
+    constructor(public eyc: types.EYC, public symbols: Record<string, string>,
+                public decl: types.ClassNode) {
+        this.klass = decl.klass;
+    }
 
-            default:
-                throw new EYCTypeError(c, "No compiler for " + c.type);
+    go() {
+        for (const c of this.decl.children.members.children) {
+            switch (c.type) {
+                case "MethodDecl":
+                    new MethodCompilationState(this, c).go();
+                    break;
+
+                case "FieldDecl":
+                    compileFieldDecl(this, c);
+                    break;
+
+                default:
+                    throw new EYCTypeError(c, "No compiler for " + c.type);
+            }
         }
     }
+}
+
+// An SSA node
+class SSA {
+    target: string;
+    skip: boolean;
+    uses: number;
+    lastUse: number;
+    ex: any;
+    stmts: string[];
+    expr: string;
+
+    constructor(public ctx: types.Tree, public type: string,
+                public idx: number, public a1: number = -1,
+                public a2: number = -1) {
+        this.target = "$" + this.idx;
+        this.skip = false;
+        this.uses = 0;
+        this.lastUse = idx;
+        this.ex = null;
+        this.stmts = [];
+        this.expr = "";
+    }
+
+    // Mark this as used by another SSA node
+    use(idx: number) {
+        if (idx > this.lastUse)
+            this.lastUse = idx;
+    }
+
+    /* Get an expression for an *argument* of this SSA node. Will pluck the
+     * expression into the current node if nothing else between them is
+     * outlined */
+    arg(ir: SSA[], num: number = 1, tryInline: boolean = true) {
+        const a = (num === 2) ? this.a2 : this.a1;
+        const ssa = ir[a];
+        if (!tryInline || ssa.uses > 1)
+            return ssa.target;
+
+        // Try to inline it
+        let inline = true;
+        for (let i = a + 1; i < this.idx; i++) {
+            if (!ir[i].skip) {
+                inline = false;
+                break;
+            }
+        }
+        if (inline) {
+            const ssa = ir[a];
+            ssa.skip = true;
+            return ssa.expr;
+        }
+        return ssa.target;
+    }
+}
+
+// A (partially) compiled L-expression
+interface LExp {
+    assg: SSA;
+    val: SSA;
+    patch: (number)=>void;
 }
 
 // State while compiling a method
 class MethodCompilationState {
-    method: types.MethodNode;
-    varCt: number;
-    outDecls: string[];
-    halfFreeTmps: string[];
-    freeTmps: string[];
-    outCode: string;
-    postExp: string;
+    vars: string[];
+    varCtr: number;
 
-    constructor(method: types.MethodNode) {
-        this.method = method;
-        this.varCt = 0;
-        this.outDecls = [];
-        this.halfFreeTmps = [];
-        this.freeTmps = [];
-        this.outCode = "";
-        this.postExp = "";
+    constructor(public ccs: ClassCompilationState,
+                public decl: types.MethodNode) {
+        this.vars = [];
+        this.varCtr = 0;
     }
 
-    allocateVar(nm: string, init?: string) {
-        nm += "$" + (this.varCt++);
-        if (init)
-            init = "=" + init;
-        else
-            init = "";
-        this.outDecls.push(nm + init);
-        return nm;
-    }
+    go() {
+        const ir: SSA[] = [];
+        const symbols: Record<string, string> = Object.create(null);
 
-    allocateTmp() {
-        if (this.freeTmps.length)
-            return this.freeTmps.shift();
-        else
-            return this.allocateVar("");
-    }
-
-    freeTmp(nm: string) {
-        this.halfFreeTmps.push(nm);
-    }
-
-    flushPost() {
-        this.outCode += this.postExp;
-        this.postExp = "";
-        this.freeTmps = this.freeTmps.concat(this.halfFreeTmps);
-        this.halfFreeTmps = [];
-    }
-}
-
-// Compile this method
-function compileMethodDecl(eyc: types.EYC, methodDecl: types.MethodNode, symbols: Record<string, string>) {
-    const klass = methodDecl.parent.klass;
-    symbols = Object.create(symbols);
-
-    const state = new MethodCompilationState(methodDecl);
-
-    // Start with the parameters
-    const params: string[] = ["eyc", "self", "caller"];
-    if (methodDecl.children.params) {
-        for (const param of methodDecl.children.params.children) {
-            const nm = param.children.id.children.text;
-            const stateNm = nm + "$" + (state.varCt++);
-            symbols[nm] = stateNm;
-            params.push(stateNm);
+        // Figure out the parameters
+        const params: string[] = ["eyc", "self", "caller"];
+        if (this.decl.children.params) {
+            for (const param of this.decl.children.params.children) {
+                const nm = param.children.id.children.text;
+                const jsnm = "arg$$" + nm;
+                params.push(jsnm);
+                symbols[nm] = jsnm;
+            }
         }
+
+        // Compile to SSA
+        this.compileSSA(ir, symbols, this.decl.children.body);
+
+        // Compile to fragments
+        this.compileFrag(ir);
+
+        // And compile to JS
+        //console.error(this.compileJS(ir, this.decl.signature.retType));
+        this.ccs.klass.methods[this.decl.signature.id] = <types.CompiledFunction>
+            Function(params.join(","),
+                this.compileJS(ir, this.decl.signature.retType));
     }
-    const paramsStr = params.join(",");
 
-    // Then compile the function into JavaScript
-    compileStatement(eyc, state, symbols, methodDecl.children.body);
+    compileSSA(ir: SSA[], symbols: Record<string, string>, node: types.Tree): number {
+        switch (node.type) {
+            case "Block":
+            {
+                const s2 = Object.create(symbols);
+                let last = ir.length;
+                for (const c of node.children)
+                    last = this.compileSSA(ir, s2, c);
+                return last;
+            }
 
-    // And compile the JavaScript
-    const js =
-        (state.outDecls.length ? "var " + state.outDecls.join(",") + ";\n" : "") +
-        state.outCode +
-        (methodDecl.signature.retType.isVoid ? "" : "return " + methodDecl.signature.retType.default() + ";\n");
-    //console.log(methodDecl.ctype.id + "(" + params + "):\n" + js + "---");
-    klass.methods[methodDecl.signature.id] = <types.CompiledFunction> Function(paramsStr, js);
-}
+            case "VarDecl":
+            {
+                // Go over each decl
+                for (const d of node.children.decls.children) {
+                    // Make a variable for it
+                    const id = d.children.id.children.text;
+                    const jsnm = id + "$" + (this.varCtr++);
+                    this.vars.push(jsnm);
 
-// Compile a FieldDecl
-function compileFieldDecl(eyc: types.EYC, fieldDecl: types.Tree) {
-    const type = <types.Type> fieldDecl.ctype;
-    console.assert(type.isType);
-    const klass = (<types.ClassNode> fieldDecl.parent).klass;
+                    // And initialize it
+                    let init: number;
+                    if (d.children.initializer) {
+                        // Explicit initializer
+                        init = this.compileSSA(ir, symbols, d.children.initializer);
+                    } else {
+                        // Implicit initializer
+                        init = ir.length;
+                        ir.push(new SSA(d, "default", ir.length));
+                    }
+                    const ssa = new SSA(d, "var-assign", ir.length, init);
+                    ssa.ex = jsnm;
+                    ir.push(ssa);
 
-    for (const d of fieldDecl.children.decls.children) {
-        const iname = klass.prefix + "$" + d.children.id.children.text;
-        let init;
-        if (d.children.initializer)
-            init = compileExpression(eyc, null, Object.create(null), d.children.initializer);
-        else
-            init = type.default({build: true});
-        klass.fieldInits[iname] = <types.CompiledFunction> Function("eyc", "self", "caller", "return " + init + ";");
-    }
-}
-
-// Compile a statement
-function compileStatement(eyc: types.EYC, state: MethodCompilationState, symbols: Record<string, string>, stmt: types.Tree) {
-    switch (stmt.type) {
-        case "Block":
-            symbols = Object.create(symbols);
-            for (const c of stmt.children)
-                compileStatement(eyc, state, symbols, c);
-            break;
-
-        case "VarDecl":
-            for (const d of stmt.children.decls.children) {
-                const name = d.children.id.children.text;
-                const sym = state.allocateVar(name);
-
-                if (d.children.initializer) {
-                    state.postExp = "";
-                    const init = compileExpression(eyc, state, symbols, d.children.initializer);
-                    state.outCode += sym + "=" + init + ";\n";
-                    state.flushPost();
-                } else {
-                    state.outCode += sym + "=" + d.ctype.default() + ";\n";
+                    symbols[id] = jsnm;
                 }
-
-                symbols[name] = sym;
-            }
-            break;
-
-        case "IfStatement":
-        {
-            // Condition
-            const tmp = state.allocateTmp();
-            state.postExp = "";
-            const condition = compileExpressionBool(eyc, state, symbols, stmt.children.condition);
-            state.outCode += tmp + "=" + condition + ";\n";
-            state.freeTmp(tmp);
-            state.flushPost();
-
-            // Body
-            state.outCode += "if(" + tmp + "){\n";
-            compileStatement(eyc, state, Object.create(symbols), stmt.children.ifStatement);
-
-            // Else clause
-            if (stmt.children.elseStatement) {
-                state.outCode += "}else{\n";
-                compileStatement(eyc, state, Object.create(symbols), stmt.children.elseStatement);
-            }
-
-            // Cleanup
-            state.outCode += "}\n";
-            break;
-        }
-
-        case "ForStatement":
-        {
-            symbols = Object.create(symbols);
-
-            // Initializer
-            if (stmt.children.initializer) {
-                if (stmt.children.initializer.type === "VarDecl") {
-                    compileStatement(eyc, state, symbols, stmt.children.initializer);
-                } else {
-                    state.postExp = "";
-                    const init = compileExpression(eyc, state, symbols, stmt.children.initializer);
-                    state.outCode += init + ";\n";
-                    state.flushPost();
-                }
-            }
-
-            // Loop
-            state.outCode += "while(1){\n";
-
-            // Condition
-            if (stmt.children.condition) {
-                state.postExp = "";
-                const cond = compileExpression(eyc, state, symbols, stmt.children.condition);
-                state.outCode +=
-                    "if(!(" + cond + ")){\n" +
-                    state.postExp +
-                    "break;\n" +
-                    "}\n";
-                state.flushPost();
-            }
-
-            // Body
-            compileStatement(eyc, state, Object.create(symbols), stmt.children.body);
-
-            // Increment
-            if (stmt.children.increment) {
-                state.postExp = "";
-                const inc = compileExpression(eyc, state, symbols, stmt.children.increment);
-                state.outCode +=
-                    inc + ";\n";
-                state.flushPost();
-            }
-
-            state.outCode += "}\n";
-            break;
-        }
-
-        case "ForInStatement":
-        {
-            symbols = Object.create(symbols);
-
-            // Get the collection code
-            state.postExp = "";
-            const collection = compileExpression(eyc, state, symbols, stmt.children.collection);
-
-            // Convert it to an iterable array
-            const tmpCollection = state.allocateTmp(),
-                tmpIterator = state.allocateTmp(),
-                tmpLength = state.allocateTmp();
-            let arrayCode;
-            switch (stmt.children.collection.ctype.type) {
-                case "string":
-                case "array":
-                    arrayCode = collection;
-                    break;
-
-                case "set":
-                    arrayCode = "Array.from(" + collection + ".values()).sort(eyc.cmp." +
-                        stmt.children.collection.ctype.valueType.type +
-                        ")";
-                    break;
-
-                default:
-                    throw new EYCTypeError(stmt, "Cannot iterate over " + stmt.children.collection.ctype.type);
-            }
-            state.outCode +=
-                tmpCollection + "=" + arrayCode + ";\n" +
-                tmpLength + "=" + tmpCollection + ".length;\n";
-            state.flushPost();
-
-            // Allocate the iterator
-            let iterator;
-            if (stmt.children.type) {
-                const name = stmt.children.id.children.text;
-                iterator = symbols[name] = state.allocateVar(name);
-            } else {
-                iterator = symbols[stmt.children.id.children.text];
-            }
-
-            // Get the loop header
-            if (stmt.children.reverse) {
-                state.outCode +=
-                    "for(" + tmpIterator + "=" + tmpLength + "-1;" + tmpIterator + ">=0;" + tmpIterator + "--){\n";
-            } else {
-                state.outCode +=
-                    "for(" + tmpIterator + "=0;" + tmpIterator + "<" + tmpLength + ";" + tmpIterator + "++){\n";
-            }
-            state.outCode +=
-                iterator + "=" + tmpCollection + "[" + tmpIterator + "];\n";
-
-            // Then the loop body
-            compileStatement(eyc, state, symbols, stmt.children.body);
-
-            // End the loop
-            state.outCode += "}\n";
-
-            // And clear everything up
-            state.outCode +=
-                tmpCollection + "=0;\n";
-            state.freeTmp(tmpCollection);
-            state.freeTmp(tmpIterator);
-            state.freeTmp(tmpLength);
-
-            break;
-        }
-
-        case "ForInMapStatement":
-        {
-            const collectionNode = stmt.children.collection;
-
-            if (collectionNode.ctype.isString || collectionNode.ctype.isArray) {
-                // Special form for strings and arrays
-
-                // Allocate variables
-                symbols = Object.create(symbols);
-                if (stmt.children.keyType)
-                    symbols[stmt.children.key.children.text] = state.allocateVar(stmt.children.key.children.text);
-                if (stmt.children.valueType)
-                    symbols[stmt.children.value.children.text] = state.allocateVar(stmt.children.value.children.text);
-
-                // Get the thing we're iterating over
-                const arrayTmp = state.allocateTmp();
-                state.postExp = "";
-                state.outCode +=
-                    arrayTmp + "=" +
-                    compileExpression(eyc, state, symbols, collectionNode) +
-                    ";\n";
-                state.flushPost();
-
-                // Initializer
-                state.outCode +=
-                    symbols[stmt.children.key.children.text] + "=0;\n" +
-                    symbols[stmt.children.value.children.text] + "=0;\n";
-
-                // Loop
-                const lv = symbols[stmt.children.key.children.text];
-                const vv = symbols[stmt.children.value.children.text];
-                state.outCode += "for(" + lv + "=0;" + lv + "<" + arrayTmp + ".length;" + lv + "++){\n" +
-                    vv + "=" + arrayTmp + "[" + lv + ']||"";\n';
-
-                // Body
-                compileStatement(eyc, state, Object.create(symbols), stmt.children.body);
-
-                state.outCode += "}\n";
                 break;
             }
 
-            console.assert(collectionNode.ctype.isMap);
+            case "IfStatement":
+            {
+                // Condition
+                const cond = this.compileSSA(ir, symbols, node.children.condition);
+                const bool = new SSA(node,
+                    "bool-from-" + node.children.condition.ctype.type,
+                    ir.length, cond);
+                ir.push(bool);
+                const iff = new SSA(node, "if", ir.length, bool.idx);
+                ir.push(iff);
 
-            // FIXME: Maps with tuple keys
-            symbols = Object.create(symbols);
+                // Then branch
+                this.compileSSA(ir, Object.create(symbols), node.children.ifStatement);
+                ir.push(new SSA(node, "fi", ir.length, iff.idx));
 
-            // Get the collection code
-            state.postExp = "";
-            const collection = compileExpression(eyc, state, symbols, collectionNode);
-
-            // Convert it to an iterable array
-            const tmpCollection = state.allocateTmp(),
-                tmpKeys = state.allocateTmp(),
-                tmpIterator = state.allocateTmp(),
-                tmpLength = state.allocateTmp();
-            state.outCode +=
-                tmpCollection + "=" + collection + ";\n" +
-                tmpKeys + "=Array.from(" + tmpCollection + ".keys()).sort(eyc.cmp." +
-                    stmt.children.collection.ctype.keyType.type +
-                    ");\n" +
-                tmpLength + "=" + tmpKeys + ".length;\n";
-            state.flushPost();
-
-            // Allocate the iterator(s)
-            let keyIterator;
-            if (stmt.children.keyType) {
-                const name = stmt.children.key.children.text;
-                keyIterator = symbols[name] = state.allocateVar(name);
-            } else {
-                keyIterator = symbols[stmt.children.key.children.text];
-            }
-            let valIterator;
-            if (stmt.children.valueType) {
-                const name = stmt.children.value.children.text;
-                valIterator = symbols[name] = state.allocateVar(name);
-            } else {
-                valIterator = symbols[stmt.children.value.children.text];
+                // Else branch if applicable
+                if (node.children.elseStatement) {
+                    ir.push(new SSA(node, "else", ir.length, iff.idx));
+                    this.compileSSA(ir, Object.create(symbols), node.children.elseStatement);
+                    ir.push(new SSA(node, "esle", ir.length, iff.idx));
+                }
+                break;
             }
 
-            // Get the loop header
-            if (stmt.children.reverse) {
-                state.outCode +=
-                    "for(" + tmpIterator + "=" + tmpLength + "-1;" + tmpIterator + ">=0;" + tmpIterator + "--){\n";
-            } else {
-                state.outCode +=
-                    "for(" + tmpIterator + "=0;" + tmpIterator + "<" + tmpLength + ";" + tmpIterator + "++){\n";
+            case "ForStatement":
+            {
+                const s2 = Object.create(symbols);
+
+                // Initialize
+                if (node.children.initializer)
+                    this.compileSSA(ir, s2, node.children.initializer);
+
+                // Begin the loop
+                const loop = new SSA(node, "loop", ir.length);
+                ir.push(loop);
+
+                // Condition
+                if (node.children.condition) {
+                    const c = this.compileSSA(ir, s2, node.children.condition);
+                    const cf = new SSA(node, "not-" + node.children.condition.ctype.type, ir.length, c);
+                    ir.push(cf);
+                    ir.push(new SSA(node, "break", ir.length, cf.idx));
+                }
+
+                // Body
+                this.compileSSA(ir, s2, node.children.body);
+
+                // Increment
+                if (node.children.increment)
+                    this.compileSSA(ir, s2, node.children.increment);
+
+                // And loop
+                ir.push(new SSA(node, "pool", ir.length, loop.idx));
+                break;
             }
-            state.outCode +=
-                keyIterator + "=" + tmpKeys + "[" + tmpIterator + "];\n" +
-                valIterator + "=" + tmpCollection + ".has(" + keyIterator + ")?" +
-                    tmpCollection + ".get(" + keyIterator + "):" +
-                    stmt.children.collection.ctype.valueType.default() +
-                    ";\n";
 
-            if (stmt.children.collection.ctype.keyType.isTuple) {
-                state.outCode +=
-                    keyIterator + "=" + valIterator + ".key;\n" +
-                    valIterator + "=" + valIterator + ".value;\n";
-            }
+            case "ForInStatement":
+            {
+                // FIXME: reverse
+                // First, get what we're looping over
+                const coll = this.compileSSA(ir, symbols, node.children.collection);
 
-            // Then the loop body
-            compileStatement(eyc, state, symbols, stmt.children.body);
+                // Possibly declare the variable
+                const s2 = Object.create(symbols);
+                if (node.children.type) {
+                    const nm = node.children.id.children.text;
+                    const jsnm = nm + "$" + (this.varCtr++);
+                    this.vars.push(jsnm);
+                    s2[nm] = jsnm;
+                }
 
-            // End the loop
-            state.outCode += "}\n";
+                // How to loop over it depends on the type
+                let loopHead: SSA;
+                switch (node.children.collection.ctype.type) {
+                    case "array":
+                        loopHead = new SSA(node, "for-in-array", ir.length, coll);
+                        ir.push(loopHead);
+                        break;
 
-            // And clear everything up
-            state.outCode +=
-                tmpCollection + "=0;\n" +
-                tmpKeys + "=0;\n";
-            state.freeTmp(tmpCollection);
-            state.freeTmp(tmpKeys);
-            state.freeTmp(tmpIterator);
-            state.freeTmp(tmpLength);
+                    case "set":
+                    {
+                        let op: string;
 
-            break;
-        }
-
-        case "ReturnStatement":
-            if (stmt.children.value) {
-                state.postExp = "";
-                const exp = compileExpression(eyc, state, symbols, stmt.children.value);
-                state.outCode += "return " + exp + ";\n";
-                state.flushPost();
-            } else {
-                state.outCode += "return;\n";
-            }
-            break;
-
-        case "ExtendStatement":
-        case "RetractStatement":
-        {
-            state.postExp = "";
-            const exp = stmt.children.expression;
-            console.assert(exp.type === "CastExp");
-            const expCode = compileExpression(eyc, state, symbols, exp.children.expression);
-            const type = exp.children.type.ctype.instanceOf.prefix;
-            state.outCode += expCode + "." +
-                (stmt.type==="ExtendStatement"?"extend":"retract") +
-                "(" + JSON.stringify(type) + ");\n";
-            state.flushPost();
-            break;
-        }
-
-        case "ExpStatement":
-        {
-            state.postExp = "";
-            const exp = compileExpression(eyc, state, symbols, stmt.children.expression);
-            state.outCode += exp + ";\n";
-            state.flushPost();
-            break;
-        }
-
-        default:
-            throw new EYCTypeError(stmt, "No compiler for " + stmt.type);
-    }
-}
-
-// Compile an expression
-function compileExpression(eyc: types.EYC, state: MethodCompilationState, symbols: Record<string, string>, exp: types.Tree): string {
-    function sub(e: string) {
-        return compileExpression(eyc, state, symbols, exp.children[e]);
-    }
-
-    function subb(e: string) {
-        return compileExpressionBool(eyc, state, symbols, exp.children[e]);
-    }
-
-    switch (exp.type) {
-        case "OrExp":
-        case "AndExp":
-            return "(" + subb("left") + exp.children.op + subb("right") + ")";
-
-        case "EqExp":
-        {
-            const op = exp.children.op + "=";
-            if (exp.children.left.ctype.isTuple)
-                throw new EYCTypeError(exp, "Equality comparison of tuples is not yet implemented");
-
-            return "(" + sub("left") + op + sub("right") + ")";
-        }
-
-        case "AssignmentExp":
-            return compileAssignmentExpression(eyc, state, symbols, exp);
-
-        case "RelExp":
-            if (exp.children.op === "in") {
-                const tmp = state.allocateTmp();
-                let out = "(" +
-                    tmp + "=" + sub("left") + ",";
-
-                const rightType = exp.children.right.ctype;
-                switch (rightType.type) {
-                    case "map":
-                        if (rightType.keyType.isTuple) {
-                            // string->special object instead of tuple->*
-                            out += sub("right") + ".has(eyc.tupleStr(" + tmp + "))";
+                        // Special case for sets of tuples
+                        if ((<types.SetType> node.children.collection.ctype).valueType.isTuple) {
+                            op = "set-tuple-values-array";
                         } else {
-                            out += sub("right") + ".has(" + tmp + ")";
+                            op = "set-values-array";
                         }
+
+                        const loopArr = new SSA(node, op, ir.length, coll);
+                        ir.push(loopArr);
+                        loopHead = new SSA(node, "for-in-array", ir.length, loopArr.idx);
+                        ir.push(loopHead);
+                        break;
+                    }
+
+                    case "string":
+                        loopHead = new SSA(node, "for-in-string", ir.length, coll);
+                        ir.push(loopHead);
                         break;
 
                     default:
-                        throw new EYCTypeError(exp, "No compiler for in " + exp.children.right.ctype.type);
+                        throw new EYCTypeError(node, "No compiler for for-in " + node.children.collection.ctype.type);
                 }
+                loopHead.ex = s2[node.children.id.children.text];
 
-                out += ")";
+                // Then the body
+                this.compileSSA(ir, s2, node.children.body);
 
-                state.postExp += tmp + "=0;\n";
-                state.freeTmp(tmp);
-                return out;
+                // Then end it
+                ir.push(new SSA(node, "ni-rof", ir.length, loopHead.idx));
+                break;
+            }
 
-            } else if (exp.children.op === "is") {
-                return "(!!" + sub("left") + ".type." + exp.children.right.ctype.prefix + ")";
+            case "ForInMapStatement":
+            {
+                // FIXME: reverse
+                // First, get what we're looping over
+                const coll = this.compileSSA(ir, symbols, node.children.collection);
 
-            } else {
-                const ltype = exp.children.left.ctype;
-                let op = exp.children.op;
-                if (op === "==")
-                    op = "===";
-                else if (op === "!=")
-                    op = "!==";
-
-                if (ltype.isNullable) {
-                    // Compare ID's
-                    return "(" + sub("left") + ".id" + op + sub("right") + ".id)";
-
-                } else if (ltype.isTuple) {
-                    throw new EYCTypeError(exp, "No compiler for comparisons for tuples");
-
-                } else {
-                    return "(" + sub("left") + op + sub("right") + ")";
-
+                // Possibly declare the variable
+                const s2 = Object.create(symbols);
+                if (node.children.keyType) {
+                    const nm = node.children.key.children.text;
+                    const jsnm = nm + "$" + (this.varCtr++);
+                    this.vars.push(jsnm);
+                    s2[nm] = jsnm;
                 }
-
-            }
-
-        case "AddExp":
-        case "MulExp":
-        {
-            const types = exp.children.left.ctype.type + ":" + exp.children.right.ctype.type;
-            switch (types) {
-                case "num:num":
-                    return "(" + sub("left") + exp.children.op + sub("right") + ")";
-
-                case "string:string":
-                    return "(" + sub("left") + exp.children.op + sub("right") + ")";
-
-                case "suggestion:suggestion":
-                    console.assert(exp.children.op === "+");
-                    return "(eyc.Suggestion(self.prefix," + sub("left") + "," + sub("right") + "))";
-
-                default:
-                    throw new EYCTypeError(exp, "No compiler for AddExp(" + types + ")");
-            }
-        }
-
-        case "UnExp":
-            switch (exp.children.op) {
-                case "-":
-                    return "(-" + subb("expression") + ")";
-
-                case "!":
-                    return "(!" + subb("expression") + ")";
-
-                default:
-                    throw new EYCTypeError(exp, "No UnExp compiler for " + exp.children.op);
-            }
-            break;
-
-        case "PostIncExp":
-        case "PostDecExp":
-            return compileIncDecExpression(eyc, state, symbols, exp, true);
-
-        case "CastExp":
-            if (exp.ctype.isString) {
-                // Coerce to a string
-                const from = exp.children.expression.ctype;
-                if (from.isNullable)
-                    return "(" + sub("expression") + ".id)";
-                else if (from.isTuple)
-                    return "(eyc.tupleStr(" + sub("expression") + "))";
-                else
-                    return '(""+' + sub("expression") + ")";
-
-            } else {
-                // This is only meaningful for types
-                return sub("expression");
-
-            }
-
-        case "CallExp":
-        {
-            // This depends on a lot of steps
-            const left = exp.children.expression;
-            const leftLeft = left.children.expression;
-            let lhs = null;
-            let out = "(";
-
-            // 1: Compute the leftLeft
-            if (leftLeft.ctype.isObject) {
-                lhs = state.allocateTmp();
-                out += lhs + "=" + compileExpression(eyc, state, symbols, leftLeft) + ",";
-            }
-
-            // 2: Compute arguments
-            const argTmps = [];
-            if (exp.children.args) {
-                for (const a of exp.children.args.children) {
-                    const argTmp = state.allocateTmp();
-                    argTmps.push(argTmp);
-                    out += argTmp + "=" + compileExpression(eyc, state, symbols, a) + ",";
+                if (node.children.valueType) {
+                    const nm = node.children.value.children.text;
+                    const jsnm = nm + "$" + (this.varCtr++);
+                    this.vars.push(jsnm);
+                    s2[nm] = jsnm;
                 }
-            }
+                const keyNm = s2[node.children.key.children.text];
+                const valNm = s2[node.children.value.children.text];
 
-            // 3: Call target
-            switch (leftLeft.ctype.type) {
-                case "object":
-                    out += lhs + ".methods." + left.ctype.id + "?" + lhs + ".methods." + left.ctype.id + "(eyc," + lhs + ",self";
-                    break;
+                // How to loop over it depends on the type
+                let loopHead: SSA;
+                const ctype = node.children.collection.ctype.type;
+                switch (ctype) {
+                    case "array":
+                    case "string":
+                    {
+                        // Loop over the indices
+                        loopHead = new SSA(node, "for-in-" + ctype + "-idx", ir.length, coll);
+                        loopHead.ex = keyNm;
+                        ir.push(loopHead);
 
-                case "class":
-                    out += "eyc.classes." + leftLeft.ctype.prefix + ".methods." + left.ctype.id + "(eyc,eyc.nil,self";
-                    break;
+                        // Then extract the values
+                        const varr = new SSA(node, "var", ir.length);
+                        varr.ex = keyNm;
+                        ir.push(varr);
+                        const getter = new SSA(node.children.value, ctype + "-index",
+                            ir.length, coll, varr.idx);
+                        ir.push(getter);
+                        const setter = new SSA(node, "var-assign", ir.length, getter.idx);
+                        setter.ex = valNm;
+                        ir.push(setter);
 
-                default:
-                    throw new EYCTypeError(exp, "Cannot call method on " + leftLeft.ctype.type);
-            }
-
-            // 4: Actual arguments
-            for (const a of argTmps)
-                out += "," + a;
-            out += ")";
-
-            // 5: Default
-            if (leftLeft.ctype.isObject)
-                out += ":" + (<types.Type> exp.ctype).default();
-
-            // 6: Cleanup
-            if (lhs) {
-                // Cleanup
-                state.postExp += lhs + "=0;\n";
-                state.freeTmp(lhs);
-            }
-            for (const a of argTmps) {
-                state.postExp += a + "=0;\n";
-                state.freeTmp(a);
-            }
-
-            out += ")";
-
-            return out;
-        }
-
-        case "IndexExp":
-        {
-            const left = exp.children.expression;
-
-            switch (left.ctype.type) {
-                case "array":
-                {
-                    const tmpArray = state.allocateTmp(),
-                        tmpIdx = state.allocateTmp();
-
-                    const out = "(" +
-                        tmpArray + "=" + sub("expression") + "," +
-                        tmpIdx + "=" + sub("index") + "," +
-                        tmpIdx + " in " + tmpArray + "?" +
-                        tmpArray + "[" + tmpIdx + "]:" +
-                        (<types.Type> exp.ctype).default() +
-                        ")";
-
-                    state.postExp += tmpArray + "=0;\n";
-                    state.freeTmp(tmpArray);
-                    state.freeTmp(tmpIdx);
-
-                    return out;
-                }
-
-                case "tuple":
-                    return "(" + sub("expression") + "[" + exp.children.idx + "])";
-
-                case "map":
-                    // Simplest case: Non-tuple key, non-number value
-                    if (!left.ctype.keyType.isTuple && !exp.ctype.isNum) {
-                        // We can just pull it out directly with a default
-                        return "(" +
-                            sub("expression") +
-                            ".get(" + sub("index") +
-                            ")||" + (<types.Type> exp.ctype).default() +
-                            ")";
-
-                    } else if (left.ctype.keyType.isTuple) {
-                        // The key type is a tuple, so it's really string->special object
-                        const tmpMap = state.allocateTmp(),
-                            tmpKey = state.allocateTmp();
-                        const out = "(" +
-                            tmpMap + "=" + sub("expression") + "," +
-                            tmpKey + "=" + sub("index") + "," +
-                            "(" +
-                                tmpMap + ".get(eyc.tupleStr(" + tmpKey + "))" +
-                                "||{value:" + (<types.Type> exp.ctype).default() + "}" +
-                            ").value" +
-                            ")";
-                        state.postExp +=
-                            tmpMap + "=0;\n" +
-                            tmpKey + "=0;\n";
-                        state.freeTmp(tmpMap);
-                        state.freeTmp(tmpKey);
-                        return out;
-
-                    } else { // value type is number
-                        // This is slightly complicated because numbers have multiple falsey values
-                        const tmpMap = state.allocateTmp(),
-                            tmpKey = state.allocateTmp();
-                        const out = "(" +
-                            tmpMap + "=" + sub("expression") + "," +
-                            tmpKey + "=" + sub("index") + "," +
-                            tmpMap + ".has(" + tmpKey + ")?" +
-                            tmpMap + ".get(" + tmpKey + "):0)";
-                        state.postExp +=
-                            tmpMap + "=0;\n" +
-                            tmpKey + "=0;\n";
-                        state.freeTmp(tmpMap);
-                        state.freeTmp(tmpKey);
-                        return out;
-
+                        break;
                     }
 
-                case "set":
-                    return "(" + sub("expression") + ".has(" + sub("index") + "))";
+                    case "map":
+                    {
+                        // Special case for maps of tuples
+                        if ((<types.MapType> node.children.collection.ctype).keyType.isTuple) {
+                            throw new EYCTypeError(node, "No compiler for two-variable for-in map of tuple");
+                        }
 
-                case "string":
-                    return "(" +
-                        sub("expression") +
-                        "[" + sub("index") +
-                        ']||"")';
-                    break;
+                        const loopArr = new SSA(node.children.collection,
+                            "map-keys-array", ir.length, coll);
+                        ir.push(loopArr);
 
-                case "sprites":
-                    return "(" + JSON.stringify((<types.Spritesheet> left.ctype).prefix + "$") +
-                        "+" + sub("index") + ")";
+                        // Loop over the keys
+                        loopHead = new SSA(node, "for-in-array", ir.length, loopArr.idx);
+                        loopHead.ex = keyNm;
+                        ir.push(loopHead);
 
-                default:
-                    throw new EYCTypeError(exp, "No compiler for indexing " + left.ctype.type);
-            }
-        }
+                        // Then extract the values
+                        const varr = new SSA(node, "var", ir.length);
+                        varr.ex = keyNm;
+                        ir.push(varr);
+                        const getter = new SSA(node.children.value, "map-get",
+                            ir.length, coll, varr.idx);
+                        ir.push(getter);
+                        const setter = new SSA(node, "var-assign", ir.length, getter.idx);
+                        setter.ex = valNm;
+                        ir.push(setter);
+                        break;
+                    }
 
-        case "SuggestionExtendExp":
-        {
-            const subExp = sub("expression");
-            const sug = compileSuggestions(eyc, state, symbols, exp.children.suggestions);
-            return "(eyc.Suggestion(self.prefix," + subExp + "," + sug + "))";
-        }
+                    default:
+                        throw new EYCTypeError(node, "No compiler for two-variable for-in " + node.children.collection.ctype.type);
+                }
 
-        case "DotExp":
-        {
-            const left = exp.children.expression;
-            const name = exp.children.id.children.text;
-            const leftExp = sub("expression");
+                // Then the body
+                this.compileSSA(ir, s2, node.children.body);
 
-            switch (left.ctype.type) {
-                case "object":
-                    // Normal case, handled next
-                    break;
-
-                case "array":
-                    console.assert(name === "length");
-                    return "(" + leftExp + ".length)";
-
-                case "set":
-                    console.assert(name === "length");
-                    return "(" + leftExp + ".size)";
-
-                case "string":
-                    console.assert(name === "length");
-                    return "(" + leftExp + ".length)";
-
-                default:
-                    throw new EYCTypeError(exp, "No compiler for dot expression of " + left.ctype.type);
+                // Then end it
+                ir.push(new SSA(node, "ni-rof", ir.length, loopHead.idx));
+                break;
             }
 
-            const iname = left.ctype.instanceOf.fieldNames[name];
-
-            // Fix possibility of missing fields
-            if (exp.ctype.isNum) {
-                const tmp = state.allocateTmp();
-                const out = "(" + tmp + "=" + leftExp + "," +
-                    JSON.stringify(iname) + "in " + tmp + "?" +
-                    tmp + "." + iname + ":" +
-                    (<types.Type> exp.ctype).default() +
-                    ")";
-                state.postExp += tmp + "=0;\n";
-                state.freeTmp(tmp);
-                return out;
-
-            } else {
-                // All other types are either always truthy or falsey=default
-                return "(" + leftExp + "." + iname + "||" + (<types.Type> exp.ctype).default() + ")";
-
+            case "ReturnStatement":
+            {
+                const c = this.compileSSA(ir, symbols, node.children.value);
+                ir.push(new SSA(node, "return", ir.length, c));
+                break;
             }
-        }
 
-        case "SuggestionLiteral":
-        {
-            const sug = compileSuggestions(eyc, state, symbols, exp.children.suggestions);
-            return "(eyc.Suggestion(self.prefix," + sug + "))";
-        }
+            case "ExtendStatement":
+            case "RetractStatement":
+            {
+                const c = this.compileSSA(ir, symbols, node.children.expression.children.expression);
+                const ex = new SSA(node,
+                    (node.type === "RetractStatement") ? "retract" : "extend",
+                    ir.length, c);
+                ex.ex = node.children.expression.children.type.ctype;
+                ir.push(ex);
+                break;
+            }
 
-        case "NewExp":
-        {
-            let out;
-            switch (exp.ctype.type) {
-                case "object":
-                    out = "(new eyc.Object(self.prefix).extend(" + JSON.stringify((<types.EYCObjectType> exp.ctype).instanceOf.prefix) + "))";
-                    break;
+            case "ExpStatement":
+                return this.compileSSA(ir, symbols, node.children.expression);
 
-                case "array":
-                {
-                    const arrayType = <types.ArrayType> exp.ctype;
-                    const tmp = state.allocateTmp();
+            case "AssignmentExp":
+            {
+                const target = this.compileLExp(ir, symbols, node.children.target);
 
-                    out = "(" +
-                        tmp + "=[]," +
-                        tmp + ".prefix=self.prefix," +
-                        tmp + '.id=self.prefix+"$"+eyc.freshId(),' +
-                        tmp + ".valueType=" + JSON.stringify(arrayType.valueType.basicType()) + "," +
-                        tmp + ")";
+                // Special op case for sets
+                if (node.children.target.ctype.isSet && node.children.op !== "=") {
+                    const setType = <types.SetType> node.children.target.ctype;
 
-                    state.postExp += tmp + "=0;\n";
-                    state.freeTmp(tmp);
+                    // Adding or removing from a set
+                    let op = "";
+                    if (setType.valueType.isTuple) {
+                        if (node.children.op === "-=")
+                            op = "set-tuple-delete";
+                        else
+                            op = "set-tuple-add";
+                    } else {
+                        if (node.children.op === "-=")
+                            op = "set-delete";
+                        else
+                            op = "set-add";
+                    }
 
+                    const tv = target.val;
+                    tv.idx = ir.length;
+                    ir.push(tv);
+                    const value = this.compileSSA(ir, symbols, node.children.value);
+                    ir.push(new SSA(node, op, ir.length, tv.idx, value));
+                    return tv.idx;
+
+                } else if (node.children.target.ctype.isArray && node.children.op === "+=") {
+                    // And for array concatenation
+                    let op = "";
+                    if (node.children.target.ctype.equals(node.children.value.ctype)) {
+                        // array-array concatenation
+                        op = "array-concatenate";
+                    } else {
+                        // array-element append
+                        op = "array-append";
+                    }
+
+                    const tv = target.val;
+                    tv.idx = ir.length;
+                    ir.push(tv);
+                    const value = this.compileSSA(ir, symbols, node.children.value);
+                    ir.push(new SSA(node, op, ir.length, tv.idx, value));
+                    return tv.idx;
+
+                }
+
+                let value: number;
+
+                // Special case for non-= ops
+                if (node.children.op !== "=") {
+                    const l = node.children.target.ctype.type;
+                    const r = node.children.value.ctype.type;
+                    let op: string;
+                    switch (node.children.op) {
+                        case "*=": op = "mul"; break;
+                        case "/=": op = "div"; break;
+                        case "%=": op = "mod"; break;
+                        case "+=": op = "add"; break;
+                        case "-=": op = "sub"; break;
+                    }
+                    op = op + "-" + l + "-" + r;
+
+                    // Get the value of the left
+                    const tv = target.val;
+                    tv.idx = ir.length;
+                    ir.push(tv);
+
+                    // Then the value of the right
+                    const rv = this.compileSSA(ir, symbols, node.children.value);
+
+                    // Then put them together
+                    value = ir.length;
+                    const cv = new SSA(node, op, value, tv.idx, rv);
+                    cv.ex = node.children.op[0];
+                    ir.push(cv);
+                } else {
+                    value = this.compileSSA(ir, symbols, node.children.value);
+                }
+
+                // Finally, assign
+                target.patch(value);
+                target.assg.idx = ir.length;
+                ir.push(target.assg);
+                return value;
+            }
+
+            case "UnExp":
+            {
+                let type = "";
+                switch (node.children.op) {
+                    case "-": type = "neg"; break;
+                    case "!": type = "not"; break;
+                    default:
+                        throw new EYCTypeError(node, "No compiler for unary " + node.children.op);
+                }
+                const s = this.compileSSA(ir, symbols, node.children.expression);
+                ir.push(new SSA(node,
+                    type + "-" + node.children.expression.ctype.type,
+                    ir.length, s
+                ));
+                break;
+            }
+
+            case "OrExp":
+            case "AndExp":
+            {
+                // Because of short-circuiting, these need to be rewritten as conditions
+                const target = "$ss$" + (this.varCtr++);
+                this.vars.push(target);
+
+                // Left
+                const l = this.compileSSA(ir, symbols, node.children.left);
+
+                // Short circuit long case
+                let iff: SSA;
+                if (node.children.op === "||") {
+                    // Only pass if it's false
+                    const not = new SSA(node,
+                        "not-" + node.children.left.ctype.type, ir.length, l);
+                    ir.push(not);
+                    iff = new SSA(node, "if", ir.length, not.idx);
+                    ir.push(iff);
+
+                } else { // &&
+                    // Only pass if it's true
+                    const bool = new SSA(node,
+                        "bool-from-" + node.children.left.ctype.type,
+                        ir.length, l);
+                    ir.push(bool);
+                    iff = new SSA(node, "if", ir.length, bool.idx);
+                    ir.push(iff);
+
+                }
+
+                // Right
+                const r = this.compileSSA(ir, symbols, node.children.right);
+                const boolr = new SSA(node,
+                    "bool-from-" + node.children.right.ctype.type, ir.length,
+                    r);
+                ir.push(boolr);
+
+                // Set the result
+                const set = new SSA(node, "var-assign", ir.length, boolr.idx);
+                set.ex = target;
+                ir.push(set);
+
+                // Short circuit short case
+                ir.push(new SSA(node, "fi", ir.length, iff.idx));
+                ir.push(new SSA(node, "else", ir.length, iff.idx));
+                const booll = new SSA(node,
+                    "bool-from-" + node.children.left.ctype.type, ir.length,
+                    l);
+                ir.push(booll);
+                const set2 = new SSA(node, "var-assign", ir.length, booll.idx);
+                set2.ex = target;
+                ir.push(set2);
+                ir.push(new SSA(node, "esle", ir.length, iff.idx));
+
+                // And retrieve the value
+                const varr = new SSA(node, "var", ir.length);
+                varr.ex = target;
+                ir.push(varr);
+                break;
+            }
+
+            case "EqExp":
+            case "RelExp":
+            case "AddExp":
+            case "MulExp":
+            {
+                let op: string;
+                switch (node.children.op) {
+                    case "==": op = "eq"; break;
+                    case "!=": op = "ne"; break;
+                    case "<=": op = "le"; break;
+                    case "<": op = "lt"; break;
+                    case ">=": op = "ge"; break;
+                    case ">": op = "gt"; break;
+                    case "in": op = "in"; break;
+                    case "is": op = "is"; break;
+                    case "+": op = "add"; break;
+                    case "-": op = "sub"; break;
+                    case "*": op = "mul"; break;
+                    case "/": op = "div"; break;
+                    case "%": op = "mod"; break;
+                    default: throw new Error(node.children.op); // Should never be reached
+                }
+
+                const l = this.compileSSA(ir, symbols, node.children.left);
+                const r = this.compileSSA(ir, symbols, node.children.right);
+                ir.push(new SSA(node,
+                    op + "-" +
+                    node.children.left.ctype.type + "-" +
+                    node.children.right.ctype.type,
+                    ir.length, l, r
+                ));
+                break;
+            }
+
+            case "CastExp":
+            {
+                if (node.ctype.isString) {
+                    // An actual coercion
+                    const sub = this.compileSSA(ir, symbols, node.children.expression);
+                    ir.push(new SSA(node,
+                        "string-from-" + node.children.expression.ctype.type,
+                        ir.length, sub));
+                } else {
+                    // Just pass thru
+                    return this.compileSSA(ir, symbols, node.children.expression);
+                }
+                break;
+            }
+
+            case "PostIncExp":
+            case "PostDecExp":
+            {
+                // The target is written to
+                const target = this.compileLExp(ir, symbols, node.children.expression);
+
+                // Get the value
+                const tv = target.val;
+                tv.idx = ir.length;
+                ir.push(tv);
+
+                // Add/subtract one
+                const one = new SSA(node, "compile-time-literal", ir.length);
+                one.ex = "1";
+                ir.push(one);
+                const add = new SSA(node,
+                    (node.children.op === "--") ? "sub-num-num" : "add-num-num",
+                    ir.length, tv.idx, one.idx);
+                add.ex = (node.children.op === "--") ? "-" : "+";
+                ir.push(add);
+
+                // Assign it
+                target.patch(add.idx);
+                target.assg.idx = ir.length;
+                ir.push(target.assg);
+
+                // Result is *pre* value
+                return tv.idx;
+            }
+
+            case "SuperCall":
+            {
+                // Arguments
+                const head = new SSA(node, "call-head", ir.length);
+                ir.push(head);
+                for (const c of node.children.args ? node.children.args.children : [])
+                    ir.push(new SSA(node, "arg", ir.length, head.idx, this.compileSSA(ir, symbols, c)));
+
+                // Then the call
+                ir.push(new SSA(node, "call-call-super", ir.length, head.idx));
+                break;
+            }
+
+            case "CallExp":
+            {
+                // First, the target
+                const target = this.compileSSA(ir, symbols, node.children.expression.children.expression);
+
+                // Then, the arguments
+                const head = new SSA(node, "call-head", ir.length);
+                ir.push(head);
+                for (const c of node.children.args ? node.children.args.children : [])
+                    ir.push(new SSA(node, "arg", ir.length, head.idx, this.compileSSA(ir, symbols, c)));
+
+                // Then the call proper
+                if (node.children.expression.children.expression.ctype.isClass) {
+                    // Static method call
+                    ir.push(new SSA(node, "call-call-static", ir.length, head.idx, target));
+                } else {
+                    // Standard method call
+                    ir.push(new SSA(node, "call-call", ir.length, head.idx, target));
+                }
+                break;
+            }
+
+            case "IndexExp":
+            {
+                const target = this.compileSSA(ir, symbols, node.children.expression);
+                const index = this.compileSSA(ir, symbols, node.children.index);
+
+                switch (node.children.expression.ctype.type) {
+                    case "array":
+                    case "tuple":
+                        ir.push(new SSA(node,
+                            node.children.expression.ctype.type + "-index",
+                            ir.length, target, index));
+                        break;
+
+                    case "map":
+                    {
+                        // Tuple case
+                        let tuple = "";
+                        if ((<types.MapType> node.children.expression.ctype).keyType.isTuple)
+                            tuple = "-tuple";
+                        ir.push(new SSA(node, "map" + tuple + "-get", ir.length, target, index));
+                        break;
+                    }
+
+                    case "set":
+                    {
+                        // Tuple case
+                        let tuple = "";
+                        if ((<types.SetType> node.children.expression.ctype).valueType.isTuple)
+                            tuple = "-tuple";
+                        ir.push(new SSA(node, "set" + tuple + "-get", ir.length, target, index));
+                        break;
+                    }
+
+                    default:
+                        throw new EYCTypeError(node, "No compiler for index " + node.children.expression.ctype.type);
+                }
+                break;
+            }
+
+            case "SuggestionExtendExp":
+            {
+                const target = this.compileSSA(ir, symbols, node.children.expression);
+                const sug = this.compileSuggestions(ir, symbols, node, node.children.suggestions);
+                ir.push(new SSA(node, "add-suggestion-suggestion", ir.length, target, sug));
+                break;
+            }
+
+            case "DotExp":
+            {
+                if (node.ctype.isClass) {
+                    // Just get the class directly
+                    const klass = new SSA(node, "class", ir.length);
+                    klass.ex = node.ctype;
+                    ir.push(klass);
                     break;
                 }
 
-                case "map":
+                const target = this.compileSSA(ir, symbols, node.children.expression);
+                const ttype = node.children.expression.ctype.type;
+                switch (ttype) {
+                    case "object":
+                        ir.push(new SSA(node, "field", ir.length, target));
+                        break;
+
+                    case "array":
+                    case "string":
+                        // Must be length
+                        console.assert(node.children.id.children.text === "length");
+                        ir.push(new SSA(node, ttype + "-length", ir.length, target));
+                        break;
+
+                    default:
+                        throw new EYCTypeError(node, "No compiler for dot " + ttype);
+                }
+                break;
+            }
+
+            case "SuggestionLiteral":
+            {
+                const sug = this.compileSuggestions(ir, symbols, node, node.children.suggestions);
+                ir.push(new SSA(node, "suggestion-literal", ir.length, sug));
+                break;
+            }
+
+            case "NewExp":
+            {
+                let ret: SSA;
+                switch (node.ctype.type) {
+                    case "object":
+                    {
+                        // The actual object creation
+                        const neww = new SSA(node, "new-object", ir.length);
+                        ir.push(neww);
+
+                        // Then, we extend it
+                        const ext = ret = new SSA(node, "extend", ir.length, neww.idx);
+                        ext.ex = node.ctype;
+                        ir.push(ext);
+                        break;
+                    }
+
+                    case "set":
+                        if ((<types.SetType> node.ctype).valueType.isTuple) {
+                            // Sets of tuples are stored as maps
+                            ret = new SSA(node, "new-map", ir.length);
+                            ir.push(ret);
+                            break;
+                        }
+                        // Intentional fallthrough
+
+                    default:
+                        ret = new SSA(node, "new-" + node.ctype.type, ir.length);
+                        ir.push(ret);
+                }
+
+                // Now there may be a with block
+                if (node.children.withBlock) {
+                    ir.push(new SSA(node, "with", ir.length, ret.idx));
+                    this.compileSSA(ir, symbols, node.children.withBlock);
+                    ir.push(new SSA(node, "htiw", ir.length, ret.idx));
+                }
+
+                return ret.idx;
+            }
+
+            case "This":
+                ir.push(new SSA(node, "this", ir.length));
+                break;
+
+            case "JavaScriptExpression":
+            {
+                // First, the arguments
+                const params: string[] = [];
+                const args: number[] = [];
+                const head = new SSA(node, "javascript-head", ir.length);
+                ir.push(head);
+                for (const c of node.children.pass ? node.children.pass.children : []) {
+                    const id = c.children.id.children.text;
+                    params.push(id);
+                    if (c.children.initializer) {
+                        // Initialize to a set expression
+                        const arg = this.compileSSA(ir, symbols, c.children.initializer);
+                        args.push(ir.length);
+                        ir.push(new SSA(node, "arg", ir.length, head.idx, arg));
+                    } else {
+                        // Just look up the name
+                        if (!(id in symbols))
+                            throw new EYCTypeError(c, "Undefined symbol " + id);
+                        const jsnm = symbols[id];
+                        const varr = new SSA(node, "var", ir.length);
+                        varr.ex = jsnm;
+                        ir.push(varr);
+                        args.push(ir.length);
+                        ir.push(new SSA(node, "arg", ir.length, head.idx, varr.idx));
+                    }
+                }
+
+                // Now the actual code
+                const ssa = new SSA(node, "javascript-call", ir.length, head.idx);
+                ssa.ex = params;
+                ir.push(ssa);
+                break;
+            }
+
+            case "NullLiteral":
+                ir.push(new SSA(node, "null", ir.length));
+                break;
+
+            case "HexLiteral":
+                ir.push(new SSA(node, "hex-literal", ir.length));
+                break;
+
+            case "DecLiteral":
+                ir.push(new SSA(node, "dec-literal", ir.length));
+                break;
+
+            case "StringLiteral":
+                ir.push(new SSA(node, "string-literal", ir.length));
+                break;
+
+            case "TupleLiteral":
+            {
+                // Structurally similar to a call, just builds a tuple instead
+                const head = new SSA(node, "tuple-literal-head", ir.length);
+                ir.push(head);
+                const args: number[] = [];
+                for (const c of node.children.elements.children) {
+                    const arg = this.compileSSA(ir, symbols, c);
+                    args.push(ir.length);
+                    ir.push(new SSA(node, "arg", ir.length, head.idx, arg));
+                }
+                ir.push(new SSA(node, "tuple-literal-tail", ir.length, head.idx));
+                break;
+            }
+
+            case "ID":
+            {
+                const id = node.children.text;
+                if (id in symbols) {
+                    const ssa = new SSA(node, "var", ir.length);
+                    ssa.ex = symbols[id];
+                    ir.push(ssa);
+                    break;
+                }
+                if (node.ctype.isClass) {
+                    const ssa = new SSA(node, "class", ir.length);
+                    ssa.ex = node.ctype;
+                    ir.push(ssa);
+                    break;
+                }
+                if (id in this.ccs.symbols) {
+                    const l = new SSA(node, "compile-time-literal", ir.length);
+                    l.ex = this.ccs.symbols[id];
+                    ir.push(l);
+                    break;
+                }
+                throw new EYCTypeError(node, "Undefined ID " + id);
+            }
+
+            default:
+                console.error(node);
+                throw new EYCTypeError(node, "No compiler for " + node.type);
+        }
+
+        return ir.length - 1;
+    }
+
+    // Compile a node as an l-expression
+    compileLExp(ir: SSA[], symbols: Record<string, string>, node: types.Tree): LExp {
+        switch (node.type) {
+            case "IndexExp":
+                switch (node.children.expression.ctype.type) {
+                    case "map":
+                    {
+                        const mapType = <types.MapType> node.children.expression.ctype;
+
+                        // Special case for tuple
+                        let tuple = "";
+                        if (mapType.keyType.isTuple)
+                            tuple = "-tuple";
+
+                        const target = this.compileSSA(ir, symbols, node.children.expression);
+                        const index = this.compileSSA(ir, symbols, node.children.index);
+                        const mapPair = new SSA(node, "map-pair", ir.length, target, index);
+                        ir.push(mapPair);
+                        const assg = new SSA(node, "map" + tuple + "-assign", -1, mapPair.idx);
+                        const val = new SSA(node, "map" + tuple + "-get", -1, target, index);
+                        return {
+                            assg, val,
+                            patch: (x) => {
+                                assg.a2 = x;
+                            }
+                        };
+                    }
+
+                    default:
+                        throw new EYCTypeError(node, "No compiler for l-expression index " + node.children.expression.ctype.type);
+                }
+
+            case "DotExp":
+            {
+                if (node.ctype.isClass) {
+                    // Just get it directly
+                    const val = new SSA(node, "class", -1);
+                    val.ex = node.ctype;
+                    return {
+                        assg: null,
+                        val: val,
+                        patch: null
+                    };
+                } else {
+                    const target = this.compileSSA(ir, symbols, node.children.expression);
+                    const assg = new SSA(node, "field-assign", -1, target);
+                    const val = new SSA(node, "field", -1, target);
+                    return {
+                        assg, val,
+                        patch: (x) => {
+                            assg.a2 = x;
+                        }
+                    };
+                }
+            }
+
+            case "This":
+                /* You can't actually change 'this', but it *can* be the LHS of
+                 * certain assignments */
+                return {
+                    assg: null,
+                    val: new SSA(node, "this", -1),
+                    patch: null
+                };
+
+            case "ID":
+            {
+                const nm = node.children.text;
+                if (!(nm in symbols))
+                    throw new EYCTypeError(node, "Undefined variable " + nm);
+                const jsnm = symbols[nm];
+                const assg = new SSA(node, "var-assign", -1);
+                assg.ex = jsnm;
+                const val = new SSA(node, "var", -1);
+                val.ex = jsnm;
+                return {
+                    assg, val,
+                    patch: (x) => {
+                        assg.a1 = x;
+                    }
+                };
+            }
+
+            default:
+                throw new EYCTypeError(node, "No compiler for l-expression " + node.type);
+        }
+    }
+
+    // Compile an array of suggestions
+    compileSuggestions(ir: SSA[], symbols: Record<string, string>,
+        parent: types.Tree, nodes: types.Tree[]): number {
+
+        const head = new SSA(parent, "suggestion-head", ir.length);
+        ir.push(head);
+
+        for (const node of nodes) {
+            const idx = this.compileSSA(ir, symbols, node);
+            const ssa = ir[idx];
+
+            // Transform it to a suggestion operation
+            const type = ssa.type;
+            ssa.type = "suggestion-" + type;
+
+            // Then add the corresponding suggestion part
+            ir.push(new SSA(node, "arg", ir.length, head.idx, idx));
+        }
+
+        ir.push(new SSA(parent, "suggestion-tail", ir.length, head.idx));
+
+        return ir.length - 1;
+    }
+
+    compileFrag(ir: SSA[]) {
+        // First count uses
+        for (const ssa of ir) {
+            if (ssa.a1 >= 0)
+                ir[ssa.a1].uses++;
+            if (ssa.a2 >= 0)
+                ir[ssa.a2].uses++;
+            if (ssa.type === "arg")
+                ssa.uses++;
+        }
+
+        // Then compile fragments
+        for (let iri = 0; iri < ir.length; iri++) {
+            const ssa = ir[iri];
+            ssa.target = "$" + ssa.idx;
+
+            switch (ssa.type) {
+                case "param":
+                    ssa.expr = ssa.ex;
+                    break;
+
+                case "set-values-array":
+                    ssa.expr = "(Array.from(" + ssa.arg(ir) +
+                        ".values()).sort(eyc.cmp." +
+                        (<types.SetType> ir[ssa.a1].ctx.ctype).valueType.type +
+                        "))";
+                    break;
+
+                case "if":
+                    ssa.skip = true;
+                    ssa.stmts.push("if (" + ssa.arg(ir) + ") {\n");
+                    break;
+
+                case "else":
+                    ssa.skip = true;
+                    ssa.stmts.push("else {\n");
+                    break;
+
+                case "loop":
+                    ssa.skip = true;
+                    ssa.stmts.push("while (true) {\n");
+                    break;
+
+                case "break":
+                    ssa.skip = true;
+                    ssa.stmts.push("if (" + ssa.arg(ir) + ") break;\n");
+                    break;
+
+                case "for-in-array":
+                case "for-in-string":
                 {
-                    const mapType = <types.MapType> exp.ctype;
-                    out = "(new eyc.Map(self.prefix," +
+                    const idx = "$$" + (this.varCtr++);
+                    this.vars.push(idx);
+                    const coll = ssa.arg(ir, 1, false);
+                    ssa.skip = true;
+                    ssa.stmts.push("for (" + idx + " = 0; " +
+                        idx + " < " + coll + ".length; " +
+                        idx + "++) {\n");
+                    ssa.stmts.push(ssa.ex + " = " + coll + "[" + idx + "];\n");
+                    break;
+                }
+
+                case "for-in-array-idx":
+                case "for-in-string-idx":
+                {
+                    const idx = "$$" + (this.varCtr++);
+                    this.vars.push(idx);
+                    const coll = ssa.arg(ir, 1, false);
+                    ssa.skip = true;
+                    ssa.stmts.push("for (" + idx + " = 0; " +
+                        idx + " < " + coll + ".length; " +
+                        idx + "++) {\n");
+                    ssa.stmts.push(ssa.ex + " = " + idx + ";\n");
+                    break;
+                }
+
+                case "map-keys-array":
+                {
+                    /* NOTE: The resulting array is *not* an EYC array, and
+                     * cannot be used as one! */
+                    ssa.expr = "(Array.from(" + ssa.arg(ir) +
+                        ".keys()).sort(eyc.cmp." +
+                        (<types.MapType> ssa.ctx.ctype).keyType.type + "))";
+                    break;
+                }
+
+                case "fi":
+                case "esle":
+                case "pool":
+                case "ni-rof":
+                    ssa.skip = true;
+                    ssa.stmts.push("}\n");
+                    // } } } make matching happy
+                    break;
+
+                case "return":
+                    ssa.skip = true;
+                    ssa.stmts.push("return " + ssa.arg(ir) + ";\n");
+                    break;
+
+                case "extend":
+                case "retract":
+                    ssa.expr = "(" + ssa.arg(ir) + "." + ssa.type + "(" +
+                        JSON.stringify((<types.EYCObjectType> ssa.ex).instanceOf.prefix) +
+                        "))";
+                    break;
+
+                case "suggestion-extend":
+                case "suggestion-retract":
+                    ssa.expr = "({action:" + JSON.stringify(ssa.type[11]) + "," +
+                        "target:" + ssa.arg(ir) + "," +
+                        "type:" +
+                        JSON.stringify((<types.EYCObjectType> ssa.ex).instanceOf.prefix) +
+                        "})";
+                    break;
+
+                case "array-append":
+                {
+                    const arr = ssa.arg(ir, 1, false);
+                    ssa.expr = "(" + arr + ".push(" + ssa.arg(ir, 2) + ")," + arr + ")";
+                    break;
+                }
+
+                case "map-assign":
+                {
+                    const val = ssa.arg(ir, 2, false);
+                    // map-assign's target is actually a map-pair
+                    const mapPair = ir[ssa.a1];
+                    const idx = mapPair.arg(ir, 2);
+                    const map = mapPair.arg(ir, 1);
+                    ssa.expr = "(" + map + ".set(" + idx + "," + val + ")," + val + ")";
+                    break;
+                }
+
+                case "map-tuple-assign":
+                {
+                    const val = ssa.arg(ir, 2, false);
+                    const mapPair = ir[ssa.a1];
+                    const idx = mapPair.arg(ir, 2, false);
+                    const map = mapPair.arg(ir, 1);
+                    ssa.expr = "(" + map + ".set(eyc.tupleStr(" + idx +
+                        "),{key:" + idx + ",value:" + val + "})," + val + ")";
+                    break;
+                }
+
+                case "set-add":
+                {
+                    const val = ssa.arg(ir, 2);
+                    const set = ssa.arg(ir, 1, false);
+                    ssa.expr = "(" + set + ".add(" + val + ")," + set + ")";
+                    break;
+                }
+
+                case "set-delete":
+                {
+                    const val = ssa.arg(ir, 2);
+                    const set = ssa.arg(ir, 1, false);
+                    ssa.expr = "(" + set + ".delete(" + val + ")," + set + ")";
+                    break;
+                }
+
+                case "in-object-map":
+                {
+                    const l = ssa.arg(ir, 1, false);
+                    ssa.expr = "(" + ssa.arg(ir, 2) + ".has(" + l + "))";
+                    break;
+                }
+
+                case "is-object-class":
+                {
+                    ssa.expr = "(!!(" + ssa.arg(ir, 1) +
+                        ".type[" + ssa.arg(ir, 2) + "]))";
+                    break;
+                }
+
+                case "eq-object-object":
+                case "eq-object-null":
+                case "eq-num-num":
+                case "eq-string-string":
+                case "ne-object-object":
+                case "ne-object-null":
+                case "ne-num-num":
+                case "ne-string-string":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    const op = ssa.ctx.children.op;
+                    ssa.expr = "(" + l + op + "=" + r + ")";
+                    break;
+                }
+
+                case "gt-object-object":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    const op = ssa.ctx.children.op;
+                    ssa.expr = "(" + l + ".id" + op + r + ".id)";
+                    break;
+                }
+
+                case "lt-num-num":
+                case "le-num-num":
+                case "gt-num-num":
+                case "ge-num-num":
+                case "add-num-num":
+                case "add-string-string":
+                case "sub-num-num":
+                case "mul-num-num":
+                case "div-num-num":
+                case "mod-num-num":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    const op = ssa.ex || ssa.ctx.children.op;
+                    ssa.expr = "(" + l + op + r + ")";
+                    break;
+                }
+
+                case "in-tuple-map":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    ssa.expr = "(" + r + ".has(eyc.tupleStr(" + l + ")))";
+                    break;
+                }
+
+                case "add-suggestion-suggestion":
+                {
+                    const tmp = "$$" + (this.varCtr++);
+                    this.vars.push(tmp);
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    ssa.expr = "(" + tmp + "=Array.prototype.concat.call(" +
+                        l + "," + r + ")," +
+                        tmp + '.id=self.prefix+"$"+eyc.freshId(),' +
+                        tmp + ")";
+                    break;
+                }
+
+                case "neg-num":
+                    ssa.expr = "(-" + ssa.arg(ir) + ")";
+                    break;
+
+                case "not-bool":
+                    ssa.expr = "(!" + ssa.arg(ir) + ")";
+                    break;
+
+                case "string-from-num":
+                    ssa.expr = '(""+' + ssa.arg(ir) + ")";
+                    break;
+
+                case "call-call-super":
+                case "call-call":
+                case "call-call-static":
+                {
+                    // Find the head
+                    const head = ssa.a1;
+
+                    // Get the arguments
+                    const args: string[] = [];
+                    for (let j = iri - 1; j > head; j--) {
+                        const sssa = ir[j];
+                        if (sssa.type === "arg" && sssa.a1 === head)
+                            args.unshift(sssa.arg(ir, 2, false));
+                    }
+
+                    if (ssa.type === "call-call-super") {
+                        ssa.expr = "(this.proto." + this.decl.signature.id + "(eyc,self,self" +
+                            (args.length?","+args.join(","):"") +
+                            "))";
+
+                    } else {
+                        // Get the target
+                        const target = ssa.arg(ir, 2, false);
+                        const meth = ssa.ctx.children.expression.ctype.id;
+
+                        // And perform the call
+                        ssa.expr = "(" + target + ".methods." + meth + "?" +
+                            target + ".methods." + meth + "(eyc," + target + ",self" +
+                            (args.length?","+args.join(","):"") +
+                            "):" +
+                            (<types.Type> ssa.ctx.ctype).default() +
+                            ")";
+
+                    }
+                    break;
+                }
+
+                case "suggestion-call-call":
+                {
+                    // Find the head
+                    const head = ssa.a1;
+
+                    // Get the arguments
+                    const args: string[] = [];
+                    for (let j = iri - 1; j > head; j--) {
+                        const sssa = ir[j];
+                        if (sssa.type === "arg" && sssa.a1 === head)
+                            args.unshift(sssa.arg(ir, 2, false));
+                    }
+
+                    // Get the target
+                    const target = ssa.arg(ir, 2, false);
+                    const meth = ssa.ctx.children.expression.ctype.id;
+
+                    // And create the suggestion
+                    ssa.expr = '({action:"m",' +
+                        "target:" + target + "," +
+                        "source:self," +
+                        "method:" + JSON.stringify(meth) + "," +
+                        "args:[" + args.join(",") + "]})";
+                    break;
+                }
+
+                case "array-index":
+                {
+                    /* Defaulting is different for numbers, because 0 and NaN
+                     * are both falsey */
+                    if (ssa.ctx.ctype.isNum) {
+                        const arr = ssa.arg(ir, 1, false);
+                        const idx = ssa.arg(ir, 2, false);
+                        ssa.expr = "((" + idx + " in " + arr + ")?" +
+                            arr + "[" + idx + "]:" +
+                            (<types.Type> ssa.ctx.ctype).default() +
+                            ")";
+
+                    } else {
+                        const idx = ssa.arg(ir, 2);
+                        const arr = ssa.arg(ir, 1);
+                        ssa.expr = "(" + arr + "[" + idx + "]||" +
+                            (<types.Type> ssa.ctx.ctype).default() +
+                            ")";
+
+                    }
+                    break;
+                }
+
+                case "tuple-index":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    ssa.expr = "(" + l + "[" + r + "])";
+                    break;
+                }
+
+                case "string-index":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    ssa.expr = "(" + l + "[" + r + ']||"")';
+                    break;
+                }
+
+                case "map-get":
+                {
+                    const map = ssa.arg(ir, 1, false);
+                    const idx = ssa.arg(ir, 2, false);
+                    ssa.expr = "(" + map + ".has(" + idx + ")?" +
+                        map + ".get(" + idx + "):" +
+                        (<types.Type> ssa.ctx.ctype).default() + ")";
+                    break;
+                }
+
+                case "map-tuple-get":
+                {
+                    // Need a temporary for the tuple string
+                    const tmp = "$$" + (this.varCtr++);
+                    this.vars.push(tmp);
+                    const map = ssa.arg(ir, 1, false);
+                    const idx = ssa.arg(ir, 2, false);
+                    ssa.expr = "(" + tmp + "=eyc.tupleStr(" + idx + ")," +
+                        map + ".has(" + tmp + ")?" +
+                        map + ".get(" + tmp + ").value:" +
+                        (<types.Type> ssa.ctx.ctype).default() + ")";
+                    break;
+                }
+
+                case "set-get":
+                {
+                    const idx = ssa.arg(ir, 2);
+                    const set = ssa.arg(ir, 1);
+                    ssa.expr = "(" + set + ".has(" + idx + "))";
+                    break;
+                }
+
+                case "field":
+                {
+                    const left = ssa.ctx.children.expression;
+                    const name = ssa.ctx.children.id.children.text;
+                    const jsnm = left.ctype.instanceOf.fieldNames[name];
+
+                    /* Defaulting is slightly different for numbers, because 0
+                     * and NaN are both falsey */
+                    if (ssa.ctx.ctype.isNum) {
+                        const target = ssa.arg(ir, 1, false);
+                        ssa.expr = "(" + JSON.stringify(jsnm) + "in " + target + "?" +
+                            target + "." + jsnm + ":" +
+                            (<types.Type> ssa.ctx.ctype).default() +
+                            ")";
+
+                    } else {
+                        // Simple case, just ||default
+                        const target = ssa.arg(ir);
+                        ssa.expr = "(" + target + "." + jsnm + "||" +
+                            (<types.Type> ssa.ctx.ctype).default() +
+                            ")";
+
+                    }
+                    break;
+                }
+
+                case "field-assign":
+                {
+                    const target = ssa.arg(ir, 1, false);
+                    const value = ssa.arg(ir, 2, false);
+                    const left = ssa.ctx.children.expression;
+                    const name = ssa.ctx.children.id.children.text;
+                    const jsnm = left.ctype.instanceOf.fieldNames[name];
+
+                    ssa.expr = "(" + JSON.stringify(jsnm) + "in " + target + "?" +
+                        target + "." + jsnm + "=" + value + ":" +
+                        value + ")";
+                    break;
+                }
+
+                case "array-length":
+                case "string-length":
+                {
+                    const target = ssa.arg(ir, 1);
+                    ssa.expr = "(" + target + ".length)";
+                    break;
+                }
+
+                case "suggestion-tail":
+                {
+                    const head = ssa.a1;
+
+                    // Get the elements
+                    const els: string[] = [];
+                    for (let j = iri - 1; j > head; j--) {
+                        const sssa = ir[j];
+                        if (sssa.type === "arg" && sssa.a1 === head)
+                            els.unshift(sssa.arg(ir, 2, false));
+                    }
+
+                    // And make the array
+                    ssa.expr = "([" + els.join(",") + "])";
+                    break;
+                }
+
+                case "suggestion-literal":
+                {
+                    const tmp = "$$" + (this.varCtr++);
+                    this.vars.push(tmp);
+                    ssa.expr = "(" + tmp + "=" + ssa.arg(ir, 1) + "," +
+                        tmp + '.id=self.prefix+"$"+eyc.freshId(),' +
+                        tmp + ")";
+                    break;
+                }
+
+                case "new-object":
+                    ssa.expr = "(new eyc.Object(self.prefix))";
+                    break;
+
+                case "new-array":
+                {
+                    const tmp = "$$" + (this.varCtr++);
+                    this.vars.push(tmp);
+                    ssa.expr = "(" + tmp + "=[]," +
+                        tmp + ".prefix=self.prefix," +
+                        tmp + '.id=self.prefix+"$"+eyc.freshId(),' +
+                        tmp + ".valueType=" + JSON.stringify((<types.ArrayType> ssa.ctx.ctype).valueType.basicType()) + "," +
+                        tmp + ")";
+                    break;
+                }
+
+                case "new-map":
+                {
+                    const mapType = <types.MapType> ssa.ctx.ctype;
+                    ssa.expr = "(new eyc.Map(self.prefix," +
                         JSON.stringify(mapType.keyType.basicType()) + "," +
                         JSON.stringify(mapType.valueType.basicType()) + "))";
                     break;
                 }
 
-                case "set":
+                case "new-set":
                 {
-                    const setType = <types.SetType> exp.ctype;
-                    if (setType.valueType.isTuple) {
-                        // Sets of tuples are stored as maps
-                        out = '(new eyc.Map(self.prefix,"-set",' +
-                            JSON.stringify(setType.valueType.basicType()) + "))";
+                    const setType = <types.SetType> ssa.ctx.ctype;
+                    ssa.expr = "(new eyc.Set(self.prefix," +
+                        JSON.stringify(setType.valueType.basicType()) +
+                        "))";
+                    break;
+                }
+
+                case "with":
+                    ssa.skip = true;
+                    ssa.stmts.push("(function(self) {\n");
+                    break;
+
+                case "htiw":
+                    ssa.skip = true;
+                    ssa.stmts.push("})(" + ssa.arg(ir) + ");\n");
+                    break;
+
+                case "this":
+                    ssa.skip = true;
+                    ssa.target = ssa.expr = "self";
+                    break;
+
+                case "javascript-call":
+                {
+                    // Find the head
+                    const head = ssa.a1;
+
+                    // Get the arguments
+                    const args: string[] = [];
+                    for (let j = iri - 1; j > head; j--) {
+                        const sssa = ir[j];
+                        if (sssa.type === "arg" && sssa.a1 === head)
+                            args.unshift(sssa.arg(ir, 2));
+                    }
+
+                    // Put it together
+                    ssa.expr = "((function(" +
+                        ssa.ex.join(",") + "){" +
+                        ssa.ctx.children.body + "})(" +
+                        args.join(",") + "))";
+                    break;
+                }
+
+                case "null":
+                    ssa.skip = true;
+                    ssa.target = ssa.expr = "(eyc.nil)";
+                    break;
+
+                case "default":
+                    ssa.skip = true;
+                    ssa.target = ssa.expr = "(" + (<types.Type> ssa.ctx.ctype).default() + ")";
+                    break
+
+                case "hex-literal":
+                {
+                    const text = ssa.ctx.children.text;
+                    if (text.indexOf(".") >= 0) {
+                        /* Fractional hex literals aren't supported by JS, so
+                         * do it ourselves */
+                        let cur = text;
+                        let val = 0;
+
+                        // Fractional part
+                        // eslint-disable-next-line no-constant-condition
+                        while (true) {
+                            val += parseInt(cur.slice(-1), 16);
+                            val /= 16;
+                            cur = cur.slice(0, -1);
+                            if (cur.slice(-1) === ".")
+                                break;
+                        }
+
+                        // Whole part
+                        val += parseInt("0" + cur.slice(0, -1), 16);
+                        ssa.expr = "(" + val + ")";
+
                     } else {
-                        out = "(new eyc.Set(self.prefix," +
-                            JSON.stringify(setType.valueType.basicType()) + "))";
+                        ssa.expr = "(0x" + text + ")";
                     }
                     break;
                 }
 
-                default:
-                    throw new EYCTypeError(exp, "No compiler for new " + exp.ctype.type);
-            }
+                case "dec-literal":
+                    ssa.expr = "(" + (ssa.ctx.children.text.replace(/^0*/, "")||"0") + ")";
+                    break;
 
-            if (exp.children.withBlock) {
-                // Perform this with-block action
-                const tmpV = state.allocateTmp(),
-                    tmpF = "$" + (state.varCt++);
+                case "string-literal":
+                    ssa.expr = "(" + ssa.ctx.children.text + ")";
+                    break;
 
-                out = "(" +
-                    tmpV + "=" + out + "," +
-                    tmpF + "(" + tmpV + ")," +
-                    tmpV +
-                    ")";
+                case "string-from-object":
+                    ssa.expr = "(" + ssa.arg(ir) + ".id)";
+                    break;
 
-                state.postExp += tmpV + "=0;\n";
-                state.freeTmp(tmpV);
+                case "bool-from-bool":
+                    ssa.expr = "(" + ssa.arg(ir) + ")";
+                    break;
 
-                // Compile the with-block action
-                state.outCode += "function " + tmpF + "(self){\n";
-                const postExp = state.postExp;
-                state.postExp = "";
-                const halfFreeTmps = state.halfFreeTmps;
-                state.halfFreeTmps = [];
-                compileStatement(eyc, state, symbols, exp.children.withBlock);
-                state.postExp = postExp;
-                state.halfFreeTmps = halfFreeTmps;
-
-                state.outCode += "}\n";
-            }
-
-            return out;
-        }
-
-        case "SuperCall":
-        {
-            let out = "(this.proto." + state.method.signature.id + "(eyc,self,self";
-
-            // Arguments
-            if (exp.children.args) {
-                for (const a of exp.children.args.children)
-                    out += "," + compileExpression(eyc, state, symbols, a);
-            }
-
-            out += "))";
-
-            return out;
-        }
-
-
-        case "This":
-            return "(self)";
-
-        case "JavaScriptExpression":
-        {
-            let out = "((function(";
-
-            // Argument names
-            if (exp.children.pass)
-                out += exp.children.pass.children.map((c: types.Tree) => c.children.id.children.text).join(",");
-
-            // The body
-            out += "){" + exp.children.body + "})(";
-
-            // Argument values
-            if (exp.children.pass) {
-                out += exp.children.pass.children.map((c: types.Tree) => {
-                    if (c.children.initializer)
-                        return compileExpression(eyc, state, symbols, c.children.initializer);
-                    else
-                        return symbols[c.children.id.children.text];
-                });
-            }
-
-            out += "))";
-            return out;
-        }
-
-        case "NullLiteral":
-            return "(eyc.nil)";
-
-        case "HexLiteral":
-            if (exp.children.text.indexOf(".") >= 0) {
-                // Fractional hex literals aren't supported by JS, so do it ourselves.
-                let cur = exp.children.text;
-                let val = 0;
-                // eslint-disable-next-line no-constant-condition
-                while (true) {
-                    val += parseInt(cur.slice(-1), 16);
-                    val /= 16;
-                    cur = cur.slice(0, -1);
-                    if (cur.slice(-1) === ".")
-                        break;
-                }
-                val += parseInt("0" + cur.slice(0, -1), 16);
-                return "(" + val + ")";
-
-            } else {
-                return "(0x" + exp.children.text + ")";
-
-            }
-
-        case "B64Literal":
-            return "(" + lexNum.lexStringToNum("000" + exp.children.text) + ")";
-
-        case "DecLiteral":
-            return "(" + (exp.children.text.replace(/^0*/, "")||"0") + ")";
-
-        case "StringLiteral":
-            return "(" + exp.children.text + ")";
-
-        case "ArrayLiteral":
-        {
-            const arrayType = <types.ArrayType> exp.ctype;
-            const arrayTmp = state.allocateTmp();
-            const out = "(" +
-                arrayTmp + "=[" +
-                exp.children.elements.children.map((c: types.Tree) => compileExpression(eyc, state, symbols, c)).join(",") +
-                "]," +
-                arrayTmp + ".prefix=self.prefix," +
-                arrayTmp + '.id=self.prefix+"$"+eyc.freshId(),' +
-                arrayTmp + ".valueType=" + JSON.stringify(arrayType.valueType.basicType()) + "," +
-                arrayTmp + ")";
-            state.postExp += arrayTmp + "=0;\n";
-            state.freeTmp(arrayTmp);
-            return out;
-        }
-
-        case "TupleLiteral":
-            return "([" +
-                exp.children.elements.children.map((c: types.Tree) => compileExpression(eyc, state, symbols, c)).join(",") +
-                "])";
-
-        case "ID":
-        {
-            const nm = exp.children.text;
-            if (nm in symbols) {
-                return symbols[nm];
-            } else if (exp.ctype.isClass) {
-                // Get the class directly
-                return "(eyc.classes." + nm.ctype.prefix + ")";
-            } else {
-                throw new EYCTypeError(exp, "Cannot find ID " + nm);
-            }
-        }
-
-        default:
-            throw new EYCTypeError(exp, "No compiler for " + exp.type);
-    }
-}
-
-// Compile an assignment expression
-function compileAssignmentExpression(eyc: types.EYC, state: MethodCompilationState, symbols: Record<string, string>, exp: types.Tree) {
-    function sub(e: types.Tree) {
-        return compileExpression(eyc, state, symbols, e);
-    }
-
-    const left = exp.children.target;
-    const right = exp.children.value;
-
-    if (exp.children.op === "+=") {
-        // There are several special cases of +=
-        switch (left.ctype.type) {
-            case "array":
-            {
-                const arrayTmp = state.allocateTmp(),
-                    valTmp = state.allocateTmp();
-                let out = "(" +
-                    arrayTmp + "=" + sub(left) + "," +
-                    valTmp + "=" + sub(right) + ",";
-
-                // Either array concatenation or array push
-                if (right.ctype.equals(left.ctype, {subtype: true})) {
-                    // The types are the same, so it's concatenation
-                    out += arrayTmp + ".push.apply(" + arrayTmp + "," + valTmp + "),";
-
-                } else {
-                    // Just pushing onto the array
-                    out += arrayTmp + ".push(" + valTmp + "),";
-
-                }
-
-                out += arrayTmp + ")";
-
-                state.postExp +=
-                    arrayTmp + "=0;\n" +
-                    valTmp + "=0;\n";
-                state.freeTmp(arrayTmp);
-                state.freeTmp(valTmp);
-
-                return out;
-            }
-
-            case "set":
-            {
-                const setTmp = state.allocateTmp();
-                let out = "(" +
-                    setTmp + "=" + sub(left) + ",";
-
-                // Special case for sets of tuples
-                if (left.ctype.valueType.isTuple) {
-                    const valTmp = state.allocateTmp();
-                    out += valTmp + "=" + sub(right) + "," +
-                        setTmp + ".set(eyc.tupleStr(" + valTmp + ")," + valTmp + "),";
-                } else {
-                    out += setTmp + ".add(" + sub(right) + "),";
-                }
-                out += setTmp + ")";
-                state.postExp += setTmp + "=0;\n";
-                state.freeTmp(setTmp);
-                return out;
-            }
-
-            case "num":
-            case "string":
-                // Handled below
-                break;
-
-            default:
-                throw new EYCTypeError(exp, "No compiler for += " + left.ctype.type);
-        }
-
-    } else if (exp.children.op === "-=") {
-        // There's a special case for removing elements from maps or sets
-        switch (left.ctype.type) {
-            case "map":
-            {
-                const mapTmp = state.allocateTmp(),
-                    valTmp = state.allocateTmp();
-
-                let out = "(" +
-                    mapTmp + "=" + sub(left) + "," +
-                    valTmp + "=" + sub(right) + ",";
-
-                if (left.ctype.keyType.isTuple) {
-                    // Removing a tuple from a map means removing its string
-                    out += mapTmp + ".delete(eyc.tupleStr(" + valTmp + ")),";
-
-                } else {
-                    // Everything else can simply be removed
-                    out += mapTmp + ".delete(" + valTmp + "),";
-
-                }
-
-                out += mapTmp + ")";
-
-                state.postExp +=
-                    mapTmp + "=0;\n" +
-                    valTmp + "=0;\n";
-                state.freeTmp(mapTmp);
-                state.freeTmp(valTmp);
-
-                return out;
-
-            }
-
-            case "set":
-            {
-                const setTmp = state.allocateTmp();
-                const out = "(" +
-                    setTmp + "=" + sub(left) + "," +
-                    setTmp + ".delete(" + sub(right) + ")," +
-                    setTmp + ")";
-                state.postExp += setTmp + "=0;\n";
-                state.freeTmp(setTmp);
-                return out;
-            }
-
-            case "num":
-                // Handled below
-                break;
-
-            default:
-                throw new EYCTypeError(exp, "No compiler for -= " + left.ctype.type);
-        }
-
-    } else if (exp.children.op !== "=") {
-        // Every other case is only valid for numbers
-        if (left.ctype.type !== "num")
-            throw new EYCTypeError(exp, exp.children.op + " is only valid on numbers");
-
-    }
-
-    switch (left.type) {
-        case "IndexExp":
-        {
-            const leftLeftType = left.children.expression.ctype;
-            switch (leftLeftType.type) {
-                case "map":
+                case "tuple-literal-tail":
                 {
-                    const mapTmp = state.allocateTmp(),
-                        keyTmp = state.allocateTmp(),
-                        valueTmp = state.allocateTmp();
+                    // Find the head
+                    const head = ssa.a1;
 
-                    let out = "(" +
-                        mapTmp + "=" + sub(left.children.expression) + "," +
-                        keyTmp + "=" + sub(left.children.index) + "," +
-                        valueTmp + "=" + sub(right) + ",";
-
-                    // If we're doing += or -=, do that now
-                    if (exp.children.op !== "=") {
-                        // We must be num or string, because only that falls through to here
-
-                        // Get the original value
-                        const prevValueTmp = state.allocateTmp();
-                        if (leftLeftType.keyType.isTuple)
-                            out += prevValueTmp + "=" + mapTmp + ".get(eyc.tupleStr(" + keyTmp + "))," +
-                                   prevValueTmp + "=" + prevValueTmp + "?" + prevValueTmp + ".value:0,";
-                        else
-                            out += prevValueTmp + "=" + mapTmp + ".get(eyc.tupleStr(" + keyTmp + "))||0,";
-
-                        // Make the change
-                        out += prevValueTmp + exp.children.op + valueTmp + "," +
-                            valueTmp + "=" + prevValueTmp + ",";
-
-                        state.postExp += prevValueTmp + "=0;\n";
-                        state.freeTmp(prevValueTmp);
+                    // Get the elements
+                    const els: string[] = [];
+                    for (let j = iri - 1; j > head; j--) {
+                        const sssa = ir[j];
+                        if (sssa.type === "arg" && sssa.a1 === head)
+                            els.unshift(sssa.arg(ir, 2, false));
                     }
 
-                    if (leftLeftType.keyType.isTuple) {
-                        // Maps tuple->* instead are maps string->special object
-                        out += mapTmp + ".set(eyc.tupleStr(" + keyTmp + "),{key:" + keyTmp + ",value:" + valueTmp + "}),";
-                    } else {
-                        out += mapTmp + ".set(" + keyTmp + "," + valueTmp + "),";
-                    }
-
-                    out += valueTmp + ")";
-
-                    state.postExp +=
-                        mapTmp + "=0;\n" +
-                        keyTmp + "=0;\n" +
-                        valueTmp + "=0;\n";
-                    state.freeTmp(mapTmp);
-                    state.freeTmp(keyTmp);
-                    state.freeTmp(valueTmp);
-
-                    return out;
+                    // And make the array
+                    ssa.expr = "([" + els.join(",") + "])";
+                    break;
                 }
 
-                case "set":
-                {
-                    const setTmp = state.allocateTmp(),
-                        valueTmp = state.allocateTmp();
+                case "var":
+                case "compile-time-literal":
+                    ssa.skip = true;
+                    ssa.target = ssa.expr = ssa.ex;
+                    break;
 
-                    console.assert(exp.children.op === "=");
+                case "var-assign":
+                    ssa.expr = "(" + ssa.ex + "=" + ssa.arg(ir) + ")";
+                    break;
 
-                    let out = "(" +
-                        setTmp + "=" + sub(left.children.expression) + "," +
-                        valueTmp + "=" + sub(left.children.index) + ",";
+                case "class":
+                    ssa.expr = "(eyc.classes." + (<types.EYCClass> ssa.ex).prefix + ")";
+                    break;
 
-                    if (right.type === "BoolLiteral") {
-                        // Simpler case
-                        const b = JSON.parse(right.children.text);
-
-                        if (leftLeftType.valueType.isTuple) {
-                            // Sets of tuples are instead maps of string->tuple
-                            out += setTmp + "." + (b?"set":"delete") + "(eyc.tupleStr(" + valueTmp + ")," + valueTmp + "),";
-                        } else {
-                            out += setTmp + "." + (b?"add":"delete") + "(" + valueTmp + "),";
-                        }
-                        out += b + ")";
-
-                    } else {
-                        // Depends on boolean value
-                        const bTmp = state.allocateTmp();
-
-                        out += bTmp + "=" + sub(right) + ",";
-
-                        if (leftLeftType.valueType.isTuple) {
-                            out += setTmp + "[" + bTmp + '?"set":"delete"](eyc.tupleStr(' + valueTmp + ")," + valueTmp + "),";
-                        } else {
-                            out += setTmp + "[" + bTmp + '?"add":"delete"](' + valueTmp + "),";
-                        }
-                        out += bTmp + ")";
-
-                        state.freeTmp(bTmp);
-                    }
-
-                    state.postExp +=
-                        setTmp + "=0;\n"
-                        valueTmp + "=0;\n";
-                    state.freeTmp(setTmp);
-                    state.freeTmp(valueTmp);
-
-                    return out;
-                }
+                case "arg":
+                case "call-head":
+                case "javascript-head":
+                case "map-pair":
+                case "suggestion-head":
+                case "tuple-literal-head":
+                    // No code
+                    ssa.skip = true;
+                    break;
 
                 default:
-                    throw new EYCTypeError(exp, "No compiler for index assignment to " + left.children.expression.ctype.type);
+                    throw new EYCTypeError(ssa.ctx, "No compiler for " + ssa.type);
             }
         }
+    }
 
-        case "DotExp":
-        {
-            const leftTmp = state.allocateTmp(),
-                rightTmp = state.allocateTmp();
-            const name = left.children.id.children.text;
-            const iname = left.children.expression.ctype.instanceOf.fieldNames[name];
-
-            let out = "(" +
-                leftTmp + "=" + sub(left.children.expression) + "," +
-                rightTmp + "=" + sub(right) + ",";
-
-            // If we're doing += or -=, do that now
-            if (exp.children.op !== "=") {
-                // We must be num or string, because only that falls through to here
-
-                // Get the original value
-                const prevValueTmp = state.allocateTmp();
-                out += prevValueTmp + "=" + leftTmp + "." + iname + "||0," +
-                    prevValueTmp + exp.children.op + rightTmp + "," +
-                    rightTmp + "=" + prevValueTmp + ",";
-
-                state.postExp += prevValueTmp + "=0;\n";
-                state.freeTmp(prevValueTmp);
-            }
-
-            out +=
-                JSON.stringify(iname) + "in " + leftTmp + "?" +
-                leftTmp + "." + iname + "=" + rightTmp + ":" +
-                rightTmp + ")";
-
-            state.postExp +=
-                leftTmp + "=0;\n" +
-                rightTmp + "=0;\n";
-            state.freeTmp(leftTmp);
-            state.freeTmp(rightTmp);
-
-            return out;
+    compileJS(ir: SSA[], retType: types.Type): string {
+        // Figure out what variables need to be defined
+        const vars: string[] = this.vars.slice(0);
+        for (const ssa of ir) {
+            if (ssa.uses && !ssa.skip)
+                vars.push(ssa.target);
         }
 
-        case "ID":
-            return "(" +
-                symbols[left.children.text] + exp.children.op +
-                sub(right) +
-                ")";
+        const varStr = vars.length ? ("var " + vars.join(",") + ";\n") : "";
 
-        default:
-            throw new EYCTypeError(exp, "No compiler for assignment to " + exp.children.target.type);
+        // And put it all together
+        return varStr +
+            ir.map(ssa => {
+                const pre = ssa.stmts.join("");
+                if (ssa.skip)
+                    return pre;
+                else if (ssa.uses)
+                    return pre + ssa.target + "=" + ssa.expr + ";\n";
+                else
+                    return pre + ssa.expr + ";\n";
+            }).join("") +
+            "return " + retType.default() + ";\n";
     }
 }
 
-// Compile an increment/decrement expression
-function compileIncDecExpression(eyc: types.EYC, state: MethodCompilationState, symbols: Record<string, string>, exp: types.Tree, post: boolean) {
-    const subExp = exp.children.expression;
-    const op = exp.children.op;
+// Compile a FieldDecl
+function compileFieldDecl(ccs: ClassCompilationState, fieldDecl: types.Tree) {
+    const type = <types.Type> fieldDecl.ctype;
+    const klass = (<types.ClassNode> fieldDecl.parent).klass;
 
-    switch (subExp.type) {
-        case "DotExp":
-        {
-            // Remember that even *having* this field isn't guaranteed!
-            const tmpExp = state.allocateTmp();
-            const left = subExp.children.expression;
-            const name = subExp.children.id.children.text;
-            const iname = left.ctype.instanceOf.fieldNames[name];
-
-            const out = "(" +
-                tmpExp + "=" + compileExpression(eyc, state, symbols, left) + "," +
-                JSON.stringify(iname) + "in " + tmpExp + "?" +
-                    (post?"":op) +
-                    tmpExp + "." + iname +
-                    (post?op:"") +
-                ":0)";
-
-            state.postExp += tmpExp + "=0;\n";
-            state.freeTmp(tmpExp);
-            return out;
+    for (const d of fieldDecl.children.decls.children) {
+        const iname = klass.prefix + "$" + d.children.id.children.text;
+        let init;
+        if (d.children.initializer) {
+            // Make it a method
+            const mcs = new MethodCompilationState(ccs, null);
+            const ir: SSA[] = [];
+            const symbols: Record<string, string> = Object.create(null);
+            const val = mcs.compileSSA(ir, symbols, d.children.initializer);
+            ir.push(new SSA(d.children.initializer, "return", ir.length, val));
+            mcs.compileFrag(ir);
+            init = mcs.compileJS(ir, type);
+        } else {
+            init = "return " + type.default({build: true}) + ";";
         }
-
-        case "ID":
-            return "(" +
-                (post?"":op) +
-                symbols[subExp.children.text] +
-                (post?op:"") +
-                ")";
-
-        default:
-            throw new EYCTypeError(exp, "No compiler for increment/decrement of " + subExp.type);
-    }
-}
-
-// Compile an expression to bool
-function compileExpressionBool(eyc: types.EYC, state: MethodCompilationState, symbols: Record<string, string>, exp: types.Tree) {
-    let out = compileExpression(eyc, state, symbols, exp);
-
-    switch (exp.ctype.type) {
-        // Nullable types
-        case "suggestion":
-            out = "(" + out + "!==eyc.nil)";
-            break;
-
-        case "num":
-            out = "(!!" + out + ")";
-            break;
-
-        case "bool":
-            break;
-
-        default:
-            throw new EYCTypeError(exp, "Cannot convert " + exp.ctype.type + " to boolean");
-    }
-
-    return out;
-}
-
-// Compile this list of suggestions into an object literal
-function compileSuggestions(eyc: types.EYC, state: MethodCompilationState, symbols: Record<string, string>, suggestions: types.Tree[]) {
-    const out = [];
-    for (const s of suggestions)
-        out.push(compileSuggestion(eyc, state, symbols, s));
-    return "[" + out.join(",") + "]";
-}
-
-// Compile this suggestion into a field
-function compileSuggestion(eyc: types.EYC, state: MethodCompilationState, symbols: Record<string, string>, suggestion: types.Tree) {
-    function sub(e: types.Tree) {
-        return compileExpression(eyc, state, symbols, e);
-    }
-
-    switch (suggestion.type) {
-        case "ExtendStatement":
-        case "RetractStatement":
-        {
-            let out = '({action:"' +
-                (suggestion.type==="ExtendStatement"?"e":"r") +
-                '",target:';
-
-            // Compile the expression
-            const exp = suggestion.children.expression;
-            console.assert(exp.type === "CastExp");
-            out += compileExpression(eyc, state, symbols, exp.children.expression);
-
-            // And get the target type
-            out += ",type:" + JSON.stringify(exp.children.type.ctype.instanceOf.prefix) + "})";
-            return out;
-        }
-
-        case "ExpStatement":
-        {
-            let out = '({action:"m"';
-
-            const exp = suggestion.children.expression;
-            console.assert(exp.type === "CallExp");
-
-            // FIXME: Static methods?
-
-            out +=
-                ",target:" + compileExpression(eyc, state, symbols, exp.children.expression.children.expression) +
-                ",source:self" +
-                ",method:" + JSON.stringify(exp.children.expression.ctype.id) +
-                ",args:[";
-
-            const outArgs = [];
-            for (const arg of (exp.children.args ? exp.children.args.children : [])) {
-                outArgs.push(compileExpression(eyc, state, symbols, arg));
-            }
-
-            out += outArgs.join(",") +
-                "]})";
-            return out;
-        }
-
-        default:
-            throw new EYCTypeError(suggestion, "No compiler for suggestion " + suggestion.type);
+        klass.fieldInits[iname] = <types.CompiledFunction> Function("eyc", "self", "caller", init);
     }
 }
