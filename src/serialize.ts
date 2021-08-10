@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/explicit-module-boundary-types */
 import * as types from "./types";
 
 /* SERIALIZATION */
 
-export function serialize(eyc: types.EYC, val: any) {
+export function serialize(eyc: types.EYC, val: any): string {
     const szd = <any[]> [];
 
     /* First element of the serialization array is metadata. We'll replace it
@@ -160,7 +161,7 @@ function serializeMap(eyc: types.EYC, szd: any[], mapping: Record<string, number
         ret[0] = "s";
         ret.push(ser(eyc, szd, mapping, val.valueType));
 
-        let values: any[] = Array.from(val.values()).sort(eyc.cmp.tuple);
+        const values: any[] = Array.from(val.values()).sort(eyc.cmp.tuple);
         for (const v of values)
             ret.push(ser(eyc, szd, mapping, v));
         return;
@@ -193,7 +194,7 @@ function serializeSet(eyc: types.EYC, szd: any[], mapping: Record<string, number
 
 /* DESERIALIZATION */
 
-export function deserialize(eyc: types.EYC, szdS: string, loadModules: boolean) {
+export function deserialize(eyc: types.EYC, szdS: string, loadModules: boolean): any {
     // Check magic
     if (szdS.slice(0, 8) !== "@EYCSer\n")
         return eyc.nil;
@@ -351,10 +352,8 @@ function manifestObject(eyc: types.EYC, szd: any[], ret: any[], types: string[],
 
     // 4: Gather field types
     const fieldTypes: Record<string, types.Type> = Object.create(null);
-    for (const id in obj.type) {
-        const klass = eyc.classes[id];
+    for (const id in obj.type)
         Object.assign(fieldTypes, eyc.classes[id].ownFieldTypes);
-    }
 
     // 5: Set fields
     for (const pair of el.slice(3)) {

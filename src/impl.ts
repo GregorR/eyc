@@ -108,6 +108,7 @@ function urlAbsolute(rel: string, path: string) {
         return "/" + normParts.join("/");
 
     else
+        // eslint-disable-next-line no-useless-escape
         return rel.replace(/\/[^\/]*$/, "") + "/" + normParts.join("/");
 }
 
@@ -421,7 +422,7 @@ export async function eyc(
                 }
 
                 // Make sure *they're* all the same length
-                let maxStr = ("").padEnd(max, " ");
+                const maxStr = ("").padEnd(max, " ");
                 let ymax = 0;
                 for (const layer of layers) {
                     if (layer.length > ymax)
@@ -1010,6 +1011,7 @@ export async function eyc(
             if (s.action === "e") {
                 const se = <types.SuggestionStepExtendRetract> s;
                 // FIXME: Check targets
+                void targets;
                 se.target.extend(se.type);
             }
         }
@@ -1021,7 +1023,9 @@ export async function eyc(
                 const target = sm.target;
                 const method = sm.method;
                 if (target.methods[method])
-                    target.methods[method].apply(target.methods, (<unknown[]> [eyc, target, sm.source]).concat(sm.args));
+                    target.methods[method].apply(
+                        target.methods,
+                        (<unknown[]> [eyc, target, sm.source]).concat(sm.args));
             }
         }
 
@@ -1060,6 +1064,7 @@ export async function eyc(
     },
 
     // Frontend indirector
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newStage: function(w: number, h: number, ex: any) {
         const beId = this.freshId();
         frontendP = frontendP.then(() => {

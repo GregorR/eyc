@@ -7,5 +7,13 @@ module.exports = {
     extends: [
         'eslint:recommended',
         'plugin:@typescript-eslint/recommended',
+    ],
+    overrides: [
+        {
+            files: ["*.ts"],
+            rules: {
+                "prefer-spread": "off"
+            }
+        }
     ]
 };

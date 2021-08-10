@@ -103,7 +103,7 @@ export async function go(): Promise<void> {
     loadingScreen();
 
     const w = new Worker("eyc-w" + (useAdvanced?"-dbg":"") + ".js");
-    let id = 0;
+    const id = 0;
 
     w.onmessage = ev => {
         const msg = ev.data;

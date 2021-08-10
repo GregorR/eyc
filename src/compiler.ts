@@ -1,4 +1,3 @@
-import * as lexNum from "./lexnum";
 import * as parser from "./parser";
 import * as types from "./types";
 
@@ -78,8 +77,9 @@ function linkParseTree(tree: types.Tree, module: types.Module) {
     for (let c in tree.children) {
         c = tree.children[c];
         if (typeof c === "object" && c !== null) {
+            // eslint-disable-next-line @typescript-eslint/ban-types
             if ((<Object> c) instanceof Array) {
-                for (let i of (<types.Tree[]> c)) {
+                for (const i of (<types.Tree[]> c)) {
                     if (typeof i === "object" && i !== null)
                         linkParseTree(i, module);
                 }
@@ -586,7 +586,7 @@ async function resolveFabricDeclTypes(eyc: types.EYC, fabricDecl: types.FabricNo
         return fabricDecl.fabric;
 
     const url = eyc.urlAbsolute(fabricDecl.module.url, fabricDecl.children.url);
-    const fabric = fabricDecl.fabric = fabricDecl.ctype =
+    fabricDecl.fabric = fabricDecl.ctype =
         new eyc.Fabric(fabricDecl.module,
             fabricDecl.children.kind === "garment",
             fabricDecl.children.id.children.text, fabricDecl.children.url,
@@ -1820,6 +1820,7 @@ class SSA {
     skip: boolean;
     uses: number;
     lastUse: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ex: any;
     stmts: string[];
     expr: string;
@@ -1845,7 +1846,7 @@ class SSA {
     /* Get an expression for an *argument* of this SSA node. Will pluck the
      * expression into the current node if nothing else between them is
      * outlined */
-    arg(ir: SSA[], num: number = 1, tryInline: boolean = true) {
+    arg(ir: SSA[], num = 1, tryInline = true) {
         const a = (num === 2) ? this.a2 : this.a1;
         const ssa = ir[a];
         if (!tryInline || ssa.uses > 1)

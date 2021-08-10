@@ -5,7 +5,7 @@ import * as EYC from "./impl";
 import * as types from "./types";
 
 
-let settings = {
+const settings = {
     local: false
 };
 let eyc: types.EYC = null;
@@ -21,8 +21,10 @@ const eycExtWorker: types.EYCExt = {
         });
     },
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newStage: async function(w: number, h: number, ex: any) {
         // nothing!
+        void w; void h; void ex;
         return "-";
     }
 };

@@ -103,7 +103,9 @@ export interface EYC {
     tupleStr(tuple: Tuple): string;
 
     // Serialization
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     serialize(val: any): string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     deserialize(val: string, loadModules: boolean): any;
 
     // Comparators
@@ -119,6 +121,7 @@ export interface EYC {
     };
 
     // Frontend interaction
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newStage(w: number, h: number, ex: any): string;
 
     // External features which must be provided by a user of EYC
