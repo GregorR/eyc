@@ -2973,7 +2973,7 @@ class MethodCompilationState {
                 case "is-object-class":
                 {
                     ssa.expr = "(!!(" + ssa.arg(ir, 1) +
-                        ".type[" + ssa.arg(ir, 2) + "]))";
+                        ".type[" + ssa.arg(ir, 2) + ".prefix]))";
                     break;
                 }
 
@@ -3047,10 +3047,6 @@ class MethodCompilationState {
 
                 case "not-bool":
                     ssa.expr = "(!" + ssa.arg(ir) + ")";
-                    break;
-
-                case "string-from-num":
-                    ssa.expr = '(""+' + ssa.arg(ir) + ")";
                     break;
 
                 case "call-call-super":
@@ -3380,7 +3376,12 @@ class MethodCompilationState {
                     break;
 
                 case "string-from-object":
+                case "string-from-array":
                     ssa.expr = "(" + ssa.arg(ir) + ".id)";
+                    break;
+
+                case "string-from-num":
+                    ssa.expr = '(""+' + ssa.arg(ir) + ")";
                     break;
 
                 case "bool-from-bool":
