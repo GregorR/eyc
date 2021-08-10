@@ -2643,6 +2643,10 @@ class MethodCompilationState {
                 ir.push(new SSA(node, "string-literal", ir.length));
                 break;
 
+            case "BoolLiteral":
+                ir.push(new SSA(node, "bool-literal", ir.length));
+                break;
+
             case "TupleLiteral":
             {
                 // Structurally similar to a call, just builds a tuple instead
@@ -3381,7 +3385,12 @@ class MethodCompilationState {
                     break;
 
                 case "string-from-num":
+                case "string-from-bool":
                     ssa.expr = '(""+' + ssa.arg(ir) + ")";
+                    break;
+
+                case "bool-literal":
+                    ssa.expr = "(" + ssa.ctx.children.text + ")";
                     break;
 
                 case "bool-from-bool":
