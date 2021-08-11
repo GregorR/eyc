@@ -1,10 +1,6 @@
 export interface EYCElement {
     type: string;
     isModule?: boolean;
-    isSprite?: boolean;
-    isSpritesheet?: boolean;
-    isSound?: boolean;
-    isSoundset?: boolean;
     isClass?: boolean;
     isType?: boolean;
     isObject?: boolean;

@@ -117,18 +117,6 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
                 break;
             }
 
-            case "SpriteSheetDecl":
-                if (!c.children.exportClause)
-                    break; // Not exported
-                exports[c.children.id.children.text] = c;
-                break;
-
-            case "SoundSetDecl":
-                if (!c.children.exportClause)
-                    break; // Not exported
-                exports[c.children.id.children.text] = c;
-                break;
-
             case "FabricDecl":
                 if (!c.children.exportClause)
                     break; // Not exported
@@ -265,14 +253,6 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
                 break;
             }
 
-            case "SpriteSheetDecl":
-                defineSymbol(c, c.children.id.children.text, c, true);
-                break;
-
-            case "SoundSetDecl":
-                defineSymbol(c, c.children.id.children.text, c, true);
-                break;
-
             case "FabricDecl":
                 defineSymbol(c, c.children.id.children.text, c, true);
                 break;
@@ -307,14 +287,6 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
         const c = module.parsed.symbols[id];
         c.parent = module.parsed;
         switch (c.type) {
-            case "SpriteSheetDecl":
-                symbolTypes[id] = resolveSpriteSheetDeclTypes(eyc, <types.SpritesheetNode> c);
-                break;
-
-            case "SoundSetDecl":
-                symbolTypes[id] = resolveSoundSetDeclTypes(eyc, <types.SoundsetNode> c);
-                break;
-
             case "ClassDecl":
                 symbolTypes[id] = resolveClassDeclTypes(eyc, <types.ClassNode> c);
                 break;
@@ -332,251 +304,6 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
                 throw new EYCTypeError(c, "Cannot resolve types of " + c.type);
         }
     }
-}
-
-// Resolve the "types" of a sprite declaration
-function resolveSpriteSheetDeclTypes(eyc: types.EYC, spritesDecl: types.SpritesheetNode) {
-    if (spritesDecl.spritesheet)
-        return spritesDecl.spritesheet;
-
-    const sheet = spritesDecl.spritesheet = spritesDecl.ctype =
-        new eyc.Spritesheet(spritesDecl.module,
-            spritesDecl.children.id.children.text, spritesDecl.children.url);
-
-    // Our default settings
-    let defaults = {
-        x: 0,
-        y: 0,
-        w: 1,
-        h: 1,
-        scale: 1,
-        factor: 1,
-        frames: 1,
-        speed: 1
-    };
-
-    // Loop over the sprites...
-    for (const sprite of (spritesDecl.children.sprites || [])) {
-        switch (sprite.type) {
-            case "Sprite":
-            {
-                // The natural content, a sprite
-                const nm = sprite.children.id.children.text;
-                const args = sprite.children.args ? sprite.children.args.children : [];
-
-                // Get the values associated with the sprite
-                const vals = Object.assign({}, defaults);
-
-                for (let i = 0; i < args.length; i++) {
-                    const a = args[i];
-                    let an, av;
-
-                    switch (a.type) {
-                        case "AssignmentExp":
-                        {
-                            const l = a.children.target;
-                            const r = a.children.value;
-
-                            // Must be in the form {x,y,w,h,scale,factor} = {num}
-                            if (l.type !== "ID" || (
-                                r.type !== "HexLiteral" && r.type !== "B64Literal" && r.type !== "DecLiteral")) {
-                                throw new EYCTypeError(a, "Expected {x,y,w,h,scale,factor} = {number}");
-                            }
-                            an = l.children.text;
-                            av = r;
-                            if (!(an in defaults))
-                                throw new EYCTypeError(a, "Unrecognized sprite property " + an);
-                            break;
-                        }
-
-                        case "HexLiteral":
-                        case "B64Literal":
-                        case "DecLiteral":
-                        {
-                            // Name is implicit by position
-                            switch (i) {
-                                case 0:
-                                    an = "x";
-                                    break;
-
-                                case 1:
-                                    an = "y";
-                                    break;
-
-                                case 2:
-                                    an = "w";
-                                    break;
-
-                                case 3:
-                                    an = "h";
-                                    break;
-
-                                case 4:
-                                    an = "scale";
-                                    break;
-
-                                default:
-                                    throw new EYCTypeError(a, "No default property for index " + i);
-                            }
-
-                            // Value is given
-                            av = a;
-                            break;
-                        }
-
-                        default:
-                            throw new EYCTypeError(a, "Invalid sprite sheet literal");
-                    }
-
-                    // Now get the actual value out of the value
-                    //av = Function("return " + compileExpression(eyc, null, {}, av))();
-                    throw new Error;
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (<any> vals)[an] = av;
-                }
-
-                if (nm === "default") {
-                    // These are the new defaults
-                    defaults = vals;
-
-                } else {
-                    // Bump the default x
-                    defaults.x = vals.x + vals.w * vals.frames;
-
-                    // Scale
-                    vals.x *= vals.factor;
-                    vals.y *= vals.factor;
-                    vals.w *= vals.factor;
-                    vals.h *= vals.factor;
-                    delete vals.factor;
-
-                    // This is a new sprite
-                    sheet.add(new eyc.Sprite(sheet, nm, vals));
-
-                }
-
-                break;
-            }
-
-            default:
-                throw new EYCTypeError(sprite, "Unrecognized spritesheet element " + sprite.type);
-        }
-    }
-
-    return sheet;
-}
-
-// Resolve the "types" of a sound set declaration
-function resolveSoundSetDeclTypes(eyc: types.EYC, soundsDecl: types.SoundsetNode) {
-    if (soundsDecl.soundset)
-        return soundsDecl.soundset;
-
-    const set = soundsDecl.soundset = soundsDecl.ctype =
-        new eyc.Soundset(soundsDecl.module,
-            soundsDecl.children.id.children.text, soundsDecl.children.url);
-
-    // Our default settings
-    let defaults = {
-        start: 0,
-        length: 0,
-        end: <number> null
-    };
-
-    // Loop over the sounds...
-    for (const sound of (soundsDecl.children.sounds || [])) {
-        switch (sound.type) {
-            case "Sound":
-            {
-                // The natural content, a sound
-                const nm = sound.children.id.children.text;
-                const args = sound.children.args.children;
-
-                // Get the values associated with the sound
-                const vals = {
-                    start: defaults.start,
-                    length: defaults.length,
-                    end: defaults.end
-                };
-
-                for (let i = 0; i < args.length; i++) {
-                    const a = args[i];
-                    let an, av;
-
-                    switch (a.type) {
-                        case "AssignmentExp":
-                        {
-                            const l = a.children.target;
-                            const r = a.children.value;
-
-                            // Must be in the form {x,y,w,h} = {num}
-                            if (l.type !== "ID" || (
-                                r.type !== "HexLiteral" && r.type !== "B64Literal" && r.type !== "DecLiteral")) {
-                                throw new EYCTypeError(a, "Expected {start,length,end} = {number}");
-                            }
-                            an = l.children.text;
-                            av = r;
-                            break;
-                        }
-
-                        case "HexLiteral":
-                        case "B64Literal":
-                        case "DecLiteral":
-                        {
-                            // Name is implicit by position
-                            switch (i) {
-                                case 0:
-                                    an = "start";
-                                    break;
-
-                                case 1:
-                                    an = "length";
-                                    break;
-
-                                default:
-                                    throw new EYCTypeError(a, "No default property for index " + i);
-                            }
-
-                            // Value is given
-                            av = a;
-                            break;
-                        }
-
-                        default:
-                            throw new EYCTypeError(a, "Invalid sound set literal");
-                    }
-
-                    // Now get the actual value out of the value
-                    //av = Function("return " + compileExpression(eyc, null, {}, av))();
-                    throw new Error;
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (<any> vals)[an] = av;
-
-                    // Only one of length/end is allowed
-                    if (an === "length")
-                        vals.end = null;
-                    else if (an === "end")
-                        vals.length = null;
-                }
-
-                if (nm === "default") {
-                    // These are the new defaults
-                    defaults = vals;
-
-                } else {
-                    // This is a new sound
-                    set.add(new eyc.Sound(set, nm, vals.start, (vals.length === null) ? (vals.end - vals.start) : vals.length));
-
-                }
-
-                break;
-            }
-
-            default:
-                throw new EYCTypeError(sound, "Unrecognized soundset element " + sound.type);
-        }
-    }
-
-    return set;
 }
 
 /* Resolve a fabric declaration. Involves fetching the actual file defined by
@@ -759,8 +486,6 @@ function typeCheckModule(eyc: types.EYC, module: types.Module) {
             case "ImportDecl":
             case "AliasDecl":
             case "AliasStarDecl":
-            case "SpriteSheetDecl":
-            case "SoundSetDecl":
             case "FabricDecl":
                 // No types or no possibility of type error
                 break;
@@ -1300,11 +1025,6 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
                 resType = eyc.stringType;
 
-            } else if (subExpType.isSpritesheet) {
-                if (!idxType.isString)
-                    throw new EYCTypeError(exp, "Spritesheet index must be a string");
-                resType = eyc.stringType;
-
             } else {
                 throw new EYCTypeError(exp, "Cannot type check index of " + subExpType.type);
 
@@ -1775,8 +1495,6 @@ function compileModule(eyc: types.EYC, module: types.Module) {
             case "ImportDecl":
             case "AliasDecl":
             case "AliasStarDecl":
-            case "SpriteSheetDecl":
-            case "SoundSetDecl":
             case "FabricDecl":
                 // No code
                 break;
