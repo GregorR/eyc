@@ -13,7 +13,7 @@ const EYC = require("./eyc-dbg.js");
         let emodule = await eyc.importModule(eyc.urlAbsolute("/", process.argv[2].replace(/\.eyc$/, "")), {ctx: {privileged: true}});
         let x = new eyc.Object();
         x.extend(emodule.main.klass.prefix);
-        x.methods.$$core$Basic$init(eyc, x, eyc.nil);
+        x.methods.$$core$Program$init(eyc, x, eyc.nil);
         x.methods.$$core$Basic$main(eyc, x, eyc.nil);
     } catch (ex) {
         console.log(ex.toString());
