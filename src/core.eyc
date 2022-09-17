@@ -18,49 +18,96 @@ PERFORMANCE OF THIS SOFTWARE.
 
 @prefix core;
 
+/**
+ * What other languages call "Object". Called "Root" in EYC, because Object
+ * represents actual objects.
+ */
 export class Root {
+    /**
+     * Enforce this suggestion on this object, by ctx.
+     */
     mutating void enforce(suggestion s, set(Root) ctx) {
         @js (s, ctx) { eyc.enforce(s, ctx); } : void;
     }
 
+    /**
+     * Get a random number (from this object).
+     */
     num rand() {
         return @js () { return self.rand(); } : num;
     }
 
+    /**
+     * Get a random number in a range, lower-bound inclusive, upper-bound exclusive.
+     */
     num randRange(num min, num max) {
         return Math.floor(this.rand() * (max-min) + min);
     }
 
+    /**
+     * Get the prefix of this object.
+     */
     string prefix() {
         return @js () { return self.prefix; } : string;
     }
 
+    /**
+     * Get the ID of this object.
+     */
     string id() {
         return @js () { return self.id; } : string;
     }
 }
 
+/**
+ * Math functions.
+ */
 export class Math : Root {
+    /**
+     * Math.floor.
+     * @static
+     */
     num floor(num x) {
         return @js (x) { return Math.floor(x); } : num;
     }
 
+    /**
+     * Math.ceil.
+     * @static
+     */
     num ceil(num x) {
         return @js (x) { return Math.ceil(x); } : num;
     }
 
+    /**
+     * Math.trunc. Similar to Math.floor, but always truncates (i.e., goes
+     * towards zero).
+     * @static
+     */
     num trunc(num x) {
         return @js (x) { return Math.trunc(x); } : num;
     }
 
+    /**
+     * Minimum of exactly two numbers.
+     * @static
+     */
     num min(num x, num y) {
         return @js (x, y) { return Math.min(x, y); } : num;
     }
 
+    /**
+     * Maximum of exactly two numbers.
+     * @static
+     */
     num max(num x, num y) {
         return @js (x, y) { return Math.max(x, y); } : num;
     }
 
+    /**
+     * Absolute value.
+     * @static
+     */
     num abs(num x) {
         if (x < 0)
             return -x;
@@ -68,11 +115,22 @@ export class Math : Root {
     }
 }
 
+/**
+ * Object serialization functions.
+ */
 export class Serialize : Root {
+    /**
+     * Serialize this object.
+     * @static
+     */
     string serialize(Root x) {
         return @js (x) { return eyc.serialize(x); } : string;
     }
 
+    /**
+     * Deserialize an object.
+     * @static
+     */
     Root deserialize(string x) {
         return @js (x) {
             var ret = eyc.deserialize(x);
@@ -82,12 +140,23 @@ export class Serialize : Root {
         } : Root;
     }
 
+    /**
+     * Clone an object, by serializing and deserializing it.
+     * @static
+     */
     Root clone(Root x) {
         return this.deserialize(this.serialize(x));
     }
 }
 
+/**
+ * JSON serialization/deserialization.
+ */
 export class JSON : Root {
+    /**
+     * Like JavaScript's JSON.parse. Returns a JSON object.
+     * @static
+     */
     JSON parse(string json) {
         JSON ret = new JSON;
         return @js (ret, json) {
@@ -100,6 +169,11 @@ export class JSON : Root {
         } : JSON;
     }
 
+    /**
+     * JSON objects in EYC are wrappers for their actual values. This gets the
+     * type of the outermost JSON part, one of "object", "array", "null",
+     * "string", "number", "boolean", or "undefined".
+     */
     string type() {
         return @js () {
             if (typeof self.json === "object") {
@@ -114,6 +188,10 @@ export class JSON : Root {
         } : string;
     }
 
+    /**
+     * Gets the value of the given field of this JSON object, as another JSON
+     * object.
+     */
     JSON field(string field) {
         JSON ret = new JSON;
         return @js (ret, field) {
@@ -126,6 +204,10 @@ export class JSON : Root {
         } : JSON;
     }
 
+    /**
+     * Gets the element at the given index of this JSON array, as another JSON
+     * object, or null if out of bounds.
+     */
     JSON index(num idx) {
         JSON ret = new JSON;
         return @js (ret, idx) {
@@ -138,18 +220,28 @@ export class JSON : Root {
         } : JSON;
     }
 
+    /**
+     * Interpret this value as a number. If it *is* a number, just returns its
+     * value. Otherwise, coerces it to a number by JavaScript rules.
+     */
     num asNum() {
         return @js () {
             return +self.json;
         } : num;
     }
 
+    /**
+     * Interpret this value as a string.
+     */
     string asString() {
         return @js () {
             return "" + self.json;
         } : string;
     }
 
+    /**
+     * Interpret this value as a bool.
+     */
     bool asBool() {
         return @js () {
             return !!self.json;
@@ -165,27 +257,49 @@ export class JSON : Root {
     bool b() { return this.asBool(); }
 }
 
+/**
+ * Debugging console.
+ */
 export class Console : Root {
+    /**
+     * Debug output, strings only.
+     */
     void log(string x) {
         @js (x) { console.log(x); } : void;
     }
 }
 
-// A basic one-shot "main" program (only used in testing)
-export class Basic : Root {
+/**
+ * Abstract class for programs, which can be initialized and then run.
+ */
+export class Program : Root {
     mutating void init() {}
+}
+
+/**
+ * A basic one-shot "main" program, only used in testing.
+ */
+export class Basic : Program {
     mutating num main() {}
 }
 
-// A stage for a 2D game with object-object interactions
-export class Stage : Root {
-    mutating void init() {
+/**
+ * A stage for a 2D game with object-object interactions, i.e., a normal EYC
+ * program.
+ */
+export class Stage : Program {
+    /**
+     * Initialize the stage, mainly by connecting to the frontend.
+     */
+    override mutating void init() {
         this.extStage = @js (w=this.w, h=this.h, ex=this.ex) {
             return eyc.newStage(w, h, ex);
         } : string;
     }
 
-    // Perform a tick of game actions
+    /**
+     * Perform a tick of game actions.
+     */
     mutating void tick() {
         array(suggestion) sa = new;
 
@@ -274,7 +388,9 @@ export class Stage : Root {
             this.enforce(s, null);
     }
 
-    // Add an object to the stage
+    /**
+     * Add an object to the stage.
+     */
     mutating void addObject(Object o) {
         if (o.stage != null) {
             o.stage.remObject(o);
@@ -283,7 +399,10 @@ export class Stage : Root {
         o.addedToStage(this);
     }
 
-    // Add an object to the internal map used to look up interactions
+    /**
+     * Add an object to the internal map used to look up interactions. Used
+     * whenever the object is moved.
+     */
     mutating void addObjectMap(Object o) {
         tuple(num, num, num, num) range = this.range(o);
         for (num y = range[0]; y <= range[1]; y++) {
@@ -296,7 +415,9 @@ export class Stage : Root {
         }
     }
 
-    // Remove an object from this stage
+    /**
+     * Remove an object from this stage.
+     */
     mutating void remObject(Object o) {
         this.objects -= o;
         if (o.stage == this) {
@@ -304,7 +425,9 @@ export class Stage : Root {
         }
     }
 
-    // Utility: The range of map tiles an object occupies
+    /**
+     * Utility: Get the range of map tiles an object occupies.
+     */
     tuple(num, num, num, num) range(Object o) {
         return tuple (
             Math.floor((o.y+o.bby1)/8),
@@ -314,87 +437,130 @@ export class Stage : Root {
         );
     }
 
-    // Create a sprite
+    /**
+     * Add a sprite to the frontend and get its frontend ID.
+     */
     mutating string addSprite(string sprite, num x, num y, string ex) {
         return @js (extStage=this.extStage, sprite, x, y, ex) {
             return eyc.addSprite(extStage, sprite, x, y, ex);
         } : string;
     }
 
-    // Remove a sprite
+    /**
+     * Remove a sprite from the frontend.
+     */
     mutating string removeSprite(string sprite) {
         @js (extStage=this.extStage, sprite) {
             eyc.removeSprite(extStage, sprite);
         } : void;
     }
 
-    // Move a sprite on the stage
+    /**
+     * Move a sprite on the stage.
+     */
     mutating void moveSprite(string sprite, num x, num y) {
         @js (extStage=this.extStage, sprite, x, y) {
             eyc.moveSprite(extStage, sprite, x, y);
         } : void;
     }
 
-    // The width and height of the stage
+    /**
+     * The width and height of the stage.
+     */
     num w = 1920, h = 1080;
 
-    // Extra properties for the stage
+    /**
+     * Extra properties for the stage.
+     */
     string ex;
 
-    // External stage reference for display
+    /**
+     * External stage reference for display.
+     */
     string extStage;
 
-    // Players
+    /**
+     * Players.
+     */
     array(Player) players;
 
-    // The objects on this stage
+    /**
+     * The objects on this stage.
+     */
     set(Object) objects;
 
-    // And their locations, tiled
+    /**
+     * Object locations in terms of tiles, to make collision calculations easier.
+     */
     map(tuple(num, num), set(Object)) tiles;
 }
 
-// An object, in the sense of a thing in 2D space
+/**
+ * An object, in the sense of a thing in 2D space.
+ */
 export class Object : Root {
-    // 1: Play
+    /**
+     * 1: Play (if this object is controlled by a player, it takes input).
+     */
     suggestion takeInput(InputState input) {}
 
-    // 2: Act
+    /**
+     * 2: Act. Normal, per-tick behavior.
+     */
     mutating this suggestion act() {}
 
-    // 3: Determine the kinds of interactions with other objects
+    /**
+     * 3: Determine the kinds of interactions with other objects. e.g., may
+     * decide to damage certain objects and ignore others.
+     */
     string preinteract(Interaction interaction) {}
 
-    // 4: Choose how to interact
+    /**
+     * 4: Choose how to interact. Defines the results of interactions, before
+     * they're actually applied.
+     */
     suggestion interact(array(tuple(Interaction, Interaction)) interactions) {}
 
-    // 5: React to interaction
+    /**
+     * 5: React to interaction. This would be the time to, e.g., take damage or
+     * be destroyed, or be enhanced in some way.
+     */
     mutating this suggestion react() {}
 
-    /* Called when this object is added to a stage (usually for sprite
-     * management) */
+    /**
+     * Called when this object is added to a stage (usually for sprite
+     * management)
+     */
     mutating void addedToStage(Stage stage) {
         this.stage = stage;
     }
 
-    /* Called when this object is removed from a stage (usually for sprite
-     * management) */
+    /**
+     * Called when this object is removed from a stage (usually for sprite
+     * management)
+     */
     mutating void removedFromStage(Stage stage) {
         this.stage = stage;
     }
 
-    // Move this object in X
+    /**
+     * Move this object in the X axis.
+     */
     mutating this void moveX(num by) {
         this.x += by;
     }
 
-    // Move this object in Y
+    /**
+     * Move this object in the Y axis.
+     */
     mutating this void moveY(num by) {
         this.y += by;
     }
 
-    /* Objects aren't inherently clonable, but this helper method is provided
-     * for clonable objects */
+    /**
+     * Objects aren't inherently clonable, but this helper method is provided
+     * for clonable objects. Don't use it in non-clonable objects!
+     */
     mutating this void cloneObject(Object other) {
         this.free = other.free;
         this.x = other.x;
@@ -405,35 +571,64 @@ export class Object : Root {
         this.bby2 = other.bby2;
     }
 
-    // The stage to which this object belongs
+    /**
+     * The stage to which this object belongs.
+     */
     Stage stage;
 
-    // A free object never interacts
+    /**
+     * A free object never interacts.
+     */
     bool free;
 
+    /**
+     * Location of this object on the stage, and its bounding box.
+     */
     num x, y, z, bbx1, bbx2, bby1, bby2;
 }
 
-// An object with a sprite
+/**
+ * An object with a sprite.
+ */
 export class ObjectSprite : Object {
+    /**
+     * React by moving into place. FIXME: This should probably only fire if the
+     * sprite actually moved.
+     */
     override mutating this suggestion react() {
+        /* FIXME
         return super() suggest {
-            this.stage.moveSprite(this.dynamicSprite, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY);
+            this.stage.moveSprite(
+                this.dynamicSprite, this.x + this.spriteOffsetX,
+                this.y + this.spriteOffsetY
+            );
         };
+        */
     }
 
+    /**
+     * When we're added to the stage, we add our sprite.
+     */
     override mutating void addedToStage(Stage stage) {
         super(stage);
-        this.dynamicSprite = stage.addSprite(this.staticSprite, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY, this.spriteEx);
+        this.dynamicSprite = stage.addSprite(
+            this.staticSprite, this.x + this.spriteOffsetX,
+            this.y + this.spriteOffsetY, this.spriteEx
+        );
     }
 
+    /**
+     * When we're removed, we remove our sprite.
+     */
     override mutating void removedFromStage(Stage stage) {
         super(stage);
         stage.removeSprite(this.dynamicSprite);
     }
 
-    /* ObjectSprites aren't inherently clonable, but this helper method is
-     * provided for clonable ObjectSprites */
+    /**
+     * ObjectSprites aren't inherently clonable, but this helper method is
+     * provided for clonable ObjectSprites.
+     */
     mutating this void cloneSprite(ObjectSprite other) {
         this.cloneObject(other);
         this.staticSprite = other.staticSprite;
@@ -454,26 +649,38 @@ export class ObjectSprite : Object {
     num spriteOffsetX, spriteOffsetY;
 }
 
+/**
+ * An interaction (or interaction in potentia) between two objects.
+ */
 export class Interaction : Root {
-    // Every interaction comes as a pair, with swapped from-to
+    /**
+     * The object this interaction is being caused by and happening to. Every
+     * interaction comes as a pair, with the other having from and to swapped.
+     */
     Object from, to;
 
-    // Set by the *from* object
+    /**
+     * An arbitrary "type" of interaction, set by the from sprite.
+     */
     string type;
 
-    // Initialize
+    /**
+     * Initialization.
+     */
     mutating this void init(Object f, Object t) {
         this.from = f;
         this.to = t;
     }
 
-    /* Get the direction of this interaction, one of:
+    /**
+     * Get the direction of this interaction, one of:
      * nw n ne
      *  w o  e
      * sw s se
      *
      * Note that this is the position of *from* relative to *to*, so if the
-     * direction is 'n', then from is above to. */
+     * direction is 'n', then from is above to.
+     */
     string dir(num corner) {
         num o1x1 = this.from.x + this.from.bbx1,
             o1x2 = this.from.x + this.from.bbx2,
@@ -539,7 +746,13 @@ export class Interaction : Root {
 
 }
 
+/**
+ * A player. Really just used to interact with the frontend.
+ */
 export class Player : Root {
+    /**
+     * Each tick, if we're controlling an object, they take our input.
+     */
     suggestion tick() {
         return this.controlling.takeInput(this.input);
     }
@@ -548,10 +761,17 @@ export class Player : Root {
     InputState input;
 }
 
+/**
+ * Objects currently being played.
+ */
 export class Playing : Object {
     Player controlledBy;
 }
 
+/**
+ * State of input, as booleans for whether each controller button is pressed as
+ * well as a set of pressed buttons.
+ */
 export class InputState : Root {
     set(string) pressed;
     bool up, down, left, right, north, south, east, west;
