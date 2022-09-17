@@ -92,6 +92,7 @@ export interface EYC {
     methodTables: Record<string, Record<string, CompiledFunction>>;
 
     // Other heap types
+    newArray: (prefix: string, valueType: string) => EYCArray;
     Map: {new (prefix: string, keyType: string, valueType: string, copy?: Iterable<[unknown, unknown]>): EYCMap};
     Set: {new (prefix: string, valueType: string, copy?: Iterable<unknown>): EYCSet};
     Suggestion(prefix: string, suggestions: SuggestionStep[], append?: SuggestionStep[]): Suggestion;

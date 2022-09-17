@@ -1,8 +1,8 @@
 # Objects
 
 Objects in EYC are objects in JavaScript. Field and method names are mangled
-with the type name: `<url>$<type>$<field>`. Overridden methods share the name of
-their root. Compiled objects look like so:
+with the type name: `<url>$<type>$<field>`. Overridden methods share the name
+of their root. Compiled objects look like so:
 
 ```
 {
