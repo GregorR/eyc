@@ -688,7 +688,7 @@ export class Interaction : Root {
             o1y2 = this.from.y + this.from.bby2,
             o2x1 = this.to.x + this.from.bbx1,
             o2x2 = this.to.x + this.to.bbx2,
-            o2y1 = this.to.y + this.to.bby2,
+            o2y1 = this.to.y + this.to.bby1,
             o2y2 = this.to.y + this.to.bby2;
 
         string rwe, rns, r;
