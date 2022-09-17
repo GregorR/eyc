@@ -864,7 +864,7 @@ export async function eyc(
         rand() {
             if (this.randts !== eyc.ts) {
                 this.randts = eyc.ts;
-                this.randseed = this.id;
+                this.randseed = this.id + "$" + eyc.ts.toString(16);
             }
             const next = sha1(this.randseed, {asBytes: true});
             const nv = (
@@ -1051,7 +1051,7 @@ export async function eyc(
         return ser.deserialize(eyc, val, loadModules);
     },
 
-    // Comparitors for sorting
+    // Comparators for sorting
     cmp: {
         object: idCmp,
         array: idCmp,
