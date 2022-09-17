@@ -2693,7 +2693,7 @@ class MethodCompilationState {
                 {
                     const r = ssa.arg(ir, 2);
                     const l = ssa.arg(ir, 1);
-                    ssa.expr = `(!!${l}.type[${r}])`;
+                    ssa.expr = `(!!${l}.type[${r}.prefix])`;
                     break;
                 }
 
