@@ -32,7 +32,11 @@ export interface EYC {
     urlEncode: (a1: string) => string;
 
     modules: Record<string, Module>;
-    Module: {new (url: string, version: string, absoluteUrl: string, ctx: ModuleCtx): Module};
+    Module: {
+        new (
+            url: string, version: string, absoluteUrl: string, ctx: ModuleCtx
+        ): Module
+    };
 
     resources: Record<string, Resource>;
 
@@ -52,7 +56,12 @@ export interface EYC {
 
     fabrics: Record<string, Fabric>;
     fabricVals: Record<string, EYCArray>;
-    Fabric: {new (module: Module, isGarment: boolean, name: string, url: string, text: string): Fabric};
+    Fabric: {
+        new (
+            module: Module, isGarment: boolean, name: string, url: string,
+            text: string
+        ): Fabric
+    };
 
     classes: Record<string, EYCClass>;
     Class: {new (module: Module, name: string): EYCClass};
@@ -84,13 +93,26 @@ export interface EYC {
 
     // The actual Object class for this EYC instance, and utility functions
     Object: {new (prefix: string): EYCObject};
-    manifestType(type: string, intoArr: string[], intoMap: Record<string, boolean>): void;
+    manifestType(
+        type: string, intoArr: string[], intoMap: Record<string, boolean>
+    ): void;
     methodTables: Record<string, Record<string, CompiledFunction>>;
 
     // Other heap types
-    Map: {new (prefix: string, keyType: string, valueType: string, copy?: Iterable<[unknown, unknown]>): EYCMap};
-    Set: {new (prefix: string, valueType: string, copy?: Iterable<unknown>): EYCSet};
-    Suggestion(prefix: string, suggestions: SuggestionStep[], append?: SuggestionStep[]): Suggestion;
+    Map: {
+        new (
+            prefix: string, keyType: string, valueType: string,
+            copy?: Iterable<[unknown, unknown]>
+        ): EYCMap
+    };
+    Set: {
+        new (
+            prefix: string, valueType: string, copy?: Iterable<unknown>
+        ): EYCSet
+    };
+    Suggestion(
+        prefix: string, suggestions: SuggestionStep[], append?: SuggestionStep[]
+    ): Suggestion;
 
     // Enforce suggestions
     enforce(s: Suggestion, targets: EYCObject[]): void;
@@ -134,7 +156,8 @@ export interface EYCExt {
 }
 
 // A compiled EYC function
-export type CompiledFunction = (eyc: EYC, self: EYCObject, caller: EYCObject) => unknown;
+export type CompiledFunction =
+    (eyc: EYC, self: EYCObject, caller: EYCObject) => unknown;
 
 export interface ImportModuleOpts {
     text?: string;
@@ -334,7 +357,8 @@ export interface EYCHeapThing {
 export interface EYCObject extends EYCHeapThing {
     type: Record<string, boolean>;
     types: string[];
-    methods: Record<string, CompiledFunction>; // Manifested object with methods on it
+    // The "methods" object is manifested by the runtime
+    methods: Record<string, CompiledFunction>;
 
     rand(): number;
     extend(type: string): EYCObject;

@@ -38,7 +38,8 @@ export async function importModule(eyc: types.EYC, url: string,
     }
 
     // Make the output module for it
-    const module = new eyc.Module(url, "1.0", url + ".eyc", opts.ctx || {privileged: false});
+    const module = new eyc.Module(url, "1.0", url + ".eyc",
+                                  opts.ctx || {privileged: false});
 
     // Parse it
     let parsed;
@@ -46,7 +47,8 @@ export async function importModule(eyc: types.EYC, url: string,
         parsed = module.parsed = <types.ModuleNode> parser.parse(text);
     } catch (ex) {
         if (ex.location)
-            console.log(url + ":" + ex.location.start.line + ":" + ex.location.start.column + ": " + ex);
+            console.log(url + ":" + ex.location.start.line + ":" +
+                        ex.location.start.column + ": " + ex);
         throw ex;
     }
 
@@ -99,7 +101,8 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
             case "ImportDecl":
                 if (!c.children.exportClause)
                     break; // Not exported
-                throw new EYCTypeError(c, "Cannot resolve exports of ImportDecl");
+                throw new EYCTypeError(c,
+                                       "Cannot resolve exports of ImportDecl");
 
             case "AliasDecl":
             {
@@ -126,7 +129,8 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
             case "PrefixDecl":
                 // Not actually an export, but now is the right time to get this
                 if (!module.ctx.privileged)
-                    throw new EYCTypeError(c, "Prefix declaration in unprivileged module");
+                    throw new EYCTypeError(c,
+                        "Prefix declaration in unprivileged module");
                 module.prefix = "$$" + c.children.text;
                 break;
 
@@ -145,7 +149,8 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
                 break;
 
             default:
-                throw new EYCTypeError(c, "Cannot resolve exports of " + c.type);
+                throw new EYCTypeError(c,
+                                       "Cannot resolve exports of " + c.type);
         }
     }
 
@@ -154,7 +159,8 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
 
 // Resolve global names
 async function resolveSymbols(eyc: types.EYC, module: types.Module) {
-    const symbols = module.parsed.symbols = <Record<string, types.Tree>> Object.create(null);
+    const symbols = module.parsed.symbols =
+        <Record<string, types.Tree>> Object.create(null);
     const isLocal = <Record<string, boolean>> Object.create(null);
 
     // Start with core
@@ -165,12 +171,15 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
         isLocal.core = false;
     }
 
-    function defineSymbol(ctx: types.Tree, nm: string, val: types.Tree, local: boolean) {
+    function defineSymbol(
+        ctx: types.Tree, nm: string, val: types.Tree, local: boolean
+    ) {
         if (nm in symbols) {
             if (isLocal[nm]) {
                 // Existing definition is local
                 if (local)
-                    throw new EYCTypeError(ctx, "Multiply defined symbol " + nm);
+                    throw new EYCTypeError(ctx,
+                                           "Multiply defined symbol " + nm);
                 // Otherwise, we prefer the local definition
                 return;
             } else {
@@ -223,7 +232,9 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
 
             case "AliasDecl":
             {
-                const target = <types.ModuleNode> resolveName(eyc, module.parsed, c.children.name);
+                const target =
+                    <types.ModuleNode> resolveName(eyc, module.parsed,
+                                                   c.children.name);
                 let nm: string;
                 if (c.children.asClause) {
                     nm = c.children.asClause.children.text;
@@ -245,9 +256,13 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
 
             case "AliasStarDecl":
             {
-                const aliasModule = <types.ModuleNode> resolveName(eyc, module.parsed, c.children.name);
-                if (aliasModule.type !== "Module")
-                    throw new EYCTypeError(c, "Can only alias elements of a module");
+                const aliasModule =
+                    <types.ModuleNode> resolveName(eyc, module.parsed,
+                                                   c.children.name);
+                if (aliasModule.type !== "Module") {
+                    throw new EYCTypeError(c,
+                        "Can only alias elements of a module");
+                }
                 for (const s in aliasModule.exports)
                     defineSymbol(c, s, aliasModule.exports[s], false);
                 break;
@@ -267,7 +282,8 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
                 break;
 
             default:
-                throw new EYCTypeError(c, "Cannot resolve symbols of " + c.type);
+                throw new EYCTypeError(c,
+                                       "Cannot resolve symbols of " + c.type);
         }
     }
 
@@ -281,18 +297,21 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
 
 // Type check global declarations
 async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
-    const symbolTypes = module.parsed.symbolTypes = <Record<string, types.TypeLike>> Object.create(null);
+    const symbolTypes = module.parsed.symbolTypes =
+        <Record<string, types.TypeLike>> Object.create(null);
 
     for (const id of Object.keys(module.parsed.symbols).sort()) {
         const c = module.parsed.symbols[id];
         c.parent = module.parsed;
         switch (c.type) {
             case "ClassDecl":
-                symbolTypes[id] = resolveClassDeclTypes(eyc, <types.ClassNode> c);
+                symbolTypes[id] =
+                    resolveClassDeclTypes(eyc, <types.ClassNode> c);
                 break;
 
             case "FabricDecl":
-                symbolTypes[id] = await resolveFabricDeclTypes(eyc, <types.FabricNode> c);
+                symbolTypes[id] =
+                    await resolveFabricDeclTypes(eyc, <types.FabricNode> c);
                 break;
 
             case "Module":
@@ -308,7 +327,9 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
 
 /* Resolve a fabric declaration. Involves fetching the actual file defined by
  * the fabric. */
-async function resolveFabricDeclTypes(eyc: types.EYC, fabricDecl: types.FabricNode) {
+async function resolveFabricDeclTypes(
+    eyc: types.EYC, fabricDecl: types.FabricNode
+) {
     if (fabricDecl.fabric)
         return fabricDecl.fabric;
 
@@ -321,7 +342,8 @@ async function resolveFabricDeclTypes(eyc: types.EYC, fabricDecl: types.FabricNo
 
     // FIXME: Properties
     if (fabricDecl.children.props.length)
-        throw new EYCTypeError(fabricDecl, "Fabric properties are not yet supported");
+        throw new EYCTypeError(fabricDecl,
+                               "Fabric properties are not yet supported");
 
     /* The actual type is an array(string) (fabric) or array(array(string))
      * (garment) */
@@ -346,7 +368,8 @@ function resolveClassDeclTypes(eyc: types.EYC, classDecl: types.ClassNode) {
     const extsC: types.Tree = classDecl.children.extendsClause;
     let exts: types.EYCClass[];
     if (extsC === null) {
-        // No extends clause, implicitly extend Root (or nothing if this is root)
+        /* No extends clause, implicitly extend Root (or nothing if this is
+         * root) */
         if (classDecl.module.prefix !== "$$core")
             exts = [eyc.classes["$$core$Root"]];
         else
@@ -355,7 +378,9 @@ function resolveClassDeclTypes(eyc: types.EYC, classDecl: types.ClassNode) {
     } else {
         // Get all the classes it extends
         exts = extsC.children.map((ext: types.Tree) => {
-            const decl = <types.ClassNode> resolveName(eyc, classDecl.module.parsed, ext);
+            const decl =
+                <types.ClassNode> resolveName(eyc, classDecl.module.parsed,
+                                              ext);
             if (decl.type !== "ClassDecl")
                 throw new EYCTypeError(ext, "Invalid extension");
             if (!decl.klass)
@@ -407,7 +432,9 @@ function resolveClassDeclTypes(eyc: types.EYC, classDecl: types.ClassNode) {
 }
 
 // Resolve the type of a method declaration (does NOT type check the body)
-function resolveMethodDeclType(eyc: types.EYC, klass: types.EYCClass, methodDecl: types.MethodNode) {
+function resolveMethodDeclType(
+    eyc: types.EYC, klass: types.EYCClass, methodDecl: types.MethodNode
+) {
     // First get the mutation clauses
     let mutating = false, mutatingThis = false;
     if (methodDecl.children.mutating) {
@@ -415,49 +442,66 @@ function resolveMethodDeclType(eyc: types.EYC, klass: types.EYCClass, methodDecl
         if (!methodDecl.children.thisClause)
             mutating = true;
     } else if (methodDecl.children.thisClause) {
-        throw new EYCTypeError(methodDecl, "Cannot have 'this' without 'mutating'");
+        throw new EYCTypeError(methodDecl,
+                               "Cannot have 'this' without 'mutating'");
     }
 
     // The return type
-    const retType = typeNameToType(eyc, methodDecl.module.parsed, methodDecl.children.type);
+    const retType = typeNameToType(eyc, methodDecl.module.parsed,
+                                   methodDecl.children.type);
 
     // And the parameter types
     let paramTypes;
     if (methodDecl.children.params) {
-        paramTypes = methodDecl.children.params.children.map((param: types.Tree) => {
-            return typeNameToType(eyc, methodDecl.module.parsed, param.children.type);
-        });
+        paramTypes = methodDecl.children.params.children.map(
+            (param: types.Tree) => {
+                return typeNameToType(eyc, methodDecl.module.parsed,
+                                      param.children.type);
+            }
+        );
     } else {
         paramTypes = [];
     }
 
-    const signature = methodDecl.signature = new eyc.Method(klass, methodDecl.children.id.children.text, mutating, mutatingThis, retType, paramTypes);
+    const signature = methodDecl.signature =
+        new eyc.Method(klass, methodDecl.children.id.children.text, mutating,
+                       mutatingThis, retType, paramTypes);
 
     // Now put it in the class
     const name = methodDecl.children.id.children.text;
     if (name in klass.methodTypes) {
         // This has to be an override
-        if (!methodDecl.children.override)
-            throw new EYCTypeError(methodDecl, "Must explicitly specify override for override methods (" + name + ")");
-        if (!klass.methodTypes[name].equals(methodDecl.signature))
-            throw new EYCTypeError(methodDecl, "Override method type must be identical to base method type");
+        if (!methodDecl.children.override) {
+            throw new EYCTypeError(methodDecl,
+                "Must explicitly specify override for override methods (" +
+                name + ")");
+        }
+        if (!klass.methodTypes[name].equals(methodDecl.signature)) {
+            throw new EYCTypeError(methodDecl,
+                "Override method type must be identical to base method type");
+        }
 
         // The ID is the parent ID
         signature.id = klass.methodTypes[name].id;
 
     } else {
         // This must NOT be an override
-        if (methodDecl.children.override)
-            throw new EYCTypeError(methodDecl, "Override method overrides nothing");
+        if (methodDecl.children.override) {
+            throw new EYCTypeError(methodDecl,
+                                   "Override method overrides nothing");
+        }
         klass.methodTypes[name] = methodDecl.signature;
 
     }
 }
 
 // Resolve the types of a field declaration
-function resolveFieldDeclTypes(eyc: types.EYC, classType: types.EYCClass, fieldDecl: types.Tree) {
+function resolveFieldDeclTypes(
+    eyc: types.EYC, classType: types.EYCClass, fieldDecl: types.Tree
+) {
     // Get its type
-    const fieldType = fieldDecl.ctype = typeNameToType(eyc, fieldDecl.module.parsed, fieldDecl.children.type);
+    const fieldType = fieldDecl.ctype =
+        typeNameToType(eyc, fieldDecl.module.parsed, fieldDecl.children.type);
 
     // Then assign that type to each declaration
     for (const decl of fieldDecl.children.decls.children) {
@@ -465,9 +509,11 @@ function resolveFieldDeclTypes(eyc: types.EYC, classType: types.EYCClass, fieldD
         const iname = classType.prefix + "$" + name;
         if (name in classType.methodTypes || name in classType.fieldTypes) {
             // Invalid declaration!
-            throw new EYCTypeError(fieldDecl, "Declaration of name that already exists in this type");
+            throw new EYCTypeError(fieldDecl,
+                "Declaration of name that already exists in this type");
         }
-        classType.fieldTypes[name] = classType.ownFieldTypes[iname] = decl.ctype = fieldType;
+        classType.fieldTypes[name] = classType.ownFieldTypes[iname] =
+            decl.ctype = fieldType;
         classType.fieldNames[name] = classType.prefix + "$" + name;
     }
 }
@@ -534,7 +580,8 @@ function typeCheckMethodDecl(eyc: types.EYC, methodDecl: types.MethodNode) {
         const params = methodDecl.children.params.children;
         for (let ai = 0; ai < params.length; ai++) {
             const a = params[ai];
-            symbols[a.children.id.children.text] = methodDecl.signature.paramTypes[ai];
+            symbols[a.children.id.children.text] =
+                methodDecl.signature.paramTypes[ai];
         }
     }
 
@@ -554,7 +601,14 @@ function typeCheckFieldDecl(eyc: types.EYC, fieldDecl: types.Tree) {
             }
 
             // FIXME: null method decl could throw
-            const initType = typeCheckExpression(eyc, null, {mutating: false, mutatingThis: false}, Object.create(null), decl.children.initializer);
+            const initType = typeCheckExpression(
+                eyc, null,
+                {
+                    mutating: false,
+                    mutatingThis: false
+                },
+                Object.create(null), decl.children.initializer
+            );
             if (!initType.equals(type, {subtype: true}))
                 throw new EYCTypeError(decl, "Incorrect initializer type");
         }
@@ -562,8 +616,10 @@ function typeCheckFieldDecl(eyc: types.EYC, fieldDecl: types.Tree) {
 }
 
 // Type check a statement
-function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
-        ctx: CheckCtx, symbols: Record<string, types.TypeLike>, stmt: types.Tree) {
+function typeCheckStatement(
+    eyc: types.EYC, methodDecl: types.MethodNode, ctx: CheckCtx,
+    symbols: Record<string, types.TypeLike>, stmt: types.Tree
+) {
     switch (stmt.type) {
         case "Block":
             symbols = Object.create(symbols);
@@ -573,11 +629,14 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "VarDecl":
         {
-            const type = typeNameToType(eyc, methodDecl.module.parsed, stmt.children.type);
+            const type = typeNameToType(eyc, methodDecl.module.parsed,
+                                        stmt.children.type);
             for (const d of stmt.children.decls.children) {
                 symbols[d.children.id.children.text] = type;
                 if (d.children.initializer) {
-                    const iType = typeCheckExpression(eyc, methodDecl, ctx, symbols, d.children.initializer, {autoType: type});
+                    const iType = typeCheckExpression(
+                        eyc, methodDecl, ctx,symbols, d.children.initializer,
+                        {autoType: type});
                     if (!iType.equals(type, {subtype: true}))
                         throw new EYCTypeError(d, "Initializer of wrong type");
                 }
@@ -588,14 +647,17 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "IfStatement":
         {
-            typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.condition);
+            typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                stmt.children.condition);
 
             const ifSymbols = Object.create(symbols);
-            typeCheckStatement(eyc, methodDecl, ctx, ifSymbols, stmt.children.ifStatement);
+            typeCheckStatement(eyc, methodDecl, ctx, ifSymbols,
+                               stmt.children.ifStatement);
 
             if (stmt.children.elseStatement) {
                 const elseSymbols = Object.create(symbols);
-                typeCheckStatement(eyc, methodDecl, ctx, elseSymbols, stmt.children.elseStatement);
+                typeCheckStatement(eyc, methodDecl, ctx, elseSymbols,
+                                   stmt.children.elseStatement);
             }
 
             break;
@@ -606,23 +668,29 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
             symbols = Object.create(symbols);
             if (stmt.children.initializer) {
                 if (stmt.children.initializer.type === "VarDecl")
-                    typeCheckStatement(eyc, methodDecl, ctx, symbols, stmt.children.initializer);
+                    typeCheckStatement(eyc, methodDecl, ctx, symbols,
+                                       stmt.children.initializer);
                 else
-                    typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.initializer);
+                    typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                        stmt.children.initializer);
             }
 
             if (stmt.children.condition)
-                typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.condition);
+                typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                    stmt.children.condition);
             if (stmt.children.increment)
-                typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.increment);
+                typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                    stmt.children.increment);
 
-            typeCheckStatement(eyc, methodDecl, ctx, symbols, stmt.children.body);
+            typeCheckStatement(eyc, methodDecl, ctx, symbols,
+                               stmt.children.body);
             break;
         }
 
         case "ForInStatement":
         {
-            const expType = typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.collection);
+            const expType = typeCheckExpression(
+                eyc, methodDecl, ctx, symbols, stmt.children.collection);
             let elType;
             if (expType.isArray || expType.isSet)
                 elType = (<types.ArrayType & types.SetType> expType).valueType;
@@ -630,15 +698,19 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
                 elType = eyc.stringType;
             else if (expType.isMap)
                 elType = (<types.MapType> expType).keyType;
-            else
-                throw new EYCTypeError(stmt, "Invalid for-in loop collection type");
+            else {
+                throw new EYCTypeError(stmt,
+                                       "Invalid for-in loop collection type");
+            }
 
             let itType;
             if (stmt.children.type) {
-                itType = typeNameToType(eyc, methodDecl.module.parsed, stmt.children.type);
+                itType = typeNameToType(eyc, methodDecl.module.parsed,
+                                        stmt.children.type);
                 stmt.children.id.ctype = itType;
             } else {
-                itType = typeCheckLValue(eyc, methodDecl, ctx, symbols, stmt.children.id);
+                itType = typeCheckLValue(eyc, methodDecl, ctx, symbols,
+                                         stmt.children.id);
             }
 
             if (!elType.equals(itType, {subtype: true}))
@@ -646,68 +718,87 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
 
             symbols = Object.create(symbols);
             symbols[stmt.children.id.children.text] = itType;
-            typeCheckStatement(eyc, methodDecl, ctx, symbols, stmt.children.body);
+            typeCheckStatement(eyc, methodDecl, ctx, symbols,
+                               stmt.children.body);
             break;
         }
 
         case "ForInMapStatement":
         {
-            const expType = <types.MapType> typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.collection);
+            const expType = <types.MapType> typeCheckExpression(
+                eyc, methodDecl, ctx, symbols, stmt.children.collection);
 
             let keyType;
             if (stmt.children.keyType) {
-                keyType = typeNameToType(eyc, methodDecl.module.parsed, stmt.children.keyType);
+                keyType = typeNameToType(eyc, methodDecl.module.parsed,
+                                         stmt.children.keyType);
                 stmt.children.key.ctype = keyType;
             } else {
-                keyType = typeCheckLValue(eyc, methodDecl, ctx, symbols, stmt.children.key);
+                keyType = typeCheckLValue(eyc, methodDecl, ctx, symbols,
+                                          stmt.children.key);
             }
 
             let valType;
             if (stmt.children.valueType) {
-                valType = typeNameToType(eyc, methodDecl.module.parsed, stmt.children.valueType);
+                valType = typeNameToType(eyc, methodDecl.module.parsed,
+                                         stmt.children.valueType);
                 stmt.children.value.ctype = valType;
             } else {
-                valType = typeCheckLValue(eyc, methodDecl, ctx, symbols, stmt.children.value);
+                valType = typeCheckLValue(eyc, methodDecl, ctx, symbols,
+                                          stmt.children.value);
             }
 
             if (expType.isString) {
                 // index-string loop
-                if (!keyType.isNum || !valType.isString)
-                    throw new EYCTypeError(stmt, "Incorrect types for for-in loop over string");
+                if (!keyType.isNum || !valType.isString) {
+                    throw new EYCTypeError(stmt,
+                        "Incorrect types for for-in loop over string");
+                }
 
             } else if (expType.isArray) {
                 // index-element loop
                 if (!keyType.isNum)
                     throw new EYCTypeError(stmt, "Incorrect key iterator type");
-                if (!expType.valueType.equals(valType, {subtype: true}))
-                    throw new EYCTypeError(stmt, "Incorrect value iterator type");
+                if (!expType.valueType.equals(valType, {subtype: true})) {
+                    throw new EYCTypeError(stmt,
+                                           "Incorrect value iterator type");
+                }
 
             } else if (expType.isMap) {
                 if (!expType.keyType.equals(keyType, {subtype: true}))
                     throw new EYCTypeError(stmt, "Incorrect key iterator type");
-                if (!expType.valueType.equals(valType, {subtype: true}))
-                    throw new EYCTypeError(stmt, "Incorrect value iterator type");
+                if (!expType.valueType.equals(valType, {subtype: true})) {
+                    throw new EYCTypeError(stmt,
+                                           "Incorrect value iterator type");
+                }
 
             } else {
-                throw new EYCTypeError(stmt, "Two-variable for-in loop on invalid type");
+                throw new EYCTypeError(stmt,
+                    "Two-variable for-in loop on invalid type");
             }
 
             symbols = Object.create(symbols);
             symbols[stmt.children.key.children.text] = keyType;
             symbols[stmt.children.value.children.text] = valType;
-            typeCheckStatement(eyc, methodDecl, ctx, symbols, stmt.children.body);
+            typeCheckStatement(eyc, methodDecl, ctx, symbols,
+                               stmt.children.body);
             break;
         }
 
         case "ReturnStatement":
             if (stmt.children.value) {
-                const retType = typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.value);
-                if (!retType.equals(methodDecl.signature.retType, {subtype: true}))
+                const retType = typeCheckExpression(
+                    eyc, methodDecl, ctx, symbols, stmt.children.value);
+                if (!retType.equals(methodDecl.signature.retType,
+                                    {subtype: true})) {
                     throw new EYCTypeError(stmt, "Incorrect return type");
+                }
 
             } else {
-                if (!methodDecl.signature.retType.isVoid)
-                    throw new EYCTypeError(stmt, "void return in function expecting return value");
+                if (!methodDecl.signature.retType.isVoid) {
+                    throw new EYCTypeError(stmt,
+                        "void return in function expecting return value");
+                }
 
             }
             break;
@@ -716,18 +807,26 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
         case "RetractStatement":
         {
             const exp = stmt.children.expression;
-            if (exp.type !== "CastExp")
-                throw new EYCTypeError(exp, "Invalid extension/retraction statement");
+            if (exp.type !== "CastExp") {
+                throw new EYCTypeError(exp,
+                    "Invalid extension/retraction statement");
+            }
 
             // The target has to be an object type
-            const targetType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
-            if (!targetType.isObject)
-                throw new EYCTypeError(exp, "Only objects can be extended/retracted");
+            const targetType = typeCheckExpression(
+                eyc, methodDecl, ctx, symbols, exp.children.expression);
+            if (!targetType.isObject) {
+                throw new EYCTypeError(exp,
+                    "Only objects can be extended/retracted");
+            }
 
             // The type has to be a class
-            const type = typeNameToType(eyc, methodDecl.module.parsed, exp.children.type);
-            if (!type.isObject)
-                throw new EYCTypeError(exp, "Objects may only have classes added or removed");
+            const type = typeNameToType(eyc, methodDecl.module.parsed,
+                                        exp.children.type);
+            if (!type.isObject) {
+                throw new EYCTypeError(exp,
+                    "Objects may only have classes added or removed");
+            }
             exp.children.type.ctype = type;
 
             // And the mutation has to be allowed
@@ -743,7 +842,8 @@ function typeCheckStatement(eyc: types.EYC, methodDecl: types.MethodNode,
         }
 
         case "ExpStatement":
-            typeCheckExpression(eyc, methodDecl, ctx, symbols, stmt.children.expression);
+            typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                stmt.children.expression);
             break;
 
         default:
@@ -757,17 +857,27 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
         opts: {autoType?: types.Type} = {}): types.TypeLike {
     // Basic likely checks
     let leftType, rightType, subExpType, resType: types.TypeLike;
-    if (exp.children.left)
-        leftType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.left);
-    if (exp.children.right)
-        rightType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.right);
-    if (exp.children.expression)
-        subExpType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
+    if (exp.children.left) {
+        leftType = typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                       exp.children.left);
+    }
+    if (exp.children.right) {
+        rightType = typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                        exp.children.right);
+    }
+    if (exp.children.expression) {
+        subExpType = typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                         exp.children.expression);
+    }
 
     switch (exp.type) {
         case "AssignmentExp":
-            leftType = typeCheckLValue(eyc, methodDecl, ctx, symbols, exp.children.target, {mutating: exp.children.op !== "="});
-            rightType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.value, {autoType: leftType});
+            leftType = typeCheckLValue(
+                eyc, methodDecl, ctx, symbols, exp.children.target,
+                {mutating: exp.children.op !== "="});
+            rightType = typeCheckExpression(
+                eyc, methodDecl, ctx, symbols, exp.children.value,
+                {autoType: leftType});
             resType = leftType;
 
             if (exp.children.op === "=") {
@@ -778,12 +888,18 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             } else if (exp.children.op === "+=") {
                 switch (leftType.type) {
                     case "array":
-                        if (!rightType.equals((<types.ArrayType> leftType).valueType, {subtype: true}))
-                            throw new EYCTypeError(exp, "Invalid array expansion");
+                        if (!rightType.equals(
+                            (<types.ArrayType> leftType).valueType,
+                            {subtype: true})) {
+                            throw new EYCTypeError(exp,
+                                                   "Invalid array expansion");
+                        }
                         break;
 
                     case "set":
-                        if (!rightType.equals((<types.SetType> leftType).valueType, {subtype: true}))
+                        if (!rightType.equals(
+                            (<types.SetType> leftType).valueType,
+                            {subtype: true}))
                             throw new EYCTypeError(exp, "Invalid set addition");
                         break;
 
@@ -794,18 +910,23 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                         break;
 
                     default:
-                        throw new EYCTypeError(exp, "Cannot use += on " + leftType.type);
+                        throw new EYCTypeError(exp,
+                            "Cannot use += on " + leftType.type);
                 }
 
             } else if (exp.children.op === "-=") {
                 switch (leftType.type) {
                     case "map":
-                        if (!rightType.equals((<types.MapType> leftType).keyType, {subtype: true}))
+                        if (!rightType.equals(
+                            (<types.MapType> leftType).keyType,
+                            {subtype: true}))
                             throw new EYCTypeError(exp, "Invalid map removal");
                         break;
 
                     case "set":
-                        if (!rightType.equals((<types.SetType> leftType).valueType, {subtype: true}))
+                        if (!rightType.equals(
+                            (<types.SetType> leftType).valueType,
+                            {subtype: true}))
                             throw new EYCTypeError(exp, "Invalid set removal");
                         break;
 
@@ -815,12 +936,15 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                         break;
 
                     default:
-                        throw new EYCTypeError(exp, "Cannot use -= on " + leftType.type);
+                        throw new EYCTypeError(exp,
+                            "Cannot use -= on " + leftType.type);
                 }
 
             } else {
-                if (!leftType.isNum || !rightType.isNum)
-                    throw new EYCTypeError(exp, "Only numbers are valid for " + exp.children.op);
+                if (!leftType.isNum || !rightType.isNum) {
+                    throw new EYCTypeError(exp,
+                        "Only numbers are valid for " + exp.children.op);
+                }
 
             }
             break;
@@ -839,26 +963,37 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
         case "RelExp":
             if (exp.children.op === "in") {
                 let elType;
-                if (rightType.isSet || rightType.isArray)
-                    elType = (<types.SetType & types.ArrayType> rightType).valueType;
-                else if (rightType.isMap)
+                if (rightType.isSet || rightType.isArray) {
+                    elType =
+                        (<types.SetType & types.ArrayType> rightType).valueType;
+                } else if (rightType.isMap) {
                     elType = (<types.MapType> rightType).keyType;
-                else
-                    throw new EYCTypeError(exp, "\"in\" is only valid on collections");
-                if (!leftType.equals(elType, {subtype: true}))
-                    throw new EYCTypeError(exp, "Left type is not element type of collection");
+                } else {
+                    throw new EYCTypeError(exp,
+                        "\"in\" is only valid on collections");
+                }
+                if (!leftType.equals(elType, {subtype: true})) {
+                    throw new EYCTypeError(exp,
+                        "Left type is not element type of collection");
+                }
 
             } else if (exp.children.op === "is") {
-                if (!leftType.isObject)
-                    throw new EYCTypeError(exp, "Only objects may be instances");
+                if (!leftType.isObject) {
+                    throw new EYCTypeError(exp,
+                                           "Only objects may be instances");
+                }
                 if (!rightType.isClass)
                     throw new EYCTypeError(exp, "Invalid instance-of check");
 
             } else {
-                if (!leftType.equals(rightType, {castable: true}))
-                    throw new EYCTypeError(exp, "Attempt to compare unequal types");
-                if (leftType.isSuggestion)
-                    throw new EYCTypeError(exp, "Suggestions are not comparable");
+                if (!leftType.equals(rightType, {castable: true})) {
+                    throw new EYCTypeError(exp,
+                                           "Attempt to compare unequal types");
+                }
+                if (leftType.isSuggestion) {
+                    throw new EYCTypeError(exp,
+                                           "Suggestions are not comparable");
+                }
 
             }
             resType = eyc.boolType;
@@ -879,16 +1014,20 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             break;
 
         case "MulExp":
-            if (!leftType.isNum || !rightType.isNum)
-                throw new EYCTypeError(exp, exp.children.op + " is only valid on numbers");
+            if (!leftType.isNum || !rightType.isNum) {
+                throw new EYCTypeError(exp,
+                    exp.children.op + " is only valid on numbers");
+            }
             resType = leftType;
             break;
 
         case "UnExp":
             switch (exp.children.op) {
                 case "-":
-                    if (!subExpType.isNum)
-                        throw new EYCTypeError(exp, "Only numbers may be negated");
+                    if (!subExpType.isNum) {
+                        throw new EYCTypeError(exp,
+                                               "Only numbers may be negated");
+                    }
                     resType = eyc.numType;
                     break;
 
@@ -898,21 +1037,26 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     break;
 
                 default:
-                    throw new EYCTypeError(exp, "No UnExp type checker for " + exp.children.op);
+                    throw new EYCTypeError(exp,
+                        "No UnExp type checker for " + exp.children.op);
             }
             break;
 
         case "PostIncExp":
         case "PostDecExp":
-            typeCheckLValue(eyc, methodDecl, ctx, symbols, exp.children.expression);
-            if (!subExpType.isNum)
-                throw new EYCTypeError(exp, "Increment/decrement is only valid on numbers");
+            typeCheckLValue(eyc, methodDecl, ctx, symbols,
+                            exp.children.expression);
+            if (!subExpType.isNum) {
+                throw new EYCTypeError(exp,
+                    "Increment/decrement is only valid on numbers");
+            }
             resType = subExpType;
             break;
 
         case "CastExp":
         {
-            const targetType = typeNameToType(eyc, methodDecl.module.parsed, exp.children.type);
+            const targetType = typeNameToType(eyc, methodDecl.module.parsed,
+                                              exp.children.type);
 
             // Anything can be coerced to a string
             if (!targetType.isString) {
@@ -934,28 +1078,42 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
         case "CallExp":
         {
             const signature = <types.Method> subExpType;
-            if (!signature.isMethod)
-                throw new EYCTypeError(exp, "Attempt to call a non-method as a method");
-            if (exp.type === "CallExp" && exp.children.expression.type !== "DotExp")
-                throw new EYCTypeError(exp, "Methods are only accessible through .x syntax");
+            if (!signature.isMethod) {
+                throw new EYCTypeError(exp,
+                    "Attempt to call a non-method as a method");
+            }
+            if (exp.type === "CallExp" &&
+                exp.children.expression.type !== "DotExp") {
+                throw new EYCTypeError(exp,
+                    "Methods are only accessible through .x syntax");
+            }
 
             if (!ctx.mutating) {
                 if (!ctx.mutatingThis) {
                     // No mutation allowed
-                    if (signature.mutatingThis)
-                        throw new EYCTypeError(exp, "Attempt to call mutating method from non-mutating context");
+                    if (signature.mutatingThis) {
+                        throw new EYCTypeError(exp,
+                            "Attempt to call mutating method from " +
+                            "non-mutating context");
+                    }
 
                 } else {
                     // Only mutating this with the same this is allowed
-                    if (signature.mutating)
-                        throw new EYCTypeError(exp, "Attempt to call mutating method from mutating this context");
+                    if (signature.mutating) {
+                        throw new EYCTypeError(exp,
+                            "Attempt to call mutating method from mutating " +
+                            "this context");
+                    }
 
                     if (signature.mutatingThis) {
                         // This is only allowed if it's super or this.something
                         if (exp.type !== "SuperCall" &&
                             (exp.children.expression.type !== "DotExp" ||
                              exp.children.expression.children.expression.type !== "This")) {
-                            throw new EYCTypeError(exp, "A mutating this method may only call another mutating this method with the same this");
+                            throw new EYCTypeError(exp,
+                                "A mutating this method may only call " +
+                                "another mutating this method with the same " +
+                                "this");
                         }
 
                     }
@@ -970,9 +1128,14 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
             // Check all the argument types
             for (let ai = 0; ai < args.length; ai++) {
-                const argType = typeCheckExpression(eyc, methodDecl, ctx, symbols, args[ai], {autoType: signature.paramTypes[ai]});
-                if (!argType.equals(signature.paramTypes[ai], {subtype: true}))
-                    throw new EYCTypeError(exp.children.args.children[ai], "Argument " + (ai+1) + " of incorrect type");
+                const argType = typeCheckExpression(
+                    eyc, methodDecl, ctx, symbols, args[ai],
+                    {autoType: signature.paramTypes[ai]});
+                if (!argType.equals(
+                    signature.paramTypes[ai], {subtype: true})) {
+                    throw new EYCTypeError(exp.children.args.children[ai],
+                        "Argument " + (ai+1) + " of incorrect type");
+                }
             }
 
             // The call was correct
@@ -982,7 +1145,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "IndexExp":
         {
-            const idxType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.index);
+            const idxType = typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                                exp.children.index);
 
             if (subExpType.isArray) {
                 if (!idxType.isNum)
@@ -999,11 +1163,15 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     idx = +idx.children.text;
                 else if (idx.type === "HexLiteral")
                     idx = parseInt(idx.children.text, 16);
-                else
-                    throw new EYCTypeError(exp, "Index of tuple must be a literal");
+                else {
+                    throw new EYCTypeError(exp,
+                                           "Index of tuple must be a literal");
+                }
 
-                if (~~idx !== idx || idx < 0 || idx >= tupleType.valueTypes.length)
+                if (~~idx !== idx || idx < 0 ||
+                    idx >= tupleType.valueTypes.length) {
                     throw new EYCTypeError(exp, "Index out of bounds");
+                }
                 exp.children.idx = idx;
 
                 resType = tupleType.valueTypes[idx];
@@ -1015,27 +1183,34 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                 resType = mapType.valueType;
 
             } else if (subExpType.isSet) {
-                if (!idxType.equals((<types.SetType> subExpType).valueType, {subtype: true}))
+                if (!idxType.equals(
+                    (<types.SetType> subExpType).valueType, {subtype: true}))
                     throw new EYCTypeError(exp, "Invalid set index type");
                 resType = eyc.boolType;
 
             } else if (subExpType.isString) {
-                if (!idxType.isNum)
-                    throw new EYCTypeError(exp, "String index must be a number");
+                if (!idxType.isNum) {
+                    throw new EYCTypeError(exp,
+                                           "String index must be a number");
+                }
 
                 resType = eyc.stringType;
 
             } else {
-                throw new EYCTypeError(exp, "Cannot type check index of " + subExpType.type);
+                throw new EYCTypeError(exp,
+                    "Cannot type check index of " + subExpType.type);
 
             }
             break;
         }
 
         case "SuggestionExtendExp":
-            if (!subExpType.isSuggestion)
-                throw new EYCTypeError(exp, "Can only add suggestions to suggestions");
-            typeCheckSuggestions(eyc, methodDecl, ctx, symbols, exp.children.suggestions);
+            if (!subExpType.isSuggestion) {
+                throw new EYCTypeError(exp,
+                    "Can only add suggestions to suggestions");
+            }
+            typeCheckSuggestions(eyc, methodDecl, ctx, symbols,
+                                 exp.children.suggestions);
             resType = eyc.suggestionType;
             break;
 
@@ -1043,10 +1218,13 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
         {
             const name = exp.children.id.children.text;
 
-            if (subExpType.isArray || subExpType.isSet || subExpType.isMap || subExpType.isString) {
+            if (subExpType.isArray || subExpType.isSet || subExpType.isMap ||
+                subExpType.isString) {
                 // Collection types only accept "length"
-                if (exp.children.id.children.text !== "length")
-                    throw new EYCTypeError(exp, "Collections do not have fields");
+                if (exp.children.id.children.text !== "length") {
+                    throw new EYCTypeError(exp,
+                                           "Collections do not have fields");
+                }
                 resType = eyc.numType;
                 break;
 
@@ -1056,7 +1234,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                 // Look for an export
                 if (!(name in sModule.parsed.exports))
                     throw new EYCTypeError(exp, "No such export");
-                resType = sModule.parsed.exports[name].ctype; // FIXME: Always set?
+                // FIXME: ctype always set here?
+                resType = sModule.parsed.exports[name].ctype;
                 break;
 
             } else if (subExpType.isClass) {
@@ -1070,8 +1249,10 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
             }
 
-            if (!subExpType.isObject)
-                throw new EYCTypeError(exp, "Cannot get a member of a non-object type");
+            if (!subExpType.isObject) {
+                throw new EYCTypeError(exp,
+                    "Cannot get a member of a non-object type");
+            }
 
             // Try to find the member
             const klass = (<types.EYCObjectType> subExpType).instanceOf;
@@ -1090,21 +1271,26 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             resType = eyc.suggestionType;
 
             // But, the suggestion elements have to type check
-            typeCheckSuggestions(eyc, methodDecl, ctx, symbols, exp.children.suggestions);
+            typeCheckSuggestions(eyc, methodDecl, ctx, symbols,
+                                 exp.children.suggestions);
             break;
         }
 
         case "NewExp":
         {
             if (exp.children.type)
-                resType = typeNameToType(eyc, methodDecl.module.parsed, exp.children.type);
+                resType = typeNameToType(eyc, methodDecl.module.parsed,
+                                         exp.children.type);
             else if (opts.autoType)
                 resType = opts.autoType;
-            else
-                throw new EYCTypeError(exp, "Cannot infer type for new in this context");
+            else {
+                throw new EYCTypeError(exp,
+                    "Cannot infer type for new in this context");
+            }
 
             if (exp.children.prefix) {
-                const prefixType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.prefix);
+                const prefixType = typeCheckExpression(
+                    eyc, methodDecl, ctx, symbols, exp.children.prefix);
                 if (!prefixType.isString)
                     throw new EYCTypeError(exp, "Non-string prefix");
             }
@@ -1116,22 +1302,29 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     mutatingThis: true
                 };
                 withSymbols["this"] = resType;
-                typeCheckStatement(eyc, methodDecl, withCtx, withSymbols, exp.children.withBlock);
+                typeCheckStatement(eyc, methodDecl, withCtx, withSymbols,
+                                   exp.children.withBlock);
             }
 
             break;
         }
 
         case "This":
-            resType = <types.Type> symbols["this"]; // this is always the instance type of the class
+            // this is always the instance type of the class
+            resType = <types.Type> symbols["this"];
             break;
 
         case "JavaScriptExpression":
-            if (!methodDecl.module.ctx.privileged)
-                throw new EYCTypeError(exp, "JavaScript expression in unprivileged context");
+            if (!methodDecl.module.ctx.privileged) {
+                throw new EYCTypeError(exp,
+                    "JavaScript expression in unprivileged context");
+            }
             if (exp.children.pass) {
-                for (const c of exp.children.pass.children)
-                    typeCheckExpression(eyc, methodDecl, ctx, symbols, c.children.initializer || c.children.id);
+                for (const c of exp.children.pass.children) {
+                    typeCheckExpression(
+                        eyc, methodDecl, ctx, symbols,
+                        c.children.initializer || c.children.id);
+                }
             }
             resType = typeNameToType(eyc, exp.module.parsed, exp.children.type);
             break;
@@ -1201,9 +1394,13 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "ArrayLiteral":
         {
-            const elTypes = exp.children.elements.children.map((c: types.Tree) => typeCheckExpression(eyc, methodDecl, ctx, symbols, c));
-            if (elTypes.length === 0)
-                throw new EYCTypeError(exp, "Empty array literals do not have a type. Use 'new'.");
+            const elTypes = exp.children.elements.children.map(
+                (c: types.Tree) => typeCheckExpression(
+                    eyc, methodDecl, ctx, symbols, c));
+            if (elTypes.length === 0) {
+                throw new EYCTypeError(exp,
+                    "Empty array literals do not have a type. Use 'new'.");
+            }
             const elType = elTypes[0];
             for (let ei = 1; ei < elTypes.length; ei++) {
                 // FIXME: mutual supertype
@@ -1216,7 +1413,9 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "TupleLiteral":
         {
-            const elTypes = exp.children.elements.children.map((c: types.Tree) => typeCheckExpression(eyc, methodDecl, ctx, symbols, c));
+            const elTypes = exp.children.elements.children.map(
+                (c: types.Tree) => typeCheckExpression(
+                    eyc, methodDecl, ctx, symbols, c));
             resType = new eyc.TupleType(elTypes);
             break;
         }
@@ -1256,9 +1455,12 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
             }
 
             // Set elements aren't really things, so they're not mutable
-            const subExpType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
-            if (subExpType.isSet)
-                throw new EYCTypeError(exp, "Sets cannot be modified with assignment");
+            const subExpType = typeCheckExpression(
+                eyc, methodDecl, ctx, symbols, exp.children.expression);
+            if (subExpType.isSet) {
+                throw new EYCTypeError(exp,
+                    "Sets cannot be modified with assignment");
+            }
 
             break;
         }
@@ -1268,17 +1470,22 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
             if (!ctx.mutatingThis)
                 throw new EYCTypeError(exp, "Illegal mutation");
 
-            // Non-objects expose some "fields" such as length, but they're not mutable
-            const subExpType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
+            /* Non-objects expose some "fields" such as length, but they're not
+             * mutable */
+            const subExpType = typeCheckExpression(
+                eyc, methodDecl, ctx, symbols, exp.children.expression);
             if (!subExpType.isObject)
                 throw new EYCTypeError(exp, "Only objects have mutable fields");
 
             /* Mutation *of* the value is only allowed if we're a mutating
              * function, or it's a primitive member of this */
             if (opts.mutating && !ctx.mutating) {
-                const retType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp);
-                if (exp.children.expression.type !== "This" || !retType.isPrimitive)
+                const retType = typeCheckExpression(
+                    eyc, methodDecl, ctx, symbols, exp);
+                if (exp.children.expression.type !== "This" ||
+                    !retType.isPrimitive) {
                     throw new EYCTypeError(exp, "Illegal mutation");
+                }
             }
 
             break;
@@ -1289,7 +1496,8 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
             if (!opts.mutating)
                 throw new EYCTypeError(exp, "Illegal mutation");
 
-            const thisType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp);
+            const thisType = typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                                 exp);
             if (thisType.isPrimitive)
                 throw new EYCTypeError(exp, "Illegal mutating");
 
@@ -1303,9 +1511,11 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
         case "ID":
         {
             if (opts.mutating) {
-                const retType = typeCheckExpression(eyc, methodDecl, ctx, symbols, exp);
+                const retType = typeCheckExpression(eyc, methodDecl, ctx,
+                                                    symbols, exp);
                 if (!retType.isPrimitive) {
-                    // We're mutating the object in this L-Value, rather than changing the variable itself
+                    /* We're mutating the object in this L-Value, rather than
+                     * changing the variable itself */
                     if (!ctx.mutating)
                         throw new EYCTypeError(exp, "Illegal mutation");
                 }
@@ -1351,14 +1561,19 @@ function typeCheckSuggestion(eyc: types.EYC, methodDecl: types.MethodNode,
         {
             // It has to be a cast expression
             const exp = suggestion.children.expression;
-            if (exp.type !== "CastExp")
-                throw new EYCTypeError(suggestion, "Invalid extension/retraction statement");
+            if (exp.type !== "CastExp") {
+                throw new EYCTypeError(suggestion,
+                    "Invalid extension/retraction statement");
+            }
 
-            // The cast's subexpression has the same mutation restrictions as we do
+            /* The cast's subexpression has the same mutation restrictions as we
+             * do */
             typeCheckExpression(eyc, methodDecl, ctx, symbols, exp);
 
             // But the whole statement can mutate
-            typeCheckStatement(eyc, methodDecl, {mutating: true, mutatingThis: true}, symbols, suggestion);
+            typeCheckStatement(eyc, methodDecl,
+                               {mutating: true, mutatingThis: true}, symbols,
+                               suggestion);
             break;
         }
 
@@ -1366,38 +1581,54 @@ function typeCheckSuggestion(eyc: types.EYC, methodDecl: types.MethodNode,
         {
             // It has to be a method call
             const exp = suggestion.children.expression;
-            if (exp.type !== "CallExp")
-                throw new EYCTypeError(suggestion, "Only method calls and extensions/retractions may be suggestions");
+            if (exp.type !== "CallExp") {
+                throw new EYCTypeError(suggestion,
+                    "Only method calls and extensions/retractions may be " +
+                    "suggestions");
+            }
 
-            // We have to type-check each of the children with normal mutation rules
-            typeCheckExpression(eyc, methodDecl, ctx, symbols, exp.children.expression);
-            for (const arg of (exp.children.args ? exp.children.args.children : []))
+            /* We have to type-check each of the children with normal mutation
+             * rules */
+            typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                exp.children.expression);
+            for (const arg of (exp.children.args ?
+                               exp.children.args.children : []))
                 typeCheckExpression(eyc, methodDecl, ctx, symbols, arg);
 
             // But the whole expression is allowed to mutate
-            typeCheckStatement(eyc, methodDecl, {mutating: true, mutatingThis: true}, symbols, suggestion);
+            typeCheckStatement(eyc, methodDecl,
+                               {mutating: true, mutatingThis: true}, symbols,
+                               suggestion);
             break;
         }
 
         default:
-            throw new EYCTypeError(suggestion, "Cannot type check suggestion " + suggestion.type);
+            throw new EYCTypeError(suggestion,
+                "Cannot type check suggestion " + suggestion.type);
     }
 }
 
-// Given a type declaration, convert it into an EYC type, possibly doing typechecking to achieve this
-function typeNameToType(eyc: types.EYC, ctx: types.ModuleNode, decl: types.Tree): types.Type {
+/* Given a type declaration, convert it into an EYC type, possibly doing
+ * typechecking to achieve this */
+function typeNameToType(
+    eyc: types.EYC, ctx: types.ModuleNode, decl: types.Tree
+): types.Type {
     switch (decl.type) {
         case "TypeSet":
-            return new eyc.SetType(typeNameToType(eyc, ctx, decl.children.type));
+            return new eyc.SetType(
+                typeNameToType(eyc, ctx, decl.children.type));
 
         case "TypeArray":
-            return new eyc.ArrayType(typeNameToType(eyc, ctx, decl.children.type));
+            return new eyc.ArrayType(
+                typeNameToType(eyc, ctx, decl.children.type));
 
         case "TypeTuple":
         {
-            const elTypes = decl.children.types.children.map((type: types.Tree) => {
-                return typeNameToType(eyc, ctx, type);
-            });
+            const elTypes = decl.children.types.children.map(
+                (type: types.Tree) => {
+                    return typeNameToType(eyc, ctx, type);
+                }
+            );
             return new eyc.TupleType(elTypes);
         }
 
@@ -1425,7 +1656,8 @@ function typeNameToType(eyc: types.EYC, ctx: types.ModuleNode, decl: types.Tree)
 
         case "TypeName":
         {
-            const resolved = <types.ClassNode> resolveName(eyc, ctx, decl.children.name);
+            const resolved =
+                <types.ClassNode> resolveName(eyc, ctx, decl.children.name);
             if (resolved.type !== "ClassDecl")
                 throw new EYCTypeError(decl, "Type name does not name a type");
             if (!resolved.itype)
@@ -1439,7 +1671,9 @@ function typeNameToType(eyc: types.EYC, ctx: types.ModuleNode, decl: types.Tree)
 }
 
 // Resolve a name to its defining declaration
-function resolveName(eyc: types.EYC, module: types.ModuleNode, name: types.Tree) {
+function resolveName(
+    eyc: types.EYC, module: types.ModuleNode, name: types.Tree
+) {
     let cur = null;
 
     // Step one: Start from the base name
@@ -1459,14 +1693,17 @@ function resolveName(eyc: types.EYC, module: types.ModuleNode, name: types.Tree)
             {
                 // Check its exports
                 const curM = <types.ModuleNode> cur;
-                if (!(step in curM.exports))
-                    throw new EYCTypeError(name.children[ni], "Name " + step + " not found in module");
+                if (!(step in curM.exports)) {
+                    throw new EYCTypeError(name.children[ni],
+                        "Name " + step + " not found in module");
+                }
                 cur = curM.exports[step];
                 break;
             }
 
             default:
-                throw new EYCTypeError(name.children[ni], "Cannot look up names in a " + cur.type);
+                throw new EYCTypeError(name.children[ni],
+                                       "Cannot look up names in a " + cur.type);
         }
     }
 
@@ -1475,7 +1712,8 @@ function resolveName(eyc: types.EYC, module: types.ModuleNode, name: types.Tree)
 
 // Compile this module
 function compileModule(eyc: types.EYC, module: types.Module) {
-    // There is only one kind of global variable that actually has a value: Fabrics
+    /* There is only one kind of global variable that actually has a value:
+     * Fabrics */
     const symbols: Record<string, string> = Object.create(null);
     for (const s in module.parsed.symbols) {
         const v = module.parsed.symbols[s];
@@ -1628,12 +1866,15 @@ class MethodCompilationState {
 
         // And compile to JS
         //console.error(this.compileJS(ir, this.decl.signature.retType));
-        this.ccs.klass.methods[this.decl.signature.id] = <types.CompiledFunction>
+        this.ccs.klass.methods[this.decl.signature.id] =
+            <types.CompiledFunction>
             Function(params.join(","),
                 this.compileJS(ir, this.decl.signature.retType));
     }
 
-    compileSSA(ir: SSA[], symbols: Record<string, string>, node: types.Tree): number {
+    compileSSA(
+        ir: SSA[], symbols: Record<string, string>, node: types.Tree
+    ): number {
         switch (node.type) {
             case "Block":
             {
@@ -1657,7 +1898,8 @@ class MethodCompilationState {
                     let init: number;
                     if (d.children.initializer) {
                         // Explicit initializer
-                        init = this.compileSSA(ir, symbols, d.children.initializer);
+                        init = this.compileSSA(ir, symbols,
+                                               d.children.initializer);
                     } else {
                         // Implicit initializer
                         init = ir.length;
@@ -1675,7 +1917,8 @@ class MethodCompilationState {
             case "IfStatement":
             {
                 // Condition
-                const cond = this.compileSSA(ir, symbols, node.children.condition);
+                const cond = this.compileSSA(ir, symbols,
+                                             node.children.condition);
                 const bool = new SSA(node,
                     "bool-from-" + node.children.condition.ctype.type,
                     ir.length, cond);
@@ -1684,13 +1927,15 @@ class MethodCompilationState {
                 ir.push(iff);
 
                 // Then branch
-                this.compileSSA(ir, Object.create(symbols), node.children.ifStatement);
+                this.compileSSA(ir, Object.create(symbols),
+                                node.children.ifStatement);
                 ir.push(new SSA(node, "fi", ir.length, iff.idx));
 
                 // Else branch if applicable
                 if (node.children.elseStatement) {
                     ir.push(new SSA(node, "else", ir.length, iff.idx));
-                    this.compileSSA(ir, Object.create(symbols), node.children.elseStatement);
+                    this.compileSSA(ir, Object.create(symbols),
+                                    node.children.elseStatement);
                     ir.push(new SSA(node, "esle", ir.length, iff.idx));
                 }
                 break;
@@ -1711,7 +1956,9 @@ class MethodCompilationState {
                 // Condition
                 if (node.children.condition) {
                     const c = this.compileSSA(ir, s2, node.children.condition);
-                    const cf = new SSA(node, "not-" + node.children.condition.ctype.type, ir.length, c);
+                    const cf = new SSA(
+                        node, "not-" + node.children.condition.ctype.type,
+                        ir.length, c);
                     ir.push(cf);
                     ir.push(new SSA(node, "break", ir.length, cf.idx));
                 }
@@ -1732,7 +1979,8 @@ class MethodCompilationState {
             {
                 // FIXME: reverse
                 // First, get what we're looping over
-                const coll = this.compileSSA(ir, symbols, node.children.collection);
+                const coll = this.compileSSA(ir, symbols,
+                                             node.children.collection);
 
                 // Possibly declare the variable
                 const s2 = Object.create(symbols);
@@ -1747,7 +1995,8 @@ class MethodCompilationState {
                 let loopHead: SSA;
                 switch (node.children.collection.ctype.type) {
                     case "array":
-                        loopHead = new SSA(node, "for-in-array", ir.length, coll);
+                        loopHead = new SSA(node, "for-in-array", ir.length,
+                                           coll);
                         ir.push(loopHead);
                         break;
 
@@ -1756,7 +2005,8 @@ class MethodCompilationState {
                         let op: string;
 
                         // Special case for sets of tuples
-                        if ((<types.SetType> node.children.collection.ctype).valueType.isTuple) {
+                        if ((<types.SetType> node.children.collection.ctype)
+                            .valueType.isTuple) {
                             op = "set-tuple-values-array";
                         } else {
                             op = "set-values-array";
@@ -1764,18 +2014,22 @@ class MethodCompilationState {
 
                         const loopArr = new SSA(node, op, ir.length, coll);
                         ir.push(loopArr);
-                        loopHead = new SSA(node, "for-in-array", ir.length, loopArr.idx);
+                        loopHead = new SSA(node, "for-in-array", ir.length,
+                                           loopArr.idx);
                         ir.push(loopHead);
                         break;
                     }
 
                     case "string":
-                        loopHead = new SSA(node, "for-in-string", ir.length, coll);
+                        loopHead = new SSA(node, "for-in-string", ir.length,
+                                           coll);
                         ir.push(loopHead);
                         break;
 
                     default:
-                        throw new EYCTypeError(node, "No compiler for for-in " + node.children.collection.ctype.type);
+                        throw new EYCTypeError(node,
+                            "No compiler for for-in " +
+                            node.children.collection.ctype.type);
                 }
                 loopHead.ex = s2[node.children.id.children.text];
 
@@ -1791,7 +2045,8 @@ class MethodCompilationState {
             {
                 // FIXME: reverse
                 // First, get what we're looping over
-                const coll = this.compileSSA(ir, symbols, node.children.collection);
+                const coll = this.compileSSA(ir, symbols,
+                                             node.children.collection);
 
                 // Possibly declare the variable
                 const s2 = Object.create(symbols);
@@ -1818,7 +2073,8 @@ class MethodCompilationState {
                     case "string":
                     {
                         // Loop over the indices
-                        loopHead = new SSA(node, "for-in-" + ctype + "-idx", ir.length, coll);
+                        loopHead = new SSA(node, "for-in-" + ctype + "-idx",
+                                           ir.length, coll);
                         loopHead.ex = keyNm;
                         ir.push(loopHead);
 
@@ -1826,10 +2082,12 @@ class MethodCompilationState {
                         const varr = new SSA(node, "var", ir.length);
                         varr.ex = keyNm;
                         ir.push(varr);
-                        const getter = new SSA(node.children.value, ctype + "-index",
-                            ir.length, coll, varr.idx);
+                        const getter = new SSA(node.children.value,
+                                               ctype + "-index", ir.length,
+                                               coll, varr.idx);
                         ir.push(getter);
-                        const setter = new SSA(node, "var-assign", ir.length, getter.idx);
+                        const setter = new SSA(node, "var-assign", ir.length,
+                                               getter.idx);
                         setter.ex = valNm;
                         ir.push(setter);
 
@@ -1839,8 +2097,11 @@ class MethodCompilationState {
                     case "map":
                     {
                         // Special case for maps of tuples
-                        if ((<types.MapType> node.children.collection.ctype).keyType.isTuple) {
-                            throw new EYCTypeError(node, "No compiler for two-variable for-in map of tuple");
+                        if ((<types.MapType> node.children.collection.ctype)
+                            .keyType.isTuple) {
+                            throw new EYCTypeError(node,
+                                "No compiler for two-variable for-in map of " +
+                                "tuple");
                         }
 
                         const loopArr = new SSA(node.children.collection,
@@ -1848,7 +2109,8 @@ class MethodCompilationState {
                         ir.push(loopArr);
 
                         // Loop over the keys
-                        loopHead = new SSA(node, "for-in-array", ir.length, loopArr.idx);
+                        loopHead = new SSA(node, "for-in-array", ir.length,
+                                           loopArr.idx);
                         loopHead.ex = keyNm;
                         ir.push(loopHead);
 
@@ -1859,14 +2121,17 @@ class MethodCompilationState {
                         const getter = new SSA(node.children.value, "map-get",
                             ir.length, coll, varr.idx);
                         ir.push(getter);
-                        const setter = new SSA(node, "var-assign", ir.length, getter.idx);
+                        const setter = new SSA(node, "var-assign", ir.length,
+                                               getter.idx);
                         setter.ex = valNm;
                         ir.push(setter);
                         break;
                     }
 
                     default:
-                        throw new EYCTypeError(node, "No compiler for two-variable for-in " + node.children.collection.ctype.type);
+                        throw new EYCTypeError(node,
+                            "No compiler for two-variable for-in " +
+                            node.children.collection.ctype.type);
                 }
 
                 // Then the body
@@ -1887,7 +2152,8 @@ class MethodCompilationState {
             case "ExtendStatement":
             case "RetractStatement":
             {
-                const c = this.compileSSA(ir, symbols, node.children.expression.children.expression);
+                const c = this.compileSSA(
+                    ir, symbols,node.children.expression.children.expression);
                 const ex = new SSA(node,
                     (node.type === "RetractStatement") ? "retract" : "extend",
                     ir.length, c);
@@ -1901,10 +2167,12 @@ class MethodCompilationState {
 
             case "AssignmentExp":
             {
-                const target = this.compileLExp(ir, symbols, node.children.target);
+                const target = this.compileLExp(ir, symbols,
+                                                node.children.target);
 
                 // Special op case for sets
-                if (node.children.target.ctype.isSet && node.children.op !== "=") {
+                if (node.children.target.ctype.isSet &&
+                    node.children.op !== "=") {
                     const setType = <types.SetType> node.children.target.ctype;
 
                     // Adding or removing from a set
@@ -1924,14 +2192,17 @@ class MethodCompilationState {
                     const tv = target.val;
                     tv.idx = ir.length;
                     ir.push(tv);
-                    const value = this.compileSSA(ir, symbols, node.children.value);
+                    const value = this.compileSSA(ir, symbols,
+                                                  node.children.value);
                     ir.push(new SSA(node, op, ir.length, tv.idx, value));
                     return tv.idx;
 
-                } else if (node.children.target.ctype.isArray && node.children.op === "+=") {
+                } else if (node.children.target.ctype.isArray &&
+                           node.children.op === "+=") {
                     // And for array concatenation
                     let op = "";
-                    if (node.children.target.ctype.equals(node.children.value.ctype)) {
+                    if (node.children.target.ctype.equals(
+                        node.children.value.ctype)) {
                         // array-array concatenation
                         op = "array-concatenate";
                     } else {
@@ -1942,7 +2213,8 @@ class MethodCompilationState {
                     const tv = target.val;
                     tv.idx = ir.length;
                     ir.push(tv);
-                    const value = this.compileSSA(ir, symbols, node.children.value);
+                    const value = this.compileSSA(ir, symbols,
+                                                  node.children.value);
                     ir.push(new SSA(node, op, ir.length, tv.idx, value));
                     return tv.idx;
 
@@ -1970,7 +2242,8 @@ class MethodCompilationState {
                     ir.push(tv);
 
                     // Then the value of the right
-                    const rv = this.compileSSA(ir, symbols, node.children.value);
+                    const rv = this.compileSSA(ir, symbols,
+                                               node.children.value);
 
                     // Then put them together
                     value = ir.length;
@@ -1995,9 +2268,11 @@ class MethodCompilationState {
                     case "-": type = "neg"; break;
                     case "!": type = "not"; break;
                     default:
-                        throw new EYCTypeError(node, "No compiler for unary " + node.children.op);
+                        throw new EYCTypeError(node,
+                            "No compiler for unary " + node.children.op);
                 }
-                const s = this.compileSSA(ir, symbols, node.children.expression);
+                const s = this.compileSSA(ir, symbols,
+                                          node.children.expression);
                 ir.push(new SSA(node,
                     type + "-" + node.children.expression.ctype.type,
                     ir.length, s
@@ -2008,7 +2283,8 @@ class MethodCompilationState {
             case "OrExp":
             case "AndExp":
             {
-                // Because of short-circuiting, these need to be rewritten as conditions
+                /* Because of short-circuiting, these need to be rewritten as
+                 * conditions */
                 const target = "$ss$" + (this.varCtr++);
                 this.vars.push(target);
 
@@ -2087,7 +2363,8 @@ class MethodCompilationState {
                     case "*": op = "mul"; break;
                     case "/": op = "div"; break;
                     case "%": op = "mod"; break;
-                    default: throw new Error(node.children.op); // Should never be reached
+                    // Should never be reached:
+                    default: throw new Error(node.children.op);
                 }
 
                 const l = this.compileSSA(ir, symbols, node.children.left);
@@ -2105,13 +2382,15 @@ class MethodCompilationState {
             {
                 if (node.ctype.isString) {
                     // An actual coercion
-                    const sub = this.compileSSA(ir, symbols, node.children.expression);
+                    const sub = this.compileSSA(ir, symbols,
+                                                node.children.expression);
                     ir.push(new SSA(node,
                         "string-from-" + node.children.expression.ctype.type,
                         ir.length, sub));
                 } else {
                     // Just pass thru
-                    return this.compileSSA(ir, symbols, node.children.expression);
+                    return this.compileSSA(ir, symbols,
+                                           node.children.expression);
                 }
                 break;
             }
@@ -2120,7 +2399,8 @@ class MethodCompilationState {
             case "PostDecExp":
             {
                 // The target is written to
-                const target = this.compileLExp(ir, symbols, node.children.expression);
+                const target = this.compileLExp(ir, symbols,
+                                                node.children.expression);
 
                 // Get the value
                 const tv = target.val;
@@ -2151,8 +2431,11 @@ class MethodCompilationState {
                 // Arguments
                 const head = new SSA(node, "call-head", ir.length);
                 ir.push(head);
-                for (const c of node.children.args ? node.children.args.children : [])
-                    ir.push(new SSA(node, "arg", ir.length, head.idx, this.compileSSA(ir, symbols, c)));
+                for (const c of (node.children.args ?
+                                 node.children.args.children : [])) {
+                    ir.push(new SSA(node, "arg", ir.length, head.idx,
+                                    this.compileSSA(ir, symbols, c)));
+                }
 
                 // Then the call
                 ir.push(new SSA(node, "call-call-super", ir.length, head.idx));
@@ -2162,28 +2445,35 @@ class MethodCompilationState {
             case "CallExp":
             {
                 // First, the target
-                const target = this.compileSSA(ir, symbols, node.children.expression.children.expression);
+                const target = this.compileSSA(
+                    ir, symbols,node.children.expression.children.expression);
 
                 // Then, the arguments
                 const head = new SSA(node, "call-head", ir.length);
                 ir.push(head);
-                for (const c of node.children.args ? node.children.args.children : [])
-                    ir.push(new SSA(node, "arg", ir.length, head.idx, this.compileSSA(ir, symbols, c)));
+                for (const c of (node.children.args ?
+                                 node.children.args.children : [])) {
+                    ir.push(new SSA(node, "arg", ir.length, head.idx,
+                                    this.compileSSA(ir, symbols, c)));
+                }
 
                 // Then the call proper
                 if (node.children.expression.children.expression.ctype.isClass) {
                     // Static method call
-                    ir.push(new SSA(node, "call-call-static", ir.length, head.idx, target));
+                    ir.push(new SSA(node, "call-call-static", ir.length,
+                                    head.idx, target));
                 } else {
                     // Standard method call
-                    ir.push(new SSA(node, "call-call", ir.length, head.idx, target));
+                    ir.push(new SSA(node, "call-call", ir.length, head.idx,
+                                    target));
                 }
                 break;
             }
 
             case "IndexExp":
             {
-                const target = this.compileSSA(ir, symbols, node.children.expression);
+                const target = this.compileSSA(ir, symbols,
+                                               node.children.expression);
                 const index = this.compileSSA(ir, symbols, node.children.index);
 
                 switch (node.children.expression.ctype.type) {
@@ -2198,9 +2488,11 @@ class MethodCompilationState {
                     {
                         // Tuple case
                         let tuple = "";
-                        if ((<types.MapType> node.children.expression.ctype).keyType.isTuple)
+                        if ((<types.MapType> node.children.expression.ctype)
+                            .keyType.isTuple)
                             tuple = "-tuple";
-                        ir.push(new SSA(node, "map" + tuple + "-get", ir.length, target, index));
+                        ir.push(new SSA(node, "map" + tuple + "-get", ir.length,
+                                        target, index));
                         break;
                     }
 
@@ -2208,23 +2500,30 @@ class MethodCompilationState {
                     {
                         // Tuple case
                         let tuple = "";
-                        if ((<types.SetType> node.children.expression.ctype).valueType.isTuple)
+                        if ((<types.SetType> node.children.expression.ctype)
+                            .valueType.isTuple)
                             tuple = "-tuple";
-                        ir.push(new SSA(node, "set" + tuple + "-get", ir.length, target, index));
+                        ir.push(new SSA(node, "set" + tuple + "-get", ir.length,
+                                        target, index));
                         break;
                     }
 
                     default:
-                        throw new EYCTypeError(node, "No compiler for index " + node.children.expression.ctype.type);
+                        throw new EYCTypeError(node,
+                            "No compiler for index " +
+                            node.children.expression.ctype.type);
                 }
                 break;
             }
 
             case "SuggestionExtendExp":
             {
-                const target = this.compileSSA(ir, symbols, node.children.expression);
-                const sug = this.compileSuggestions(ir, symbols, node, node.children.suggestions);
-                ir.push(new SSA(node, "add-suggestion-suggestion", ir.length, target, sug));
+                const target = this.compileSSA(ir, symbols,
+                                               node.children.expression);
+                const sug = this.compileSuggestions(ir, symbols, node,
+                                                    node.children.suggestions);
+                ir.push(new SSA(node, "add-suggestion-suggestion", ir.length,
+                                target, sug));
                 break;
             }
 
@@ -2238,7 +2537,8 @@ class MethodCompilationState {
                     break;
                 }
 
-                const target = this.compileSSA(ir, symbols, node.children.expression);
+                const target = this.compileSSA(ir, symbols,
+                                               node.children.expression);
                 const ttype = node.children.expression.ctype.type;
                 switch (ttype) {
                     case "object":
@@ -2248,19 +2548,23 @@ class MethodCompilationState {
                     case "array":
                     case "string":
                         // Must be length
-                        console.assert(node.children.id.children.text === "length");
-                        ir.push(new SSA(node, ttype + "-length", ir.length, target));
+                        console.assert(node.children.id.children.text ===
+                                       "length");
+                        ir.push(new SSA(node, ttype + "-length", ir.length,
+                                        target));
                         break;
 
                     default:
-                        throw new EYCTypeError(node, "No compiler for dot " + ttype);
+                        throw new EYCTypeError(node,
+                                               "No compiler for dot " + ttype);
                 }
                 break;
             }
 
             case "SuggestionLiteral":
             {
-                const sug = this.compileSuggestions(ir, symbols, node, node.children.suggestions);
+                const sug = this.compileSuggestions(ir, symbols, node,
+                                                    node.children.suggestions);
                 ir.push(new SSA(node, "suggestion-literal", ir.length, sug));
                 break;
             }
@@ -2276,7 +2580,8 @@ class MethodCompilationState {
                         ir.push(neww);
 
                         // Then, we extend it
-                        const ext = ret = new SSA(node, "extend", ir.length, neww.idx);
+                        const ext = ret = new SSA(node, "extend", ir.length,
+                                                  neww.idx);
                         ext.ex = node.ctype;
                         ir.push(ext);
                         break;
@@ -2292,7 +2597,8 @@ class MethodCompilationState {
                         // Intentional fallthrough
 
                     default:
-                        ret = new SSA(node, "new-" + node.ctype.type, ir.length);
+                        ret = new SSA(node, "new-" + node.ctype.type,
+                                      ir.length);
                         ir.push(ret);
                 }
 
@@ -2317,12 +2623,14 @@ class MethodCompilationState {
                 const args: number[] = [];
                 const head = new SSA(node, "javascript-head", ir.length);
                 ir.push(head);
-                for (const c of node.children.pass ? node.children.pass.children : []) {
+                for (const c of (node.children.pass ?
+                                 node.children.pass.children : [])) {
                     const id = c.children.id.children.text;
                     params.push(id);
                     if (c.children.initializer) {
                         // Initialize to a set expression
-                        const arg = this.compileSSA(ir, symbols, c.children.initializer);
+                        const arg = this.compileSSA(ir, symbols,
+                                                    c.children.initializer);
                         args.push(ir.length);
                         ir.push(new SSA(node, "arg", ir.length, head.idx, arg));
                     } else {
@@ -2334,12 +2642,14 @@ class MethodCompilationState {
                         varr.ex = jsnm;
                         ir.push(varr);
                         args.push(ir.length);
-                        ir.push(new SSA(node, "arg", ir.length, head.idx, varr.idx));
+                        ir.push(new SSA(node, "arg", ir.length, head.idx,
+                                        varr.idx));
                     }
                 }
 
                 // Now the actual code
-                const ssa = new SSA(node, "javascript-call", ir.length, head.idx);
+                const ssa = new SSA(node, "javascript-call", ir.length,
+                                    head.idx);
                 ssa.ex = params;
                 ir.push(ssa);
                 break;
@@ -2376,7 +2686,8 @@ class MethodCompilationState {
                     args.push(ir.length);
                     ir.push(new SSA(node, "arg", ir.length, head.idx, arg));
                 }
-                ir.push(new SSA(node, "tuple-literal-tail", ir.length, head.idx));
+                ir.push(new SSA(node, "tuple-literal-tail", ir.length,
+                                head.idx));
                 break;
             }
 
@@ -2413,25 +2724,33 @@ class MethodCompilationState {
     }
 
     // Compile a node as an l-expression
-    compileLExp(ir: SSA[], symbols: Record<string, string>, node: types.Tree): LExp {
+    compileLExp(
+        ir: SSA[], symbols: Record<string, string>, node: types.Tree
+    ): LExp {
         switch (node.type) {
             case "IndexExp":
                 switch (node.children.expression.ctype.type) {
                     case "map":
                     {
-                        const mapType = <types.MapType> node.children.expression.ctype;
+                        const mapType =
+                            <types.MapType> node.children.expression.ctype;
 
                         // Special case for tuple
                         let tuple = "";
                         if (mapType.keyType.isTuple)
                             tuple = "-tuple";
 
-                        const target = this.compileSSA(ir, symbols, node.children.expression);
-                        const index = this.compileSSA(ir, symbols, node.children.index);
-                        const mapPair = new SSA(node, "map-pair", ir.length, target, index);
+                        const target = this.compileSSA(
+                            ir, symbols, node.children.expression);
+                        const index = this.compileSSA(ir, symbols,
+                                                      node.children.index);
+                        const mapPair = new SSA(node, "map-pair", ir.length,
+                                                target, index);
                         ir.push(mapPair);
-                        const assg = new SSA(node, "map" + tuple + "-assign", -1, mapPair.idx);
-                        const val = new SSA(node, "map" + tuple + "-get", -1, target, index);
+                        const assg = new SSA(node, "map" + tuple + "-assign",
+                                             -1, mapPair.idx);
+                        const val = new SSA(node, "map" + tuple + "-get", -1,
+                                            target, index);
                         return {
                             assg, val,
                             patch: (x) => {
@@ -2441,7 +2760,9 @@ class MethodCompilationState {
                     }
 
                     default:
-                        throw new EYCTypeError(node, "No compiler for l-expression index " + node.children.expression.ctype.type);
+                        throw new EYCTypeError(node,
+                            "No compiler for l-expression index " +
+                            node.children.expression.ctype.type);
                 }
 
             case "DotExp":
@@ -2456,7 +2777,8 @@ class MethodCompilationState {
                         patch: null
                     };
                 } else {
-                    const target = this.compileSSA(ir, symbols, node.children.expression);
+                    const target = this.compileSSA(ir, symbols,
+                                                   node.children.expression);
                     const assg = new SSA(node, "field-assign", -1, target);
                     const val = new SSA(node, "field", -1, target);
                     return {
@@ -2496,7 +2818,8 @@ class MethodCompilationState {
             }
 
             default:
-                throw new EYCTypeError(node, "No compiler for l-expression " + node.type);
+                throw new EYCTypeError(node,
+                    "No compiler for l-expression " + node.type);
         }
     }
 
@@ -2991,7 +3314,9 @@ class MethodCompilationState {
                     ssa.expr = "(" + tmp + "=[]," +
                         tmp + ".prefix=self.prefix," +
                         tmp + '.id=self.prefix+"$"+eyc.freshId(),' +
-                        tmp + ".valueType=" + JSON.stringify((<types.ArrayType> ssa.ctx.ctype).valueType.basicType()) + "," +
+                        tmp + ".valueType=" +
+                        JSON.stringify((<types.ArrayType> ssa.ctx.ctype).valueType.basicType()) +
+                        "," +
                         tmp + ")";
                     break;
                 }
@@ -3158,7 +3483,8 @@ class MethodCompilationState {
                     break;
 
                 default:
-                    throw new EYCTypeError(ssa.ctx, "No compiler for " + ssa.type);
+                    throw new EYCTypeError(ssa.ctx,
+                                           "No compiler for " + ssa.type);
             }
         }
     }
@@ -3208,6 +3534,7 @@ function compileFieldDecl(ccs: ClassCompilationState, fieldDecl: types.Tree) {
         } else {
             init = "return " + type.default({build: true}) + ";";
         }
-        klass.fieldInits[iname] = <types.CompiledFunction> Function("eyc", "self", "caller", init);
+        klass.fieldInits[iname] = <types.CompiledFunction>
+            Function("eyc", "self", "caller", init);
     }
 }

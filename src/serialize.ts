@@ -27,7 +27,9 @@ export function serialize(eyc: types.EYC, val: any): string {
     return "@EYCSer\n" + JSON.stringify(szd);
 }
 
-function ser(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: any) {
+function ser(
+    eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: any
+) {
     let id: string;
 
     // First get an ID for caching
@@ -114,7 +116,10 @@ function ser(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: a
     return ret;
 }
 
-function serializeObject(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCObject) {
+function serializeObject(
+    eyc: types.EYC, szd: any[], mapping: Record<string, number>,
+    val: types.EYCObject
+) {
     const ret: any[] = ["o"];
     szd.push(ret);
 
@@ -131,11 +136,16 @@ function serializeObject(eyc: types.EYC, szd: any[], mapping: Record<string, num
     fields = fields.sort();
 
     // Serialize them
-    for (const field of fields)
-        ret.push([ser(eyc, szd, mapping, field), ser(eyc, szd, mapping, val[field])]);
+    for (const field of fields) {
+        ret.push([ser(eyc, szd, mapping, field),
+                  ser(eyc, szd, mapping,val[field])]);
+    }
 }
 
-function serializeArray(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCArray) {
+function serializeArray(
+    eyc: types.EYC, szd: any[], mapping: Record<string, number>,
+    val: types.EYCArray
+) {
     const ret: any[] = ["a"];
     szd.push(ret);
     ret.push(ser(eyc, szd, mapping, val.prefix));
@@ -144,14 +154,20 @@ function serializeArray(eyc: types.EYC, szd: any[], mapping: Record<string, numb
         ret.push(ser(eyc, szd, mapping, v));
 }
 
-function serializeTuple(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.Tuple) {
+function serializeTuple(
+    eyc: types.EYC, szd: any[], mapping: Record<string, number>,
+    val: types.Tuple
+) {
     const ret: any[] = ["t"];
     szd.push(ret);
     for (const v of val)
         ret.push(ser(eyc, szd, mapping, v));
 }
 
-function serializeMap(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCMap) {
+function serializeMap(
+    eyc: types.EYC, szd: any[], mapping: Record<string, number>,
+    val: types.EYCMap
+) {
     const ret: any[] = ["m"];
     szd.push(ret);
     ret.push(ser(eyc, szd, mapping, val.prefix));
@@ -181,7 +197,10 @@ function serializeMap(eyc: types.EYC, szd: any[], mapping: Record<string, number
     }
 }
 
-function serializeSet(eyc: types.EYC, szd: any[], mapping: Record<string, number>, val: types.EYCSet) {
+function serializeSet(
+    eyc: types.EYC, szd: any[], mapping: Record<string, number>,
+    val: types.EYCSet
+) {
     const ret: any[] = ["s"];
     szd.push(ret);
     ret.push(ser(eyc, szd, mapping, val.prefix));
@@ -194,7 +213,9 @@ function serializeSet(eyc: types.EYC, szd: any[], mapping: Record<string, number
 
 /* DESERIALIZATION */
 
-export function deserialize(eyc: types.EYC, szdS: string, loadModules: boolean): any {
+export function deserialize(
+    eyc: types.EYC, szdS: string, loadModules: boolean
+): any {
     // Check magic
     if (szdS.slice(0, 8) !== "@EYCSer\n")
         return eyc.nil;
@@ -287,7 +308,9 @@ function resolveType(eyc: types.EYC, szd: any[], types: string[], idx: number) {
     }
 }
 
-function resolveTuple(eyc: types.EYC, szd: any[], types: string[], idx: number) {
+function resolveTuple(
+    eyc: types.EYC, szd: any[], types: string[], idx: number
+) {
     /* To resolve the type of a tuple, we need to get the constituent types of
      * its members */
     // FIXME: What about null in tuples?
@@ -298,7 +321,9 @@ function resolveTuple(eyc: types.EYC, szd: any[], types: string[], idx: number) 
 }
 
 // Manifest the requested element
-function manifest(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
+function manifest(
+    eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number
+) {
     if (idx === 0)
         return eyc.nil;
     if (ret[idx])
@@ -334,11 +359,14 @@ function manifest(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: 
     }
 }
 
-function manifestObject(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
+function manifestObject(
+    eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number
+) {
     const el = szd[idx];
 
     // 1: Create the object base
-    const obj = ret[idx] = new eyc.Object(manifest(eyc, szd, ret, types, el[1]) + "");
+    const obj = ret[idx] =
+        new eyc.Object(manifest(eyc, szd, ret, types, el[1]) + "");
 
     // 2: Get as much of its type as we're aware of
     for (const typeIdx of el[2]) {
@@ -378,7 +406,9 @@ function manifestObject(eyc: types.EYC, szd: any[], ret: any[], types: string[],
     return obj;
 }
 
-function manifestArray(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
+function manifestArray(
+    eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number
+) {
     const el = szd[idx];
     const subType = szd[el[2]];
     const arr = ret[idx] = <types.EYCArray> new Array(el.length - 3);
@@ -397,7 +427,9 @@ function manifestArray(eyc: types.EYC, szd: any[], ret: any[], types: string[], 
     return arr;
 }
 
-function manifestTuple(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
+function manifestTuple(
+    eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number
+) {
     const el = szd[idx];
     const tup = ret[idx] = new Array(el.length - 1);
 
@@ -406,7 +438,9 @@ function manifestTuple(eyc: types.EYC, szd: any[], ret: any[], types: string[], 
     return tup;
 }
 
-function manifestMap(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
+function manifestMap(
+    eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number
+) {
     const el = szd[idx];
     const prefix = manifest(eyc, szd, ret, types, el[1]) + "";
     const keyType = manifest(eyc, szd, ret, types, el[2]) + "";
@@ -421,13 +455,16 @@ function manifestMap(eyc: types.EYC, szd: any[], ret: any[], types: string[], id
             throw new Error;
         if (!equiv(resolveType(eyc, szd, types, vidx), valueType))
             throw new Error;
-        map.set(manifest(eyc, szd, ret, types, kidx), manifest(eyc, szd, ret, types, vidx));
+        map.set(manifest(eyc, szd, ret, types, kidx),
+                manifest(eyc, szd, ret, types, vidx));
     }
 
     return map;
 }
 
-function manifestSet(eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number) {
+function manifestSet(
+    eyc: types.EYC, szd: any[], ret: any[], types: string[], idx: number
+) {
     const el = szd[idx];
     const prefix = szd[el[1]] + "";
     const valueType = szd[el[2]] + "";

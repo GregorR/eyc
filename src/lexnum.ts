@@ -66,7 +66,8 @@ export function numToLexString(x: number): string {
     let f = Math.trunc(x);
     const fs = ts64(f);
     let fl = fs.length;
-    if (neg) fl = 171-fl; // 171 is maximum length of a 64-bit float's positive part in base-64
+    // 171 is maximum length of a 64-bit float's positive part in base-64
+    if (neg) fl = 171-fl;
     const fls = lexNumToB64(fl).padStart(2, "0");
     out += fls + fs;
     x -= f;

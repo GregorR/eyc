@@ -113,7 +113,8 @@ function urlAbsolute(rel: string, path: string) {
 }
 
 export async function eyc(
-        opts: {noImportCore?: boolean, ext?: types.EYCExt} = {}): Promise<types.EYC> {
+    opts: {noImportCore?: boolean, ext?: types.EYCExt} = {}
+): Promise<types.EYC> {
 
     // A promise for actions coming from the frontend
     let frontendP: Promise<unknown> = Promise.all([]);
@@ -182,7 +183,10 @@ export async function eyc(
         soundsets: Record<string, types.Soundset>;
         fabrics: Record<string, types.Fabric>;
 
-        constructor(url: string, version: string, absoluteUrl: string, ctx: types.ModuleCtx) {
+        constructor(
+            url: string, version: string, absoluteUrl: string,
+            ctx: types.ModuleCtx
+        ) {
             this.type = "module";
             this.isTypeLike = true;
             this.isModule = true;
@@ -219,7 +223,10 @@ export async function eyc(
         id: string;
         prefix: string;
 
-        constructor(sheet: types.Spritesheet, name: string, props: types.SpriteProperties) {
+        constructor(
+            sheet: types.Spritesheet, name: string,
+            props: types.SpriteProperties
+        ) {
             this.type = "sprite";
             this.isSprite = true;
             this.name = name;
@@ -284,7 +291,9 @@ export async function eyc(
         id: string;
         prefix: string;
 
-        constructor(set: types.Soundset, name: string, start: number, length: number) {
+        constructor(
+            set: types.Soundset, name: string, start: number, length: number
+        ) {
             this.type = "sound";
             this.isSound = true;
             this.name = name;
@@ -353,7 +362,10 @@ export async function eyc(
         code: string;
         id: string;
 
-        constructor(module: types.Module, isGarment: boolean, name: string, url: string, text: string) {
+        constructor(
+            module: types.Module, isGarment: boolean, name: string, url: string,
+            text: string
+        ) {
             this.type = isGarment ? "garment" : "fabric";
             this.isTypeLike = true;
             this.isFabric = true;
@@ -403,7 +415,8 @@ export async function eyc(
 
             if (this.isGarment) {
                 // Split the lines into layers
-                const layers = <types.EYCArray & (types.EYCArray & string[])[]> [[]];
+                const layers =
+                    <types.EYCArray & (types.EYCArray & string[])[]> [[]];
                 layers.id = this.id;
                 let layer = layers[0];
                 let li = 0;
@@ -563,7 +576,8 @@ export async function eyc(
             if (opts.castable && other.isNull)
                 return true;
             return other.isArray &&
-                   this.valueType.equals((<types.ArrayType> other).valueType, opts);
+                   this.valueType.equals(
+                       (<types.ArrayType> other).valueType, opts);
         }
 
         default() {
@@ -604,11 +618,13 @@ export async function eyc(
         }
 
         default(opts?: types.DefaultValueOpts) {
-            return "[" + this.valueTypes.map(x => x.default(opts)).join(",") + "]";
+            return "[" + this.valueTypes.map(x => x.default(opts)).join(",") +
+                "]";
         }
 
         basicType() {
-            return "tuple(" + this.valueTypes.map(x => x.basicType()).join(",") + ")";
+            return "tuple(" +
+                this.valueTypes.map(x => x.basicType()).join(",") + ")";
         }
     },
     MapType: class implements types.MapType {
@@ -649,7 +665,8 @@ export async function eyc(
         }
 
         basicType() {
-            return "map(" + this.keyType.basicType() + "," + this.valueType.basicType() + ")";
+            return "map(" + this.keyType.basicType() + "," +
+                this.valueType.basicType() + ")";
         }
     },
     SetType: class implements types.SetType {
@@ -673,7 +690,8 @@ export async function eyc(
             if (opts.castable && other.isNull)
                 return true;
             return other.isSet &&
-                   this.valueType.equals((<types.SetType> other).valueType, opts);
+                   this.valueType.equals(
+                       (<types.SetType> other).valueType, opts);
         }
 
         default(opts?: types.DefaultValueOpts) {
@@ -789,7 +807,8 @@ export async function eyc(
         equals(other: types.TypeLike) {
             if (!other.isMethod) return false;
             const otherMethod = <types.Method> other;
-            if (this.mutating !== otherMethod.mutating || this.mutatingThis !== otherMethod.mutatingThis)
+            if (this.mutating !== otherMethod.mutating ||
+                this.mutatingThis !== otherMethod.mutatingThis)
                 return false;
             if (!this.retType.equals(otherMethod.retType))
                 return false;
@@ -965,7 +984,10 @@ export async function eyc(
         keyType: string;
         valueType: string;
 
-        constructor(prefix: string, keyType: string, valueType: string, copy?: Iterable<[unknown, unknown]>) {
+        constructor(
+            prefix: string, keyType: string, valueType: string,
+            copy?: Iterable<[unknown, unknown]>
+        ) {
             super(copy);
             this.prefix = prefix = prefix || "map";
             this.id = prefix + "$" + eyc.freshId();
@@ -980,7 +1002,9 @@ export async function eyc(
         id: string;
         valueType: string;
 
-        constructor(prefix: string, valueType: string, copy?: Iterable<unknown>) {
+        constructor(
+            prefix: string, valueType: string, copy?: Iterable<unknown>
+        ) {
             super(copy);
             this.prefix = prefix = prefix || "set";
             this.id = prefix + "$" + eyc.freshId();
@@ -989,7 +1013,10 @@ export async function eyc(
     },
 
     // Suggestions
-    Suggestion: function(prefix: string, suggestions: types.SuggestionStep[], append?: types.SuggestionStep[]) {
+    Suggestion: function(
+        prefix: string, suggestions: types.SuggestionStep[],
+        append?: types.SuggestionStep[]
+    ) {
         let ret: types.Suggestion;
         if (append)
             ret = <types.Suggestion> suggestions.concat(append);
@@ -1091,8 +1118,10 @@ export async function eyc(
     eyc.suggestionType.isNullable = true;
     eyc.voidType = new eyc.PrimitiveType("void", "void 0");
 
-    if (!opts.noImportCore)
-        await eyc.importModule("/core", {text: eyc.core, ctx: {privileged: true}});
+    if (!opts.noImportCore) {
+        await eyc.importModule("/core",
+                               {text: eyc.core, ctx: {privileged: true}});
+    }
 
     if (opts.ext)
         eyc.ext = opts.ext;

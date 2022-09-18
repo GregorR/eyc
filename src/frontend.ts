@@ -68,7 +68,10 @@ async function loadPixiApp(opts: any = {}) {
 
     PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
 
-    const app = new PIXI.Application({width: opts.w || 1920, height: opts.h || 1080});
+    const app = new PIXI.Application({
+        width: opts.w || 1920,
+        height: opts.h || 1080
+    });
 
     function centerView() {
         const w = window.innerWidth;
