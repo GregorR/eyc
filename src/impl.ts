@@ -193,7 +193,7 @@ export async function eyc(
         prefix: string;
         ctx: types.ModuleCtx;
         parsed: types.ModuleNode;
-        main: types.EYCElement;
+        main: types.ClassNode;
         classes: Record<string, types.EYCClass>;
         resources: Record<string, types.Resource>;
         spritesheets: Record<string, types.Spritesheet>;
@@ -1111,9 +1111,8 @@ export async function eyc(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newStage: function(w: number, h: number, ex: any) {
         const beId = this.freshId();
-        frontendP = frontendP.then(() => {
-            return this.ext.newStage(w, h, ex);
-        }).then(feId => {
+        frontendP = frontendP.then(async () => {
+            const feId = await this.ext.newStage(w, h, ex);
             stages[beId] = feId;
         }).catch(console.error);
         return beId;

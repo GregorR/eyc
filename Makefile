@@ -35,13 +35,13 @@ eyc-dbg.js: $(BE_SRC) $(BIFY)
 	./src/build.js src/impl.ts -g -l be-license.js $(ADVANCED) > $@
 
 eyc-w.js: $(W_SRC) $(BIFY)
-	./src/build.js src/worker.ts -t -l w-license.js > $@
+	./src/build.js src/worker.ts -t --worker -l w-license.js > $@
 
 eyc-w-adv.js: $(W_SRC) $(BIFY)
-	./src/build.js src/worker.ts -t -l w-license.js $(ADVANCED) > $@
+	./src/build.js src/worker.ts -t --worker -l w-license.js $(ADVANCED) > $@
 
 eyc-w-dbg.js: $(W_SRC) $(BIFY)
-	./src/build.js src/worker.ts -g -l w-license.js $(ADVANCED) > $@
+	./src/build.js src/worker.ts -g --worker -l w-license.js $(ADVANCED) > $@
 
 eyc-fe.js: $(FE_SRC) $(BIFY)
 	./src/build.js src/frontend.ts -t -l fe-license.js > $@

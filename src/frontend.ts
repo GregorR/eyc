@@ -125,9 +125,17 @@ export async function go(): Promise<void> {
     const w = new Worker("eyc-w" + (useAdvanced?"-dbg":"") + ".js");
     const id = 0;
 
-    w.onmessage = ev => {
+    w.onmessage = async ev => {
         const msg = ev.data;
         switch (msg.c) {
+            case "newStage":
+                // Create the PIXI app. We (currently?) only support one stage.
+                await loadPixiApp({w: msg.w, h: msg.h});
+
+                // Tell them it's ready
+                w.postMessage({c: "newStage", id: "stage0"});
+                break;
+
             default:
                 console.error("Unrecognized command " + msg.c);
         }

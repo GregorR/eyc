@@ -200,7 +200,7 @@ export interface Module extends TypeLike {
     prefix: string;
     ctx: ModuleCtx;
     parsed: ModuleNode;
-    main: EYCElement;
+    main: ClassNode;
     classes: Record<string, EYCClass>;
     resources: Record<string, Resource>;
     spritesheets: Record<string, Spritesheet>;

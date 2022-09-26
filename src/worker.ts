@@ -23,15 +23,18 @@ import * as types from "./types";
 
 
 const settings = {
-    local: false
+    local: true
 };
 let eyc: types.EYC = null;
+
+// Promises for any commands we're waiting for
+let replies: Record<string, (val: any) => unknown> = {};
 
 // An ext for web workers
 const eycExtWorker: types.EYCExt = {
     fetch: async function(url: string) {
         url = (settings.local ? "." : "https:/") + url;
-        return fetch(url).then(response => {
+        return fetch(url).then(async response => {
             if (response.status !== 200)
                 throw new Error("Status code " + response.status);
             return response.text();
@@ -40,12 +43,16 @@ const eycExtWorker: types.EYCExt = {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newStage: async function(w: number, h: number, ex: any) {
-        // nothing!
-        void w; void h; void ex;
-        return "-";
+        // Send a message to the host
+        postMessage({c: "newStage", w, h, ex});
+
+        // Wait for a response
+        const r = await new Promise<{id: string}>(res => replies.newStage = res);
+        return r.id;
     }
 };
 
+// Global ordering promise
 let p: Promise<unknown> = Promise.all([]);
 
 onmessage = function(ev) {
@@ -58,16 +65,30 @@ onmessage = function(ev) {
                     break;
 
                 case "go":
+                {
                     // Make a fresh EYC instance
                     eyc = await EYC.eyc();
                     eyc.ext = eycExtWorker;
 
                     // Load the requested URL
-                    eyc.importModule(msg.url);
+                    const emodule = await eyc.importModule(msg.url);
+
+                    // Create an instance of the main class
+                    if (emodule.main) {
+                        const main = new eyc.Object("main");
+                        main.extend(emodule.main.klass.prefix);
+                        main.methods.$$core$Program$init(eyc, main, eyc.nil);
+                    }
                     break;
+                }
 
                 default:
-                    console.error("Unrecognized command " + msg.c);
+                    if (replies[msg.c]) {
+                        replies[msg.c](msg);
+                        delete replies[msg.c];
+                    } else {
+                        console.error("Unrecognized command " + msg.c);
+                    }
             }
 
         } catch (ex) {

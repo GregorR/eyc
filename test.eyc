@@ -27,7 +27,7 @@ export fabric Level foob.txt;
 
 export main class Test : Stage {
     override mutating void init() {
-        //super();
+        super();
 
         num i;
         for (i = 0; i < 10; i++) {

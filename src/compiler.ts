@@ -266,7 +266,7 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
                     module.parsed.exports[nm] = target;
 
                     if (c.children.exportClause.children.main)
-                        module.main = target;
+                        module.main = target.module.main;
                 }
                 break;
             }

@@ -48,6 +48,7 @@ let start = null;
 let licenseFile = null;
 let doTinyify = false;
 let debug = false;
+let dom = "dom";
 let noImplicitAny = false;
 let args = process.argv.slice(2);
 let babelTargets = null;
@@ -61,6 +62,8 @@ for (let ai = 0; ai < args.length; ai++) {
         doTinyify = true;
     } else if (arg === "-g" || arg === "--debug") {
         debug = true;
+    } else if (arg === "--worker") {
+        dom = "webworker";
     } else if (arg === "-n" || arg === "--no-implicit-any") {
         noImplicitAny = true;
     } else if (arg === "-a" || arg === "--advanced-features") {
@@ -102,7 +105,13 @@ if (licenseFile && !debug)
     process.stdout.write(fs.readFileSync(licenseFile, "utf8"));
 browserify({bare: true, standalone: "EYC", debug})
     .add(start)
-    .plugin(tsify, {files: [], target: "es2017", resolveJsonModule: true, noImplicitAny})
+    .plugin(tsify, {
+        files: [],
+        target: "es2017",
+        lib: ["es2017", dom],
+        resolveJsonModule: true,
+        noImplicitAny
+    })
     .transform("babelify", babelArg)
     .plugin(doTinyify ? tinyify : browserPackFlat)
     .bundle()

@@ -1,4 +1,4 @@
-Copyright (c) 2021 Gregor Richards;
+Copyright (c) 2022 Gregor Richards;
 
 license ISC (
 Permission to use, copy, modify, and/or distribute this software for any
@@ -19,4 +19,8 @@ alias core.*;
 alias basics.*;
 
 export main class Main : Stage {
+    override mutating void init() {
+        super();
+        Console.log("Hello!");
+    }
 }
