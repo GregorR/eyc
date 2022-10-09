@@ -1145,7 +1145,6 @@ export async function eyc(
         function spriteblockToDesc(prefix: string, spriteblock: types.Spriteblock) {
             for (const key in spriteblock.members) {
                 const part = spriteblock.members[key];
-                console.log(`${key}: ${part}`);
                 if ((<types.Sprite> part).isSprite) {
                     desc.sprites[prefix + key] = (<types.Sprite> part).props;
 
