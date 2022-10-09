@@ -321,7 +321,7 @@ function resolveType(eyc: types.EYC, szd: any[], types: string[], idx: number) {
             return types[idx] = "set(" + szd[el[2]] + ")";
 
         default:
-            throw new Error;
+            throw new Error("Invalid serialized string");
     }
 }
 
@@ -372,7 +372,7 @@ function manifest(
             return manifestSet(eyc, szd, ret, types, idx);
 
         default:
-            throw new Error;
+            throw new Error("Invalid serialized string");
     }
 }
 
@@ -437,7 +437,7 @@ function manifestArray(
     for (let i = 0; i < arr.length; i++) {
         const vidx = el[i+3];
         if (!equiv(resolveType(eyc, szd, types, vidx), subType))
-            throw new Error;
+            throw new Error("Invalid serialized string");
         arr[i] = manifest(eyc, szd, ret, types, vidx);
     }
 
@@ -469,9 +469,9 @@ function manifestMap(
         const kidx = kv[0];
         const vidx = kv[1];
         if (!equiv(resolveType(eyc, szd, types, kidx), keyType))
-            throw new Error;
+            throw new Error("Invalid serialized string");
         if (!equiv(resolveType(eyc, szd, types, vidx), valueType))
-            throw new Error;
+            throw new Error("Invalid serialized string");
         map.set(manifest(eyc, szd, ret, types, kidx),
                 manifest(eyc, szd, ret, types, vidx));
     }
@@ -492,7 +492,7 @@ function manifestSet(
         for (let i = 3; i < el.length; i++) {
             const vidx = el[i];
             if (!equiv(resolveType(eyc, szd, types, vidx), valueType))
-                throw new Error;
+                throw new Error("Invalid serialized string");
             const v = manifest(eyc, szd, ret, types, vidx);
             map.set(eyc.tupleStr(v), v);
         }
@@ -504,7 +504,7 @@ function manifestSet(
     for (let i = 3; i < el.length; i++) {
         const vidx = el[i];
         if (!equiv(resolveType(eyc, szd, types, vidx), valueType))
-            throw new Error;
+            throw new Error("Invalid serialized string");
         set.add(manifest(eyc, szd, ret, types, vidx));
     }
 

@@ -42,7 +42,8 @@ declaration
  / importDecl
  / aliasDecl
  / classDecl
- / dataDecl
+ / spriteSheetDecl
+ / soundDecl
  / fabricDecl
  / prefixDecl
 
@@ -87,21 +88,13 @@ aliasDecl
  = a:exportClause? alias b:name c:asClause? ";" white { return new Tree("AliasDecl", location(), {exportClause: a, name: b, asClause: c}); }
  / alias a:name ".*" white ";" white { return new Tree("AliasStarDecl", location(), {name: a}); }
 
-dataDecl
- = a:exportClause? b:idLike & {return b === "sprites" || b === "sounds";} c:package d:asClause? ";" white {
-     return new Tree("ExternDataDecl", location(), {exportClause: a, kind: b, url: c, asClause: d});
- }
- / a:exportClause? b:idLike & {return b === "data";} c:name d:id e:block {
-     return new Tree("DataDecl", location(), {exportClause: a, type: c, id: d, withBlock: e});
- }
-
 spriteSheetDecl
- = a:exportClause? b:idLike & {return b === "sprites";} c:id d:package "{" white e:sprite* "}" white {
+ = a:exportClause? b:idLike & {return b === "sprites";} c:id d:stringLiteral "{" white e:sprite* "}" white {
      return new Tree("SpriteSheetDecl", location(), {exportClause: a, id: c, url: d, sprites: e});
  }
 
 soundDecl
- = a:exportClause? b:idLike & {return b === "sounds";} c:id d:package "{" white e:sound* "}" white {
+ = a:exportClause? b:idLike & {return b === "sounds";} c:id d:stringLiteral "{" white e:sound* "}" white {
      return new Tree("SoundSetDecl", location(), {exportClause: a, id: c, url: d, sounds: e});
  }
 
@@ -406,6 +399,7 @@ typeListNext
 sprite
  = a:id ";" white { return new Tree("Sprite", location(), {id: a, args: null}); }
  / a:id "(" white b:argList? ")" white ";" white { return new Tree("Sprite", location(), {id: a, args: b}); }
+ / a:id "{" white b:sprite* "}" white { return new Tree("SpriteBlock", location(), {id: a, sprites: b}); }
  / copyrightDecl
  / licenseDecl
 

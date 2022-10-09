@@ -124,6 +124,12 @@ export async function go(): Promise<void> {
 
     const w = new Worker("eyc-w" + (useAdvanced?"-dbg":"") + ".js");
     const id = 0;
+    let loader = null;
+
+    const spritesheetTextures: Record<string, string> = Object.create(null);
+    const spritesheetDatas: Record<string, any> = Object.create(null);
+    const spritesheets: Record<string, any> = Object.create(null);
+    let spritesheetIdx = 0;
 
     w.onmessage = async ev => {
         const msg = ev.data;
@@ -131,10 +137,39 @@ export async function go(): Promise<void> {
             case "newStage":
                 // Create the PIXI app. We (currently?) only support one stage.
                 await loadPixiApp({w: msg.w, h: msg.h});
+                loader = PIXI.Loader.shared;
 
                 // Tell them it's ready
                 w.postMessage({c: "newStage", id: "stage0"});
                 break;
+
+            case "loadSpritesheet":
+            {
+                // PIXI must have already been loaded!
+                const url = msg.d.url;
+                await new Promise(res => loader.add(url).load(res));
+                const rsc = loader.resources[url];
+                const bt = rsc.texture.baseTexture;
+                bt.scaleMode = PIXI.SCALE_MODES.NEAREST;
+                const id = `spritesheet${spritesheetIdx++}`;
+                spritesheetTextures[id] = url;
+
+                // Eventually we need to load in the actual spritesheet data
+                const data = spritesheetDatas[id] = {
+                    meta: {
+                        image: msg.u,
+                        format: bt.format,
+                        size: { w: bt.width, h: bt.height },
+                        scale: 1
+                    },
+                    frames: {},
+                    animations: {}
+                };
+                spritesheets[id] = new PIXI.Spritesheet(bt, data);
+
+                w.postMessage({c: "loadSpritesheet", p: msg.d.prefix, id});
+                break;
+            }
 
             default:
                 console.error("Unrecognized command " + msg.c);

@@ -19,6 +19,8 @@ export interface EYCElement {
     type: string;
     isModule?: boolean;
     isClass?: boolean;
+    isSpritesheet?: boolean;
+    isSpriteblock?: boolean;
     isType?: boolean;
     isObject?: boolean;
     isArray?: boolean;
@@ -61,6 +63,7 @@ export interface EYC {
         new (sheet: Spritesheet, name: string, props: SpriteProperties): Sprite
     };
 
+    Spriteblock: {new (): Spriteblock};
     spritesheets: Record<string, Spritesheet>;
     Spritesheet: {new (module: Module, name: string, url: string): Spritesheet};
 
@@ -158,6 +161,7 @@ export interface EYC {
     // Frontend interaction
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newStage(w: number, h: number, ex: any): string;
+    loadSpritesheet(stageId: string, spritesheet: Spritesheet): string;
 
     // External features which must be provided by a user of EYC
     ext: EYCExt;
@@ -170,6 +174,9 @@ export interface EYCExt {
 
     // Create a new frontend stage
     newStage: (w: number, h: number, ex: unknown) => Promise<string>;
+
+    // Load in this spritesheet
+    loadSpritesheet: (stageId: string, desc: unknown) => Promise<string>;
 }
 
 // A compiled EYC function
@@ -218,7 +225,6 @@ export interface Sprite extends EYCElement {
     sheet: Spritesheet;
     props: SpriteProperties;
     id: string;
-    prefix: string;
 }
 
 export interface SpriteProperties {
@@ -231,14 +237,18 @@ export interface SpriteProperties {
     speed: number;
 }
 
+// Spritesheets have namespaces called "blocks"
+export interface Spriteblock extends Resource {
+    isSpriteblock: boolean;
+    members: Record<string, Sprite | Spriteblock>;
+}
+
 export interface Spritesheet extends Resource {
     isSpritesheet: boolean;
     name: string;
     url: string;
     prefix: string;
-    sprites: Record<string, Sprite>;
-
-    add(sprite: Sprite): void;
+    sprites: Spriteblock;
 }
 
 export interface Sound extends EYCElement {

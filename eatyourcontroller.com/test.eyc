@@ -18,9 +18,12 @@ import basics;
 alias core.*;
 alias basics.*;
 
+import /eatyourcontroller.com/assets/0x72robots/rgbiih as robots;
+
 export main class Main : Stage {
     override mutating void init() {
         super();
         Console.log("Hello!");
+        Console.log(this.addSprite(robots.Robots.wall.nesw, 0, 0, "{}"));
     }
 }

@@ -136,8 +136,10 @@ export async function eyc(
     // A promise for actions coming from the frontend
     let frontendP: Promise<unknown> = Promise.all([]);
 
-    // Map of our invented stage names to what the frontend tells us
+    // Map of our invented names to what the frontend tells us
     const stages: Record<string, string> = Object.create(null);
+    const spritesheetsLoaded: Record<string, boolean> = Object.create(null);
+    const spritesheetsToFeId: Record<string, string> = Object.create(null);
 
     const eyc: types.EYC = {
     compiler: compiler,
@@ -248,10 +250,28 @@ export async function eyc(
             this.isSprite = true;
             this.name = name;
             this.sheet = sheet;
-            sheet.add(this);
             this.props = props;
             this.id = sheet.prefix + "$" + name;
             this.prefix = sheet.prefix;
+        }
+    },
+
+    // Sprite blocks in the runtime
+    Spriteblock: class implements types.Spriteblock {
+        type: string;
+        isTypeLike: boolean;
+        isSpriteblock: boolean;
+        members: Record<string, types.Sprite | types.Spriteblock>;
+
+        constructor() {
+            this.type = "spriteblock";
+            this.isTypeLike = true;
+            this.isSpriteblock = true;
+            this.members = Object.create(null);
+        }
+
+        equals(other: types.TypeLike): boolean {
+            return (this === other);
         }
     },
 
@@ -264,16 +284,16 @@ export async function eyc(
         name: string;
         url: string;
         prefix: string;
-        sprites: Record<string, types.Sprite>;
+        sprites: types.Spriteblock;
 
         constructor(module: types.Module, name: string, url: string) {
-            this.type = "sprites";
+            this.type = "spritesheet";
             this.isTypeLike = true;
             this.isSpritesheet = true;
             this.name = name;
             this.url = url;
             const prefix = this.prefix = module.prefix + "$" + name;
-            this.sprites = Object.create(null);
+            this.sprites = new eyc.Spriteblock();
             eyc.spritesheets[prefix] = this;
             eyc.resources[prefix] = this;
             module.spritesheets[name] = this;
@@ -282,18 +302,6 @@ export async function eyc(
 
         equals(other: types.TypeLike): boolean {
             return (this === other);
-        }
-
-        // Add the given sprite
-        add(sprite: types.Sprite) {
-            this.sprites[sprite.name] = sprite;
-        }
-
-        // Get the sprite with the given name
-        get(nm: string) {
-            if (nm in this.sprites)
-                return this.sprites[nm];
-            return null;
         }
     },
 
@@ -1108,9 +1116,14 @@ export async function eyc(
     },
 
     // Frontend indirector
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    newStage: function(w: number, h: number, ex: any) {
+    newStage: function(w: number, h: number, exStr: string) {
         const beId = this.freshId();
+        this.currentStage = beId;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let ex: any = null;
+        try {
+            ex = JSON.parse(exStr);
+        } catch (ex) {}
         frontendP = frontendP.then(async () => {
             const feId = await this.ext.newStage(w, h, ex);
             stages[beId] = feId;
@@ -1118,10 +1131,45 @@ export async function eyc(
         return beId;
     },
 
+    // Frontend indirector
+    loadSpritesheet: function(stageId: string, spritesheet: types.Spritesheet) {
+        if (spritesheetsLoaded[spritesheet.prefix])
+            return spritesheet.prefix;
+
+        const desc: any = {
+            url: spritesheet.url,
+            prefix: spritesheet.prefix,
+            sprites: {}
+        };
+
+        function spriteblockToDesc(prefix: string, spriteblock: types.Spriteblock) {
+            for (const key in spriteblock.members) {
+                const part = spriteblock.members[key];
+                console.log(`${key}: ${part}`);
+                if ((<types.Sprite> part).isSprite) {
+                    desc.sprites[prefix + key] = (<types.Sprite> part).props;
+
+                } else { // spriteblock
+                    spriteblockToDesc(`${prefix}${key}.`, <types.Spriteblock> part);
+
+                }
+            }
+        }
+        console.log(spritesheet);
+        spriteblockToDesc("", spritesheet.sprites);
+
+        frontendP = frontendP.then(async () => {
+            const feId = await this.ext.loadSpritesheet(stageId, desc);
+            spritesheetsToFeId[spritesheet.prefix] = feId;
+        }).catch(console.error);
+        return spritesheet.prefix;
+    },
+
     // User provided
     ext: {
         fetch: null,
-        newStage: null
+        newStage: null,
+        loadSpritesheet: null
     }
 
     };

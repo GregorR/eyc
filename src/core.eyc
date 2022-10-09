@@ -442,7 +442,8 @@ export class Stage : Program {
      */
     mutating string addSprite(string sprite, num x, num y, string ex) {
         return @js (extStage=this.extStage, sprite, x, y, ex) {
-            return eyc.addSprite(extStage, sprite, x, y, ex);
+            //return eyc.addSprite(extStage, sprite, x, y, ex);
+            return "";
         } : string;
     }
 

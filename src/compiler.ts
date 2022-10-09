@@ -137,6 +137,7 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
                 break;
             }
 
+            case "SpriteSheetDecl":
             case "FabricDecl":
                 if (!c.children.exportClause)
                     break; // Not exported
@@ -285,16 +286,14 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
                 break;
             }
 
-            case "FabricDecl":
-                defineSymbol(c, c.children.id.children.text, c, true);
-                break;
-
             case "PrefixDecl":
                 // No symbols
                 break;
 
+            case "SpriteSheetDecl":
+            case "FabricDecl":
             case "ClassDecl":
-                // Classes declare their own name
+                // Types that declare their own name
                 defineSymbol(c, c.children.id.children.text, c, true);
                 break;
 
@@ -326,6 +325,11 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
                     resolveClassDeclTypes(eyc, <types.ClassNode> c);
                 break;
 
+            case "SpriteSheetDecl":
+                symbolTypes[id] =
+                    await resolveSpriteSheetDeclTypes(eyc, <types.SpritesheetNode> c);
+                break;
+
             case "FabricDecl":
                 symbolTypes[id] =
                     await resolveFabricDeclTypes(eyc, <types.FabricNode> c);
@@ -340,6 +344,49 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
                 throw new EYCTypeError(c, "Cannot resolve types of " + c.type);
         }
     }
+}
+
+/* Resolve a spritesheet declaration. Involves communicating with the frontend,
+ * and usually fetching resources. */
+async function resolveSpriteSheetDeclTypes(
+    eyc: types.EYC, spritesheetDecl: types.SpritesheetNode
+) {
+    if (spritesheetDecl.spritesheet)
+        return spritesheetDecl.spritesheet;
+
+    // Find the URL of the underlying image
+    let url: string;
+    try {
+        url = JSON.parse(spritesheetDecl.children.url.children.text);
+    } catch (ex) {
+        throw new EYCTypeError(spritesheetDecl.children.url, "Invalid string literal");
+    }
+    url = eyc.urlAbsolute(spritesheetDecl.module.url, url);
+
+    const spritesheet = spritesheetDecl.spritesheet = spritesheetDecl.ctype =
+        new eyc.Spritesheet(spritesheetDecl.module, spritesheetDecl.children.id.children.text, url);
+
+    function handleSpriteblock(sb: types.Spriteblock, cc: types.Tree[]) {
+        for (const c of cc) {
+            const name = c.children.id.children.text;
+            if (c.type === "Sprite") {
+                // Directly contained sprite (FIXME: default) (FIXME: duplicates) (FIXME: properties)
+                sb.members[name] = new eyc.Sprite(
+                    spritesheet, name, null);
+            } else if (c.type === "SpriteBlock") {
+                // Sub-block
+                const ssb = new eyc.Spriteblock();
+                sb.members[name] = ssb;
+                handleSpriteblock(ssb, c.children.sprites);
+            } else {
+                throw new EYCTypeError(c, "Invalid spritesheet member");
+            }
+        }
+    }
+
+    handleSpriteblock(spritesheet.sprites, spritesheetDecl.children.sprites);
+
+    return spritesheet;
 }
 
 /* Resolve a fabric declaration. Involves fetching the actual file defined by
@@ -550,6 +597,7 @@ function typeCheckModule(eyc: types.EYC, module: types.Module) {
             case "AliasDecl":
             case "AliasStarDecl":
             case "FabricDecl":
+            case "SpriteSheetDecl":
                 // No types or no possibility of type error
                 break;
 
@@ -1264,6 +1312,23 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                 resType = klass.methodTypes[name];
                 break;
 
+            } else if (subExpType.isSpritesheet || subExpType.isSpriteblock) {
+                let spriteblock: types.Spriteblock = null;
+                if (subExpType.isSpritesheet)
+                    spriteblock = (<types.Spritesheet> subExpType).sprites;
+                else
+                    spriteblock = <types.Spriteblock> subExpType;
+
+                // Look for this name
+                if (!(name in spriteblock.members))
+                    throw new EYCTypeError(exp, `Cannot find sprite/block ${name}`);
+
+                const el = spriteblock.members[name];
+                if ((<types.Sprite> el).isSprite)
+                    resType = eyc.stringType;
+                else // Spriteblock
+                    resType = <types.Spriteblock> el;
+                break;
             }
 
             if (!subExpType.isObject) {
@@ -1349,7 +1414,7 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
         case "Suggestion":
         {
             console.log(exp);
-            throw new Error;
+            throw new Error("Unimplemented (Suggestion)");
             /*
             const ltype = typeCheckExpression(eyc, methodDecl, symbols, exp.children.target);
             const op = exp.children.op;
@@ -1751,6 +1816,7 @@ function compileModule(eyc: types.EYC, module: types.Module) {
             case "AliasDecl":
             case "AliasStarDecl":
             case "FabricDecl":
+            case "SpriteSheetDecl":
                 // No code
                 break;
 
@@ -2554,12 +2620,32 @@ class MethodCompilationState {
                     break;
                 }
 
+                if (node.ctype.isSpritesheet) {
+                    // Just get the spritesheet directly
+                    const spritesheet = new SSA(node, "spritesheet", ir.length);
+                    spritesheet.ex = node.ctype;
+                    ir.push(spritesheet);
+                    break;
+                }
+
                 const target = this.compileSSA(ir, symbols,
                                                node.children.expression);
                 const ttype = node.children.expression.ctype.type;
                 switch (ttype) {
                     case "object":
                         ir.push(new SSA(node, "field", ir.length, target));
+                        break;
+
+                    case "spritesheet":
+                    case "spriteblock":
+                        if (node.ctype.isSpriteblock) {
+                            /* There's nothing to actually load for a sprite
+                             * block, so just refer to the relevant sprite
+                             * sheet */
+                            return target;
+                        } else { // sprite
+                            ir.push(new SSA(node, "sprite", ir.length, target));
+                        }
                         break;
 
                     case "array":
@@ -3487,6 +3573,16 @@ class MethodCompilationState {
 
                 case "class":
                     ssa.expr = "(eyc.classes." + (<types.EYCClass> ssa.ex).prefix + ")";
+                    break;
+
+                case "spritesheet":
+                    ssa.expr = "(eyc.loadSpritesheet(eyc.currentStage,eyc.spritesheets[" +
+                        JSON.stringify((<types.Spritesheet> ssa.ex).prefix) + "]))";
+                    break;
+
+                case "sprite":
+                    // FIXME
+                    ssa.expr = `(${ssa.arg(ir)})`;
                     break;
 
                 case "arg":
