@@ -1134,6 +1134,7 @@ export async function eyc(
     loadSpritesheet: function(spritesheet: types.Spritesheet) {
         if (spritesheetsLoaded[spritesheet.prefix])
             return spritesheet.prefix;
+        spritesheetsLoaded[spritesheet.prefix] = true;
 
         const desc: any = {
             url: spritesheet.url,

@@ -429,6 +429,7 @@ async function resolveSpritesheetDeclTypes(
                     sb.members[name] = new eyc.Sprite(
                         spritesheet, prefix + name, props);
                     defaults.x = props.x + 1;
+                    defaults.y = props.y;
                 }
 
             } else if (c.type === "SpriteBlock") {

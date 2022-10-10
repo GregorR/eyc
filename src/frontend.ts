@@ -183,14 +183,6 @@ export async function go(): Promise<void> {
                         frame: {
                             x: props.x, y: props.y,
                             w: props.w, h: props.h,
-                        },
-                        sourceSize: {
-                            x: props.x, y: props.y,
-                            w: props.w, h: props.h
-                        },
-                        spriteSourceSize: {
-                            x: props.x, y: props.y,
-                            w: props.w, h: props.h
                         }
                     };
                     //data.animations[key] = [key];
@@ -223,9 +215,9 @@ export async function go(): Promise<void> {
                     id = `sprite${spriteIdx++}`;
                     const sprite = new PIXI.Sprite(ss.textures[msg.s]);
                     pixiApp.stage.addChild(sprite);
-                    sprite.x = msg.x;
-                    sprite.y = msg.y;
                     sprite.scale.set(pixiProps.scale / ssd.frames[msg.s].scale);
+                    sprite.x = msg.x * pixiProps.scale;
+                    sprite.y = msg.y * pixiProps.scale;
                 } while (false);
 
                 // Inform the user
