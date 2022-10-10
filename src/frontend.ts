@@ -140,14 +140,22 @@ export async function go(): Promise<void> {
         const msg = ev.data;
         switch (msg.c) {
             case "newStage":
+            {
+                // Figure out the scaling
+                const scW = Math.ceil(window.screen.width / msg.w);
+                const scH = Math.ceil(window.screen.height / msg.h);
+                const scale = Math.max(scW, scH) * window.devicePixelRatio;
+                console.log(scale);
+
                 // Create the PIXI app. We (currently?) only support one stage.
-                await loadPixiApp({w: msg.w, h: msg.h});
+                await loadPixiApp({w: msg.w * scale, h: msg.h * scale});
                 loader = PIXI.Loader.shared;
-                pixiProps.scale = msg.s || 64;
+                pixiProps.scale = scale;
 
                 // Tell them it's ready
                 w.postMessage({c: "newStage", id: "stage0"});
                 break;
+            }
 
             case "loadSpritesheet":
             {

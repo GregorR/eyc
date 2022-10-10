@@ -60,9 +60,9 @@ const eycExtWorker: types.EYCExt = {
     },
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    newStage: async function(w: number, h: number, scale: number, ex: any) {
+    newStage: async function(w: number, h: number, ex: any) {
         // Send a message to the host
-        postMessage({c: "newStage", w, h, s: scale, ex});
+        postMessage({c: "newStage", w, h, ex});
 
         // Wait for a response
         return (await awaitReply("newStage")).id;
