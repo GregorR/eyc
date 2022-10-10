@@ -42,7 +42,7 @@ declaration
  / importDecl
  / aliasDecl
  / classDecl
- / spriteSheetDecl
+ / spritesheetDecl
  / soundDecl
  / fabricDecl
  / prefixDecl
@@ -88,9 +88,9 @@ aliasDecl
  = a:exportClause? alias b:name c:asClause? ";" white { return new Tree("AliasDecl", location(), {exportClause: a, name: b, asClause: c}); }
  / alias a:name ".*" white ";" white { return new Tree("AliasStarDecl", location(), {name: a}); }
 
-spriteSheetDecl
+spritesheetDecl
  = a:exportClause? b:idLike & {return b === "sprites";} c:id d:stringLiteral "{" white e:sprite* "}" white {
-     return new Tree("SpriteSheetDecl", location(), {exportClause: a, id: c, url: d, sprites: e});
+     return new Tree("SpritesheetDecl", location(), {exportClause: a, id: c, url: d, sprites: e});
  }
 
 soundDecl

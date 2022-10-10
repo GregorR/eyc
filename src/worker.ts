@@ -68,9 +68,22 @@ const eycExtWorker: types.EYCExt = {
         return (await awaitReply("newStage")).id;
     },
 
-    loadSpritesheet: async function(stageId: string, desc: unknown) {
-        postMessage({c: "loadSpritesheet", s: stageId, d: desc});
+    loadSpritesheet: async function(desc: unknown) {
+        postMessage({c: "loadSpritesheet", d: desc});
         return (await awaitReply("loadSpritesheet", {p: (<any> desc).prefix})).id;
+    },
+
+    addSprite: async function(
+        stageId: string, spritesheet: string, sprite: string, x: number,
+        y: number, ex: any
+    ) {
+        postMessage({
+            c: "addSprite", st: stageId, ss: spritesheet, s: sprite, x, y,
+            ex
+        });
+        return (await awaitReply("addSprite", {
+            st: stageId, ss: spritesheet, s: sprite
+        })).id;
     }
 };
 

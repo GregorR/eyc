@@ -137,7 +137,7 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
                 break;
             }
 
-            case "SpriteSheetDecl":
+            case "SpritesheetDecl":
             case "FabricDecl":
                 if (!c.children.exportClause)
                     break; // Not exported
@@ -290,7 +290,7 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
                 // No symbols
                 break;
 
-            case "SpriteSheetDecl":
+            case "SpritesheetDecl":
             case "FabricDecl":
             case "ClassDecl":
                 // Types that declare their own name
@@ -325,9 +325,9 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
                     resolveClassDeclTypes(eyc, <types.ClassNode> c);
                 break;
 
-            case "SpriteSheetDecl":
+            case "SpritesheetDecl":
                 symbolTypes[id] =
-                    await resolveSpriteSheetDeclTypes(eyc, <types.SpritesheetNode> c);
+                    await resolveSpritesheetDeclTypes(eyc, <types.SpritesheetNode> c);
                 break;
 
             case "FabricDecl":
@@ -348,7 +348,7 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
 
 /* Resolve a spritesheet declaration. Involves communicating with the frontend,
  * and usually fetching resources. */
-async function resolveSpriteSheetDeclTypes(
+async function resolveSpritesheetDeclTypes(
     eyc: types.EYC, spritesheetDecl: types.SpritesheetNode
 ) {
     if (spritesheetDecl.spritesheet)
@@ -366,25 +366,84 @@ async function resolveSpriteSheetDeclTypes(
     const spritesheet = spritesheetDecl.spritesheet = spritesheetDecl.ctype =
         new eyc.Spritesheet(spritesheetDecl.module, spritesheetDecl.children.id.children.text, url);
 
-    function handleSpriteblock(sb: types.Spriteblock, cc: types.Tree[]) {
+    let defaults: types.SpriteProperties = {
+        x: 0, y: 0,
+        w: 1, h: 1,
+        scale: 1,
+        frames: 1, speed: 1
+    };
+
+    // Get these properties into a properties object
+    function getProperties(cc: types.Tree[]) {
+        let props: types.SpriteProperties = Object.assign({}, defaults);
+        const idsByPos = ["x", "y", "w", "h"];
+        let idx = 0;
+        for (const c of (cc || [])) {
+            // Must be either id=literal or literal
+            let id = idsByPos[idx++];
+            let val = 0;
+            if (c.type === "AssignmentExp") {
+                const target = c.children.target;
+                const value = c.children.value;
+                if (target.type !== "ID" ||
+                    (value.type !== "DecLiteral" &&
+                     value.type !== "HexLiteral" &&
+                     value.type !== "B64Literal")) {
+                    throw new EYCTypeError(c, "Expected id=number");
+                }
+                id = target.children.text;
+                val = JSON.parse(value.children.text);
+
+            } else if (c.type === "DecLiteral" ||
+                       c.type === "HexLiteral" ||
+                       c.type === "B64Literal") {
+                if (!id)
+                    throw new EYCTypeError(c, "No name for this positional argument");
+                val = JSON.parse(c.children.text);
+
+            } else {
+                throw new EYCTypeError(c, "Expected id=number or number");
+
+            }
+
+            props[id] = val;
+        }
+        return props;
+    }
+
+    // Handle all the sprites and blocks in this spriteblock
+    function handleSpriteblock(
+        prefix: string, sb: types.Spriteblock, cc: types.Tree[]
+    ) {
         for (const c of cc) {
             const name = c.children.id.children.text;
             if (c.type === "Sprite") {
-                // Directly contained sprite (FIXME: default) (FIXME: duplicates) (FIXME: properties)
-                sb.members[name] = new eyc.Sprite(
-                    spritesheet, name, null);
+                // Figure out the properties
+                const props = getProperties(
+                    c.children.args ? c.children.args.children : null);
+                if (name === "default") {
+                    // New defaults
+                    defaults = props;
+                } else {
+                    // Define the sprite
+                    sb.members[name] = new eyc.Sprite(
+                        spritesheet, prefix + name, props);
+                    defaults.x = props.x + 1;
+                }
+
             } else if (c.type === "SpriteBlock") {
                 // Sub-block
                 const ssb = new eyc.Spriteblock();
                 sb.members[name] = ssb;
-                handleSpriteblock(ssb, c.children.sprites);
+                handleSpriteblock(`${prefix}${name}.`, ssb, c.children.sprites);
+
             } else {
                 throw new EYCTypeError(c, "Invalid spritesheet member");
             }
         }
     }
 
-    handleSpriteblock(spritesheet.sprites, spritesheetDecl.children.sprites);
+    handleSpriteblock("", spritesheet.sprites, spritesheetDecl.children.sprites);
 
     return spritesheet;
 }
@@ -597,7 +656,7 @@ function typeCheckModule(eyc: types.EYC, module: types.Module) {
             case "AliasDecl":
             case "AliasStarDecl":
             case "FabricDecl":
-            case "SpriteSheetDecl":
+            case "SpritesheetDecl":
                 // No types or no possibility of type error
                 break;
 
@@ -1325,7 +1384,7 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
                 const el = spriteblock.members[name];
                 if ((<types.Sprite> el).isSprite)
-                    resType = eyc.stringType;
+                    resType = new eyc.TupleType([eyc.stringType, eyc.stringType]);
                 else // Spriteblock
                     resType = <types.Spriteblock> el;
                 break;
@@ -1816,7 +1875,7 @@ function compileModule(eyc: types.EYC, module: types.Module) {
             case "AliasDecl":
             case "AliasStarDecl":
             case "FabricDecl":
-            case "SpriteSheetDecl":
+            case "SpritesheetDecl":
                 // No code
                 break;
 
@@ -2630,8 +2689,8 @@ class MethodCompilationState {
 
                 const target = this.compileSSA(ir, symbols,
                                                node.children.expression);
-                const ttype = node.children.expression.ctype.type;
-                switch (ttype) {
+                const ttype = node.children.expression.ctype;
+                switch (ttype.type) {
                     case "object":
                         ir.push(new SSA(node, "field", ir.length, target));
                         break;
@@ -2644,7 +2703,12 @@ class MethodCompilationState {
                              * sheet */
                             return target;
                         } else { // sprite
-                            ir.push(new SSA(node, "sprite", ir.length, target));
+                            const ssa = new SSA(node, "sprite", ir.length, target);
+                            let sb: types.Spriteblock = ttype;
+                            if (ttype.isSpritesheet)
+                                sb = (<types.Spritesheet> ttype).sprites;
+                            ssa.ex = sb.members[node.children.id.children.text];
+                            ir.push(ssa);
                         }
                         break;
 
@@ -2653,7 +2717,7 @@ class MethodCompilationState {
                         // Must be length
                         console.assert(node.children.id.children.text ===
                                        "length");
-                        ir.push(new SSA(node, ttype + "-length", ir.length,
+                        ir.push(new SSA(node, ttype.type + "-length", ir.length,
                                         target));
                         break;
 
@@ -3576,13 +3640,12 @@ class MethodCompilationState {
                     break;
 
                 case "spritesheet":
-                    ssa.expr = "(eyc.loadSpritesheet(eyc.currentStage,eyc.spritesheets[" +
+                    ssa.expr = "(eyc.loadSpritesheet(eyc.spritesheets[" +
                         JSON.stringify((<types.Spritesheet> ssa.ex).prefix) + "]))";
                     break;
 
                 case "sprite":
-                    // FIXME
-                    ssa.expr = `(${ssa.arg(ir)})`;
+                    ssa.expr = `([${ssa.arg(ir)},${JSON.stringify(ssa.ex.name)}])`;
                     break;
 
                 case "arg":

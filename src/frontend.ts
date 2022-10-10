@@ -130,6 +130,8 @@ export async function go(): Promise<void> {
     const spritesheetDatas: Record<string, any> = Object.create(null);
     const spritesheets: Record<string, any> = Object.create(null);
     let spritesheetIdx = 0;
+    const sprites: Record<string, any> = Object.create(null);
+    let spriteIdx = 0;
 
     w.onmessage = async ev => {
         const msg = ev.data;
@@ -154,20 +156,72 @@ export async function go(): Promise<void> {
                 const id = `spritesheet${spritesheetIdx++}`;
                 spritesheetTextures[id] = url;
 
-                // Eventually we need to load in the actual spritesheet data
+                // Convert the spritesheet data into the form that PIXI expects
                 const data = spritesheetDatas[id] = {
                     meta: {
-                        image: msg.u,
-                        format: bt.format,
+                        image: url,
+                        format: "RGBA8888", //bt.format,
                         size: { w: bt.width, h: bt.height },
                         scale: 1
                     },
                     frames: {},
                     animations: {}
                 };
-                spritesheets[id] = new PIXI.Spritesheet(bt, data);
+                const sprites = msg.d.sprites;
+                for (let key in sprites) {
+                    const props = sprites[key];
+                    props.x *= props.scale;
+                    props.y *= props.scale;
+                    props.w *= props.scale;
+                    props.h *= props.scale;
+                    data.frames[key] = {
+                        frame: {
+                            x: props.x, y: props.y,
+                            w: props.w, h: props.h,
+                        },
+                        sourceSize: {
+                            x: props.x, y: props.y,
+                            w: props.w, h: props.h
+                        },
+                        spriteSourceSize: {
+                            x: props.x, y: props.y,
+                            w: props.w, h: props.h
+                        }
+                    };
+                    //data.animations[key] = [key];
+                }
+                const pss = spritesheets[id] = new PIXI.Spritesheet(bt, data);
+
+                await new Promise(res => pss.parse(res));
 
                 w.postMessage({c: "loadSpritesheet", p: msg.d.prefix, id});
+                break;
+            }
+
+            case "addSprite":
+            {
+                let id = "";
+                do {
+                    // Load the parts
+                    if (!pixiApp)
+                        break;
+                    const ss = spritesheets[msg.ss];
+                    if (!ss)
+                        break;
+                    if (!ss.textures[msg.s])
+                        break;
+
+                    // Create the sprite
+                    id = `sprite${spriteIdx++}`;
+                    const sprite = new PIXI.Sprite(ss.textures[msg.s]);
+                    pixiApp.stage.addChild(sprite);
+                    sprite.x = msg.x;
+                    sprite.y = msg.y;
+                } while (false);
+
+                // Inform the user
+                w.postMessage({
+                    c: "addSprite", st: msg.st, ss: msg.ss, s: msg.s, id});
                 break;
             }
 

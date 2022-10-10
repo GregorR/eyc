@@ -140,6 +140,7 @@ export async function eyc(
     const stages: Record<string, string> = Object.create(null);
     const spritesheetsLoaded: Record<string, boolean> = Object.create(null);
     const spritesheetsToFeId: Record<string, string> = Object.create(null);
+    const sprites: Record<string, string> = Object.create(null);
 
     const eyc: types.EYC = {
     compiler: compiler,
@@ -1115,10 +1116,9 @@ export async function eyc(
         bool: valCmp
     },
 
-    // Frontend indirector
+    // Frontend indirectors
     newStage: function(w: number, h: number, exStr: string) {
         const beId = this.freshId();
-        this.currentStage = beId;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let ex: any = null;
         try {
@@ -1131,8 +1131,7 @@ export async function eyc(
         return beId;
     },
 
-    // Frontend indirector
-    loadSpritesheet: function(stageId: string, spritesheet: types.Spritesheet) {
+    loadSpritesheet: function(spritesheet: types.Spritesheet) {
         if (spritesheetsLoaded[spritesheet.prefix])
             return spritesheet.prefix;
 
@@ -1154,21 +1153,47 @@ export async function eyc(
                 }
             }
         }
-        console.log(spritesheet);
         spriteblockToDesc("", spritesheet.sprites);
 
         frontendP = frontendP.then(async () => {
-            const feId = await this.ext.loadSpritesheet(stageId, desc);
+            const feId = await this.ext.loadSpritesheet(desc);
             spritesheetsToFeId[spritesheet.prefix] = feId;
         }).catch(console.error);
         return spritesheet.prefix;
     },
 
+    addSprite: function(
+        stageId: string, spritesheet: string, sprite: string, x: number,
+        y: number, exStr: string
+    ) {
+        const beId = this.freshId();
+        let ex: any = null;
+        try {
+            ex = JSON.parse(exStr);
+        } catch (ex) {}
+        frontendP = frontendP.then(async () => {
+            if (stageId in stages)
+                stageId = stages[stageId];
+            else
+                stageId = "";
+            if (spritesheet in spritesheetsToFeId)
+                spritesheet = spritesheetsToFeId[spritesheet];
+            else
+                spritesheet = "";
+            const feId = await this.ext.addSprite(stageId, spritesheet, sprite,
+                                                  x, y, ex);
+            sprites[beId] = feId;
+        }).catch(console.error);
+        return beId
+    },
+
+
     // User provided
     ext: {
         fetch: null,
         newStage: null,
-        loadSpritesheet: null
+        loadSpritesheet: null,
+        addSprite: null
     }
 
     };

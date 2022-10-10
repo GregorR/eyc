@@ -58,7 +58,7 @@ export class Wall : ObjectSprite {
         };
     }
 
-    mutating this void init(string sprite, string blocking) {
+    mutating this void init(tuple(string, string) sprite, string blocking) {
         this.staticSprite = sprite;
         this.setBlocking(blocking);
         this.bbx1 = 0;
@@ -177,7 +177,7 @@ export class NWayWall : Wall {
 
 // Non-interactive background sprites
 export class Background : ObjectSprite {
-    mutating this void init(string sprite) {
+    mutating this void init(tuple(string, string) sprite) {
         this.staticSprite = sprite;
     }
 }

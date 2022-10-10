@@ -440,10 +440,9 @@ export class Stage : Program {
     /**
      * Add a sprite to the frontend and get its frontend ID.
      */
-    mutating string addSprite(string sprite, num x, num y, string ex) {
+    mutating string addSprite(tuple(string, string) sprite, num x, num y, string ex) {
         return @js (extStage=this.extStage, sprite, x, y, ex) {
-            //return eyc.addSprite(extStage, sprite, x, y, ex);
-            return "";
+            return eyc.addSprite(extStage, sprite[0], sprite[1], x, y, ex);
         } : string;
     }
 
@@ -638,7 +637,7 @@ export class ObjectSprite : Object {
     }
 
     // The (static) sprite to use to display this object
-    string staticSprite;
+    tuple(string, string) staticSprite;
 
     // Extra properties of the sprite
     string spriteEx;
