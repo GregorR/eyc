@@ -15,12 +15,14 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+// Static elements of EYC
 export interface EYCElement {
-    type: string;
+    type: EYCElementType;
     isModule?: boolean;
     isClass?: boolean;
     isSpritesheet?: boolean;
     isSpriteblock?: boolean;
+    isSprite?: boolean;
     isType?: boolean;
     isObject?: boolean;
     isArray?: boolean;
@@ -36,6 +38,36 @@ export interface EYCElement {
     isNull?: boolean;
     isMethod?: boolean;
 }
+
+// Things that exist at runtime but are not values
+export type EYCElementTypeVirt =
+    "module" |
+    "spritesheet" |
+    "spriteblock" |
+    "sprite" |
+    "soundset" |
+    "sound" |
+    "garment" |
+    "fabric" |
+    "class" |
+    "method";
+
+// Types of runtime values
+export type EYCElementTypeType =
+    "object" |
+    "array" |
+    "tuple" |
+    "map" |
+    "set" |
+    "suggestion" |
+    "num" |
+    "string" |
+    "bool" |
+    "void" |
+    "null";
+
+export type EYCElementType =
+    EYCElementTypeVirt | EYCElementTypeType;
 
 export interface EYC {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,7 +125,7 @@ export interface EYC {
     MapType: {new (keyType: Type, valueType: Type): MapType};
     SetType: {new (valueType: Type): SetType};
     NullType: {new (): NullType};
-    PrimitiveType: {new (of: string, defaultVal: string): PrimitiveType};
+    PrimitiveType: {new (of: EYCElementTypeType, defaultVal: string): PrimitiveType};
 
     // Singletons for singleton types
     numType: PrimitiveType;
@@ -531,16 +563,16 @@ export type TreeTypeExp =
 
 // Types
 export type TreeTypeType =
-    "TypeSet" |
+    "TypeName" |
     "TypeArray" |
     "TypeTuple" |
     "TypeMap" |
+    "TypeSet" |
+    "TypeSuggestion" |
     "TypeNum" |
     "TypeString" |
     "TypeBool" |
-    "TypeSuggestion" |
-    "TypeVoid" |
-    "TypeName";
+    "TypeVoid";
 
 // Miscellaneous tree types only used in other tree types
 export type TreeTypeMisc =

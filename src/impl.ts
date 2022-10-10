@@ -187,7 +187,7 @@ export async function eyc(
     // Modules in the runtime
     modules: Object.create(null),
     Module: class implements types.Module {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isModule: boolean;
         url: string;
@@ -235,7 +235,7 @@ export async function eyc(
 
     // Sprites in the runtime (only part of Spritesheets)
     Sprite: class implements types.Sprite {
-        type: string;
+        type: types.EYCElementType;
         isSprite: boolean;
         name: string;
         sheet: types.Spritesheet;
@@ -259,7 +259,7 @@ export async function eyc(
 
     // Sprite blocks in the runtime
     Spriteblock: class implements types.Spriteblock {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isSpriteblock: boolean;
         members: Record<string, types.Sprite | types.Spriteblock>;
@@ -279,7 +279,7 @@ export async function eyc(
     // Spritesheets in the runtime
     spritesheets: Object.create(null),
     Spritesheet: class implements types.Spritesheet {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isSpritesheet: boolean;
         name: string;
@@ -308,7 +308,7 @@ export async function eyc(
 
     // Sounds in the runtime
     Sound: class implements types.Sound {
-        type: string;
+        type: types.EYCElementType;
         isSound: boolean;
         name: string;
         set: types.Soundset;
@@ -335,7 +335,7 @@ export async function eyc(
     // Sound sets in the runtime
     soundsets: Object.create(null),
     Soundset: class implements types.Soundset {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isSoundset: boolean;
         name: string;
@@ -378,7 +378,7 @@ export async function eyc(
     fabricVals: Object.create(null),
     fabrics: Object.create(null),
     Fabric: class implements types.Fabric {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isFabric: boolean;
         isGarment: boolean;
@@ -490,7 +490,7 @@ export async function eyc(
     // Classes in the runtime
     classes: Object.create(null),
     Class: class implements types.EYCClass {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isClass: boolean;
         module: types.Module;
@@ -544,7 +544,7 @@ export async function eyc(
 
     // Types in the runtime
     ObjectType: class implements types.EYCObjectType {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isType: boolean;
         isObject: boolean;
@@ -582,7 +582,7 @@ export async function eyc(
         }
     },
     ArrayType: class implements types.ArrayType {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isType: boolean;
         isArray: boolean;
@@ -615,7 +615,7 @@ export async function eyc(
         }
     },
     TupleType: class implements types.TupleType {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isType: boolean;
         isTuple: boolean;
@@ -654,7 +654,7 @@ export async function eyc(
         }
     },
     MapType: class implements types.MapType {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isType: boolean;
         isMap: boolean;
@@ -696,7 +696,7 @@ export async function eyc(
         }
     },
     SetType: class implements types.SetType {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isType: boolean;
         isSet: boolean;
@@ -738,7 +738,7 @@ export async function eyc(
         }
     },
     NullType: class implements types.NullType {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isType: boolean;
         isNull: boolean;
@@ -767,14 +767,14 @@ export async function eyc(
         }
     },
     PrimitiveType: class implements types.PrimitiveType {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isType: boolean;
         isPrimitive: boolean;
         isNullable: boolean;
         defaultVal: string;
 
-        constructor(of: string, defaultVal: string) {
+        constructor(of: types.EYCElementTypeType, defaultVal: string) {
             this.type = of;
             this.isTypeLike = true;
             this.isType = true;
@@ -808,7 +808,7 @@ export async function eyc(
 
     // Methods aren't really types in and of themselves, but are type-adjacent
     Method: class implements types.Method {
-        type: string;
+        type: types.EYCElementType;
         isTypeLike: boolean;
         isMethod: boolean;
         id: string;

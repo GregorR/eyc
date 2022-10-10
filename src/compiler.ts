@@ -224,7 +224,8 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
     let licenses = 0;
 
     for (const c of module.parsed.children) {
-        switch (c.type) {
+        const cType = <types.TreeTypeTop> c.type;
+        switch (cType) {
             case "CopyrightDecl":
                 copyrights++;
                 // Allow multiple copyright lines
@@ -234,6 +235,9 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
                 if (++licenses > 1)
                     throw new EYCTypeError(c, "Multiple license declarations");
                 break;
+
+            case "InlineImportDecl":
+                throw new EYCTypeError(c, "Cannot resolve symbols of InlineImportDecl");
 
             case "ImportDecl":
             {
@@ -291,20 +295,23 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
                 break;
             }
 
-            case "PrefixDecl":
-                // No symbols
-                break;
-
             case "SpritesheetDecl":
+            case "SoundSetDecl":
             case "FabricDecl":
             case "ClassDecl":
                 // Types that declare their own name
                 defineSymbol(c, c.children.id.children.text, c, true);
                 break;
 
+            case "PrefixDecl":
+                // No symbols
+                break;
+
             default:
-                throw new EYCTypeError(c,
-                                       "Cannot resolve symbols of " + c.type);
+                ((x: never) => {
+                    throw new EYCTypeError(c,
+                        `Cannot resolve symbols of ${x}`);
+                })(cType);
         }
     }
 
@@ -316,7 +323,7 @@ async function resolveSymbols(eyc: types.EYC, module: types.Module) {
     return symbols;
 }
 
-// Type check global declarations
+// Resolve types within global declarations
 async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
     const symbolTypes = module.parsed.symbolTypes =
         <Record<string, types.TypeLike>> Object.create(null);
@@ -324,10 +331,11 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
     for (const id of Object.keys(module.parsed.symbols).sort()) {
         const c = module.parsed.symbols[id];
         c.parent = module.parsed;
-        switch (c.type) {
-            case "ClassDecl":
-                symbolTypes[id] =
-                    resolveClassDeclTypes(eyc, <types.ClassNode> c);
+        const cType = <"Module" | types.TreeTypeTop> c.type;
+        switch (cType) {
+            case "Module":
+                // Should've already been resolved
+                symbolTypes[id] = (<types.ClassNode> c).module;
                 break;
 
             case "SpritesheetDecl":
@@ -335,18 +343,33 @@ async function resolveDeclTypes(eyc: types.EYC, module: types.Module) {
                     await resolveSpritesheetDeclTypes(eyc, <types.SpritesheetNode> c);
                 break;
 
+            case "SoundSetDecl":
+                throw new EYCTypeError(c, "Cannot resolve types of SoundSetDecl");
+
             case "FabricDecl":
                 symbolTypes[id] =
                     await resolveFabricDeclTypes(eyc, <types.FabricNode> c);
                 break;
 
-            case "Module":
-                // Should've already been resolved
-                symbolTypes[id] = (<types.ClassNode> c).module;
+            case "ClassDecl":
+                symbolTypes[id] =
+                    resolveClassDeclTypes(eyc, <types.ClassNode> c);
+                break;
+
+            case "CopyrightDecl":
+            case "LicenseDecl":
+            case "InlineImportDecl":
+            case "ImportDecl":
+            case "AliasDecl":
+            case "AliasStarDecl":
+            case "PrefixDecl":
+                // No inner types
                 break;
 
             default:
-                throw new EYCTypeError(c, "Cannot resolve types of " + c.type);
+                ((x: never) => {
+                    throw new EYCTypeError(c, `Cannot resolve types of ${x}`);
+                })(cType);
         }
     }
 }
@@ -650,24 +673,29 @@ function resolveFieldDeclTypes(
 // Type check a module
 function typeCheckModule(eyc: types.EYC, module: types.Module) {
     for (const c of module.parsed.children) {
-        switch (c.type) {
+        const cType = <types.TreeTypeTop> c.type;
+        switch (cType) {
             case "ClassDecl":
                 typeCheckClass(eyc, c);
                 break;
 
             case "CopyrightDecl":
             case "LicenseDecl":
-            case "PrefixDecl":
+            case "InlineImportDecl":
             case "ImportDecl":
             case "AliasDecl":
             case "AliasStarDecl":
-            case "FabricDecl":
             case "SpritesheetDecl":
-                // No types or no possibility of type error
+            case "SoundSetDecl":
+            case "FabricDecl":
+            case "PrefixDecl":
+                // No types to check
                 break;
 
             default:
-                throw new EYCTypeError(c, "Cannot type check " + c.type);
+                ((x: never) => {
+                    throw new EYCTypeError(c, `Cannot type check ${x}`);
+                })(cType);
         }
     }
 }
@@ -675,7 +703,8 @@ function typeCheckModule(eyc: types.EYC, module: types.Module) {
 // Type check a class
 function typeCheckClass(eyc: types.EYC, classDecl: types.Tree) {
     for (const c of classDecl.children.members.children) {
-        switch (c.type) {
+        const cType = <types.TreeTypeClassMember> c.type;
+        switch (cType) {
             case "MethodDecl":
                 typeCheckMethodDecl(eyc, c);
                 break;
@@ -685,7 +714,9 @@ function typeCheckClass(eyc: types.EYC, classDecl: types.Tree) {
                 break;
 
             default:
-                throw new EYCTypeError(c, "Cannot type check " + c.type);
+                ((x: never) => {
+                    throw new EYCTypeError(c, `Cannot type check ${x}`);
+                })(cType);
         }
     }
 }
@@ -750,7 +781,8 @@ function typeCheckStatement(
     eyc: types.EYC, methodDecl: types.MethodNode, ctx: CheckCtx,
     symbols: Record<string, types.TypeLike>, stmt: types.Tree
 ) {
-    switch (stmt.type) {
+    const stmtType = <types.TreeTypeStmt> stmt.type;
+    switch (stmtType) {
         case "Block":
             symbols = Object.create(symbols);
             for (const s of stmt.children)
@@ -792,6 +824,8 @@ function typeCheckStatement(
 
             break;
         }
+
+        case "WhileStatement": throw new EYCTypeError(stmt, "Cannot type check WhileStatement");
 
         case "ForStatement":
         {
@@ -977,7 +1011,9 @@ function typeCheckStatement(
             break;
 
         default:
-            throw new EYCTypeError(stmt, "Cannot type check " + stmt.type);
+            ((x: never) => {
+                throw new EYCTypeError(stmt, `Cannot type check ${x}`);
+            })(stmtType);
     }
 }
 
@@ -1000,7 +1036,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                                          exp.children.expression);
     }
 
-    switch (exp.type) {
+    const expType = <types.TreeTypeExp> exp.type;
+    switch (expType) {
         case "AssignmentExp":
             leftType = typeCheckLValue(
                 eyc, methodDecl, ctx, symbols, exp.children.target,
@@ -1016,7 +1053,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     throw new EYCTypeError(exp, "Invalid assignment");
 
             } else if (exp.children.op === "+=") {
-                switch (leftType.type) {
+                const leftTypeType = <types.EYCElementTypeType> leftType.type;
+                switch (leftTypeType) {
                     case "array":
                         if (!rightType.equals(
                             (<types.ArrayType> leftType).valueType,
@@ -1039,13 +1077,25 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                             throw new EYCTypeError(exp, "Invalid +=");
                         break;
 
-                    default:
+                    case "object":
+                    case "tuple":
+                    case "map":
+                    case "suggestion":
+                    case "bool":
+                    case "void":
+                    case "null":
                         throw new EYCTypeError(exp,
-                            "Cannot use += on " + leftType.type);
+                            `Cannot use += on ${leftTypeType}`);
+
+                    default:
+                        ((x: never) => {
+                            throw new EYCTypeError(exp, "Unreachable");
+                        })(leftTypeType);
                 }
 
             } else if (exp.children.op === "-=") {
-                switch (leftType.type) {
+                const leftTypeType = <types.EYCElementTypeType> leftType.type;
+                switch (leftTypeType) {
                     case "map":
                         if (!rightType.equals(
                             (<types.MapType> leftType).keyType,
@@ -1065,9 +1115,21 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                             throw new EYCTypeError(exp, "Invalid -=");
                         break;
 
-                    default:
+                    case "object":
+                    case "array":
+                    case "tuple":
+                    case "suggestion":
+                    case "string":
+                    case "bool":
+                    case "void":
+                    case "null":
                         throw new EYCTypeError(exp,
-                            "Cannot use -= on " + leftType.type);
+                            `Cannot use -= on ${leftTypeType}`);
+
+                    default:
+                        ((x: never) => {
+                            throw new EYCTypeError(exp, "Unreachable");
+                        })(leftTypeType);
                 }
 
             } else {
@@ -1166,21 +1228,15 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     resType = eyc.boolType;
                     break;
 
-                default:
+                case "++":
+                case "--":
+                case "+":
                     throw new EYCTypeError(exp,
                         "No UnExp type checker for " + exp.children.op);
-            }
-            break;
 
-        case "PostIncExp":
-        case "PostDecExp":
-            typeCheckLValue(eyc, methodDecl, ctx, symbols,
-                            exp.children.expression);
-            if (!subExpType.isNum) {
-                throw new EYCTypeError(exp,
-                    "Increment/decrement is only valid on numbers");
+                default:
+                    throw new EYCTypeError(exp, "Unreachable");
             }
-            resType = subExpType;
             break;
 
         case "CastExp":
@@ -1198,7 +1254,18 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             break;
         }
 
-        case "SuperCall":
+        case "PostIncExp":
+        case "PostDecExp":
+            typeCheckLValue(eyc, methodDecl, ctx, symbols,
+                            exp.children.expression);
+            if (!subExpType.isNum) {
+                throw new EYCTypeError(exp,
+                    "Increment/decrement is only valid on numbers");
+            }
+            resType = subExpType;
+            break;
+
+        case "SuperCall": // Out of order for intentional fallthrough
             // The method is ourself
             // FIXME: Check whether the super actually exists
             subExpType = methodDecl.signature;
@@ -1389,7 +1456,7 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     throw new EYCTypeError(exp, `Cannot find sprite/block ${name}`);
 
                 const el = spriteblock.members[name];
-                if ((<types.Sprite> el).isSprite)
+                if (el.isSprite)
                     resType = new eyc.TupleType([eyc.stringType, eyc.stringType]);
                 else // Spriteblock
                     resType = <types.Spriteblock> el;
@@ -1461,6 +1528,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             resType = <types.Type> symbols["this"];
             break;
 
+        case "Caller": throw new EYCTypeError(exp, "Cannot type check Caller");
+
         case "JavaScriptExpression":
             if (!methodDecl.module.ctx.privileged) {
                 throw new EYCTypeError(exp,
@@ -1475,43 +1544,6 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             }
             resType = typeNameToType(eyc, exp.module.parsed, exp.children.type);
             break;
-
-        case "SuggestionLiteral":
-        {
-            console.log(exp);
-            throw new Error("Unimplemented (Suggestion)");
-            /*
-            const ltype = typeCheckExpression(eyc, methodDecl, symbols, exp.children.target);
-            const op = exp.children.op;
-            const isMember = (exp.children.target.type === "DotExp" ||
-                            exp.children.target.type === "IndexExp");
-            let ttype;
-            resType = subExpType;
-
-            switch (op) {
-                case "+":
-                    switch (ltype.type) {
-                        case "num":
-                            if (!isMember)
-                                throw new EYCTypeError(exp, "Numeric addition is only valid for field suggestions");
-                            ttype = "field";
-                            if (!subExpType.isNum)
-                                throw new EYCTypeError(exp, "Invalid addition");
-                            break;
-
-                        default:
-                            throw new EYCTypeError(exp, "No type checker for suggestion +" + ltype.type);
-                    }
-                    break;
-
-                default:
-                    throw new EYCTypeError(exp, "No type checker for suggestion op " + op);
-            }
-
-            exp.ttype = ttype;
-            */
-            break;
-        }
 
         case "NullLiteral":
             if (opts.autoType && opts.autoType.isNullable)
@@ -1577,7 +1609,9 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
         }
 
         default:
-            throw new EYCTypeError(exp, "Cannot type check " + exp.type);
+            ((x: never) => {
+                throw new EYCTypeError(exp, `Cannot type check ${x}`);
+            })(expType);
     }
 
     exp.ctype = resType;
@@ -1589,7 +1623,8 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
         ctx: CheckCtx, symbols: Record<string, types.TypeLike>, exp: types.Tree,
         opts: {mutating?: boolean} = {}): types.Type {
-    switch (exp.type) {
+    const expType = <types.TreeTypeExp> exp.type;
+    switch (expType) {
         case "IndexExp":
         {
             if (!ctx.mutatingThis)
@@ -1672,12 +1707,14 @@ function typeCheckLValue(eyc: types.EYC, methodDecl: types.MethodNode,
             if (!(name in symbols))
                 throw new EYCTypeError(exp, "Undefined variable " + name);
             const type = symbols[name];
-            if (type.type === "ClassDecl")
+            if (type.isClass)
                 throw new EYCTypeError(exp, "Not an assignable variable");
             break;
         }
 
         default:
+            /* We don't use never to check for exhaustiveness, because most
+             * expressions aren't valid l-values */
             throw new EYCTypeError(exp, "Not a valid L-value: " + exp.type);
     }
 
@@ -1702,7 +1739,8 @@ function typeCheckSuggestions(eyc: types.EYC, methodDecl: types.MethodNode,
 function typeCheckSuggestion(eyc: types.EYC, methodDecl: types.MethodNode,
         ctx: CheckCtx, symbols: Record<string, types.TypeLike>,
         suggestion: types.Tree) {
-    switch (suggestion.type) {
+    const suggestionType = <types.TreeTypeStmt> suggestion.type;
+    switch (suggestionType) {
         case "ExtendStatement":
         case "RetractStatement":
         {
@@ -1750,6 +1788,8 @@ function typeCheckSuggestion(eyc: types.EYC, methodDecl: types.MethodNode,
         }
 
         default:
+            /* No exhaustiveness check: Only certain statements are valid
+             * suggestions */
             throw new EYCTypeError(suggestion,
                 "Cannot type check suggestion " + suggestion.type);
     }
@@ -1760,10 +1800,18 @@ function typeCheckSuggestion(eyc: types.EYC, methodDecl: types.MethodNode,
 function typeNameToType(
     eyc: types.EYC, ctx: types.ModuleNode, decl: types.Tree
 ): types.Type {
-    switch (decl.type) {
-        case "TypeSet":
-            return new eyc.SetType(
-                typeNameToType(eyc, ctx, decl.children.type));
+    const declType = <types.TreeTypeType> decl.type;
+    switch (declType) {
+        case "TypeName":
+        {
+            const resolved =
+                <types.ClassNode> resolveName(eyc, ctx, decl.children.name);
+            if (resolved.type !== "ClassDecl")
+                throw new EYCTypeError(decl, "Type name does not name a type");
+            if (!resolved.itype)
+                resolveClassDeclTypes(eyc, resolved);
+            return resolved.itype;
+        }
 
         case "TypeArray":
             return new eyc.ArrayType(
@@ -1786,6 +1834,13 @@ function typeNameToType(
             return new eyc.MapType(keyType, valueType);
         }
 
+        case "TypeSet":
+            return new eyc.SetType(
+                typeNameToType(eyc, ctx, decl.children.type));
+
+        case "TypeSuggestion":
+            return eyc.suggestionType;
+
         case "TypeNum":
             return eyc.numType;
 
@@ -1795,25 +1850,13 @@ function typeNameToType(
         case "TypeBool":
             return eyc.boolType;
 
-        case "TypeSuggestion":
-            return eyc.suggestionType;
-
         case "TypeVoid":
             return eyc.voidType;
 
-        case "TypeName":
-        {
-            const resolved =
-                <types.ClassNode> resolveName(eyc, ctx, decl.children.name);
-            if (resolved.type !== "ClassDecl")
-                throw new EYCTypeError(decl, "Type name does not name a type");
-            if (!resolved.itype)
-                resolveClassDeclTypes(eyc, resolved);
-            return resolved.itype;
-        }
-
         default:
-            throw new EYCTypeError(decl, "Cannot get type for " + decl.type);
+            ((x: never) => {
+                throw new EYCTypeError(decl, `Cannot get type for ${x}`);
+            })(declType);
     }
 }
 
@@ -1869,24 +1912,29 @@ function compileModule(eyc: types.EYC, module: types.Module) {
     }
 
     for (const c of module.parsed.children) {
-        switch (c.type) {
+        const cType = <types.TreeTypeTop> c.type;
+        switch (cType) {
             case "ClassDecl":
                 new ClassCompilationState(eyc, symbols, c).go();
                 break;
 
             case "CopyrightDecl":
             case "LicenseDecl":
-            case "PrefixDecl":
+            case "InlineImportDecl":
             case "ImportDecl":
             case "AliasDecl":
             case "AliasStarDecl":
-            case "FabricDecl":
             case "SpritesheetDecl":
+            case "SoundSetDecl":
+            case "FabricDecl":
+            case "PrefixDecl":
                 // No code
                 break;
 
             default:
-                throw new EYCTypeError(c, "No compiler for " + c.type);
+                ((x: never) => {
+                    throw new EYCTypeError(c, `No compiler for ${x}`);
+                })(cType);
         }
     }
 }
@@ -1902,7 +1950,8 @@ class ClassCompilationState {
 
     go() {
         for (const c of this.decl.children.members.children) {
-            switch (c.type) {
+            const cType = <types.TreeTypeClassMember> c.type;
+            switch (cType) {
                 case "MethodDecl":
                     new MethodCompilationState(this, c).go();
                     break;
@@ -1912,7 +1961,9 @@ class ClassCompilationState {
                     break;
 
                 default:
-                    throw new EYCTypeError(c, "No compiler for " + c.type);
+                    ((x: never) => {
+                        throw new EYCTypeError(c, `No compiler for ${x}`);
+                    })(cType);
             }
         }
     }
@@ -2023,7 +2074,8 @@ class MethodCompilationState {
     compileSSA(
         ir: SSA[], symbols: Record<string, string>, node: types.Tree
     ): number {
-        switch (node.type) {
+        const nodeType = <types.TreeTypeStmt | types.TreeTypeExp> node.type;
+        switch (nodeType) {
             case "Block":
             {
                 const s2 = Object.create(symbols);
@@ -2089,6 +2141,8 @@ class MethodCompilationState {
                 break;
             }
 
+            case "WhileStatement": throw new EYCTypeError(node, "No compiler for WhileStatement");
+
             case "ForStatement":
             {
                 const s2 = Object.create(symbols);
@@ -2141,7 +2195,9 @@ class MethodCompilationState {
 
                 // How to loop over it depends on the type
                 let loopHead: SSA;
-                switch (node.children.collection.ctype.type) {
+                const collectionType = <types.EYCElementTypeType>
+                    node.children.collection.ctype.type;
+                switch (collectionType) {
                     case "array":
                         loopHead = new SSA(node, "for-in-array", ir.length,
                                            coll);
@@ -2174,10 +2230,22 @@ class MethodCompilationState {
                         ir.push(loopHead);
                         break;
 
-                    default:
+                    // Invalid
+                    case "object":
+                    case "tuple":
+                    case "map":
+                    case "suggestion":
+                    case "num":
+                    case "bool":
+                    case "void":
+                    case "null":
                         throw new EYCTypeError(node,
-                            "No compiler for for-in " +
-                            node.children.collection.ctype.type);
+                            `Invalid for-in collection: ${collectionType}`);
+
+                    default:
+                        ((x: never) => {
+                            throw new EYCTypeError(node, "Unreachable");
+                        })(collectionType);
                 }
                 loopHead.ex = s2[node.children.id.children.text];
 
@@ -2215,13 +2283,14 @@ class MethodCompilationState {
 
                 // How to loop over it depends on the type
                 let loopHead: SSA;
-                const ctype = node.children.collection.ctype.type;
-                switch (ctype) {
+                const cType = <types.EYCElementTypeType>
+                    node.children.collection.ctype.type;
+                switch (cType) {
                     case "array":
                     case "string":
                     {
                         // Loop over the indices
-                        loopHead = new SSA(node, "for-in-" + ctype + "-idx",
+                        loopHead = new SSA(node, "for-in-" + cType + "-idx",
                                            ir.length, coll);
                         loopHead.ex = keyNm;
                         ir.push(loopHead);
@@ -2231,7 +2300,7 @@ class MethodCompilationState {
                         varr.ex = keyNm;
                         ir.push(varr);
                         const getter = new SSA(node.children.value,
-                                               ctype + "-index", ir.length,
+                                               cType + "-index", ir.length,
                                                coll, varr.idx);
                         ir.push(getter);
                         const setter = new SSA(node, "var-assign", ir.length,
@@ -2276,10 +2345,22 @@ class MethodCompilationState {
                         break;
                     }
 
-                    default:
+                    case "object":
+                    case "tuple":
+                    case "set":
+                    case "suggestion":
+                    case "num":
+                    case "bool":
+                    case "void":
+                    case "null":
                         throw new EYCTypeError(node,
-                            "No compiler for two-variable for-in " +
-                            node.children.collection.ctype.type);
+                            "Invalid for-in (two variable) collection type: " +
+                            cType);
+
+                    default:
+                        ((x: never) => {
+                            throw new EYCTypeError(node, "Unreachable");
+                        })(cType);
                 }
 
                 // Then the body
@@ -2381,6 +2462,7 @@ class MethodCompilationState {
                         case "%=": op = "mod"; break;
                         case "+=": op = "add"; break;
                         case "-=": op = "sub"; break;
+                        default: throw new EYCTypeError(node, "Unreachable");
                     }
                     op = op + "-" + l + "-" + r;
 
@@ -2407,25 +2489,6 @@ class MethodCompilationState {
                 target.assg.idx = ir.length;
                 ir.push(target.assg);
                 return value;
-            }
-
-            case "UnExp":
-            {
-                let type = "";
-                switch (node.children.op) {
-                    case "-": type = "neg"; break;
-                    case "!": type = "not"; break;
-                    default:
-                        throw new EYCTypeError(node,
-                            "No compiler for unary " + node.children.op);
-                }
-                const s = this.compileSSA(ir, symbols,
-                                          node.children.expression);
-                ir.push(new SSA(node,
-                    type + "-" + node.children.expression.ctype.type,
-                    ir.length, s
-                ));
-                break;
             }
 
             case "OrExp":
@@ -2511,8 +2574,7 @@ class MethodCompilationState {
                     case "*": op = "mul"; break;
                     case "/": op = "div"; break;
                     case "%": op = "mod"; break;
-                    // Should never be reached:
-                    default: throw new Error(node.children.op);
+                    default: throw new EYCTypeError(node, "Unreachable");
                 }
 
                 const l = this.compileSSA(ir, symbols, node.children.left);
@@ -2522,6 +2584,31 @@ class MethodCompilationState {
                     node.children.left.ctype.type + "-" +
                     node.children.right.ctype.type,
                     ir.length, l, r
+                ));
+                break;
+            }
+
+
+            case "UnExp":
+            {
+                let type = "";
+                switch (node.children.op) {
+                    case "-": type = "neg"; break;
+                    case "!": type = "not"; break;
+
+                    case "++":
+                    case "--":
+                    case "+":
+                        throw new EYCTypeError(node,
+                            `No compiler for unary ${node.children.op}`);
+                    default:
+                        throw new EYCTypeError(node, "Unreachable");
+                }
+                const s = this.compileSSA(ir, symbols,
+                                          node.children.expression);
+                ir.push(new SSA(node,
+                    type + "-" + node.children.expression.ctype.type,
+                    ir.length, s
                 ));
                 break;
             }
@@ -2574,22 +2661,6 @@ class MethodCompilationState {
                 return tv.idx;
             }
 
-            case "SuperCall":
-            {
-                // Arguments
-                const head = new SSA(node, "call-head", ir.length);
-                ir.push(head);
-                for (const c of (node.children.args ?
-                                 node.children.args.children : [])) {
-                    ir.push(new SSA(node, "arg", ir.length, head.idx,
-                                    this.compileSSA(ir, symbols, c)));
-                }
-
-                // Then the call
-                ir.push(new SSA(node, "call-call-super", ir.length, head.idx));
-                break;
-            }
-
             case "CallExp":
             {
                 // First, the target
@@ -2624,7 +2695,9 @@ class MethodCompilationState {
                                                node.children.expression);
                 const index = this.compileSSA(ir, symbols, node.children.index);
 
-                switch (node.children.expression.ctype.type) {
+                const expType = <types.EYCElementTypeType>
+                    node.children.expression.ctype.type;
+                switch (expType) {
                     case "array":
                     case "tuple":
                         ir.push(new SSA(node,
@@ -2656,10 +2729,20 @@ class MethodCompilationState {
                         break;
                     }
 
-                    default:
+                    case "object":
+                    case "suggestion":
+                    case "num":
+                    case "string":
+                    case "bool":
+                    case "void":
+                    case "null":
                         throw new EYCTypeError(node,
-                            "No compiler for index " +
-                            node.children.expression.ctype.type);
+                            `Unindexable type: ${expType}`);
+
+                    default:
+                        ((x: never) => {
+                            throw new EYCTypeError(node, "Unreachable");
+                        })(expType);
                 }
                 break;
             }
@@ -2695,12 +2778,10 @@ class MethodCompilationState {
 
                 const target = this.compileSSA(ir, symbols,
                                                node.children.expression);
-                const ttype = node.children.expression.ctype;
-                switch (ttype.type) {
-                    case "object":
-                        ir.push(new SSA(node, "field", ir.length, target));
-                        break;
-
+                const expCType = node.children.expression.ctype;
+                const expType = <types.EYCElementType>
+                    expCType.type;
+                switch (expType) {
                     case "spritesheet":
                     case "spriteblock":
                         if (node.ctype.isSpriteblock) {
@@ -2710,12 +2791,16 @@ class MethodCompilationState {
                             return target;
                         } else { // sprite
                             const ssa = new SSA(node, "sprite", ir.length, target);
-                            let sb: types.Spriteblock = ttype;
-                            if (ttype.isSpritesheet)
-                                sb = (<types.Spritesheet> ttype).sprites;
+                            let sb: types.Spriteblock = expCType;
+                            if (expCType.isSpritesheet)
+                                sb = (<types.Spritesheet> expCType).sprites;
                             ssa.ex = sb.members[node.children.id.children.text];
                             ir.push(ssa);
                         }
+                        break;
+
+                    case "object":
+                        ir.push(new SSA(node, "field", ir.length, target));
                         break;
 
                     case "array":
@@ -2723,13 +2808,33 @@ class MethodCompilationState {
                         // Must be length
                         console.assert(node.children.id.children.text ===
                                        "length");
-                        ir.push(new SSA(node, ttype.type + "-length", ir.length,
+                        ir.push(new SSA(node, expType + "-length", ir.length,
                                         target));
                         break;
 
-                    default:
+                    case "module":
+                    case "sprite":
+                    case "soundset":
+                    case "sound":
+                    case "garment":
+                    case "fabric":
+                    case "class":
+                    case "method":
+                    case "tuple":
+                    case "map":
+                    case "set":
+                    case "suggestion":
+                    case "num":
+                    case "bool":
+                    case "void":
+                    case "null":
                         throw new EYCTypeError(node,
-                                               "No compiler for dot " + ttype);
+                            `Invalid dot type: ${expCType}`);
+
+                    default:
+                        ((x: never) => {
+                            throw new EYCTypeError(node, "Unreachable");
+                        })(expType);
                 }
                 break;
             }
@@ -2745,7 +2850,8 @@ class MethodCompilationState {
             case "NewExp":
             {
                 let ret: SSA;
-                switch (node.ctype.type) {
+                const cType = <types.EYCElementTypeType> node.ctype.type;
+                switch (cType) {
                     case "object":
                     {
                         // The actual object creation
@@ -2770,7 +2876,7 @@ class MethodCompilationState {
                         // Intentional fallthrough
 
                     default:
-                        ret = new SSA(node, "new-" + node.ctype.type,
+                        ret = new SSA(node, "new-" + cType,
                                       ir.length);
                         ir.push(ret);
                 }
@@ -2785,9 +2891,27 @@ class MethodCompilationState {
                 return ret.idx;
             }
 
+            case "SuperCall":
+            {
+                // Arguments
+                const head = new SSA(node, "call-head", ir.length);
+                ir.push(head);
+                for (const c of (node.children.args ?
+                                 node.children.args.children : [])) {
+                    ir.push(new SSA(node, "arg", ir.length, head.idx,
+                                    this.compileSSA(ir, symbols, c)));
+                }
+
+                // Then the call
+                ir.push(new SSA(node, "call-call-super", ir.length, head.idx));
+                break;
+            }
+
             case "This":
                 ir.push(new SSA(node, "this", ir.length));
                 break;
+
+            case "Caller": throw new EYCTypeError(node, "No compiler for Caller");
 
             case "JavaScriptExpression":
             {
@@ -2836,6 +2960,8 @@ class MethodCompilationState {
                 ir.push(new SSA(node, "hex-literal", ir.length));
                 break;
 
+            case "B64Literal": throw new EYCTypeError(node, "No compiler for B64Literal");
+
             case "DecLiteral":
                 ir.push(new SSA(node, "dec-literal", ir.length));
                 break;
@@ -2847,6 +2973,8 @@ class MethodCompilationState {
             case "BoolLiteral":
                 ir.push(new SSA(node, "bool-literal", ir.length));
                 break;
+
+            case "ArrayLiteral": throw new EYCTypeError(node, "No compiler for ArrayLiteral");
 
             case "TupleLiteral":
             {
@@ -2889,8 +3017,9 @@ class MethodCompilationState {
             }
 
             default:
-                console.error(node);
-                throw new EYCTypeError(node, "No compiler for " + node.type);
+                ((x: never) => {
+                    throw new EYCTypeError(node, `No compiler for ${x}`);
+                })(nodeType);
         }
 
         return ir.length - 1;
@@ -2900,7 +3029,8 @@ class MethodCompilationState {
     compileLExp(
         ir: SSA[], symbols: Record<string, string>, node: types.Tree
     ): LExp {
-        switch (node.type) {
+        const nType = <types.TreeTypeExp> node.type;
+        switch (nType) {
             case "IndexExp":
                 switch (node.children.expression.ctype.type) {
                     case "map":
@@ -2991,8 +3121,9 @@ class MethodCompilationState {
             }
 
             default:
+                // No exhaustiveness check
                 throw new EYCTypeError(node,
-                    "No compiler for l-expression " + node.type);
+                    `No compiler for l-expression ${nType}`);
         }
     }
 
