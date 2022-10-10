@@ -441,7 +441,7 @@ export type Tuple = unknown[] & {tupleStr?: string};
 
 // Parse tree
 export interface Tree {
-    type: string;
+    type: TreeType;
     location: {
         start: {
             line: number;
@@ -462,6 +462,115 @@ export interface Tree {
     // Type associated with this node
     ctype?: TypeLike;
 }
+
+// Top-level tree types
+export type TreeTypeTop =
+    "CopyrightDecl" |
+    "LicenseDecl" |
+    "InlineImportDecl" |
+    "ImportDecl" |
+    "AliasDecl" |
+    "AliasStarDecl" |
+    "SpritesheetDecl" |
+    "SoundSetDecl" |
+    "FabricDecl" |
+    "PrefixDecl" |
+    "ClassDecl";
+
+// Members of classes
+export type TreeTypeClassMember =
+    "MethodDecl" |
+    "FieldDecl";
+
+// Statements
+export type TreeTypeStmt =
+    "Block" |
+    "VarDecl" |
+    "IfStatement" |
+    "WhileStatement" |
+    "ForStatement" |
+    "ForInStatement" |
+    "ForInMapStatement" |
+    "ReturnStatement" |
+    "ExtendStatement" |
+    "RetractStatement" |
+    "ExpStatement";
+
+// Expressions
+export type TreeTypeExp =
+    "AssignmentExp" |
+    "OrExp" |
+    "AndExp" |
+    "EqExp" |
+    "RelExp" |
+    "AddExp" |
+    "MulExp" |
+    "UnExp" |
+    "CastExp" |
+    "PostIncExp" |
+    "PostDecExp" |
+    "CallExp" |
+    "IndexExp" |
+    "SuggestionExtendExp" |
+    "DotExp" |
+    "SuggestionLiteral" |
+    "NewExp" |
+    "SuperCall" |
+    "This" |
+    "Caller" |
+    "JavaScriptExpression" |
+    "NullLiteral" |
+    "HexLiteral" |
+    "B64Literal" |
+    "DecLiteral" |
+    "StringLiteral" |
+    "BoolLiteral" |
+    "ArrayLiteral" |
+    "TupleLiteral" |
+    "ID";
+
+// Types
+export type TreeTypeType =
+    "TypeSet" |
+    "TypeArray" |
+    "TypeTuple" |
+    "TypeMap" |
+    "TypeNum" |
+    "TypeString" |
+    "TypeBool" |
+    "TypeSuggestion" |
+    "TypeVoid" |
+    "TypeName";
+
+// Miscellaneous tree types only used in other tree types
+export type TreeTypeMisc =
+    "Module" |
+    "ExportClause" |
+    "Version" |
+    "NameList" |
+    "MemberDeclList" |
+    "ParamList" |
+    "Param" |
+    "FieldDeclList" |
+    "FieldDeclPart" |
+    "VarDeclList" |
+    "VarDeclPart" |
+    "ArgList" |
+    "TypeList" |
+    "Sprite" |
+    "SpriteBlock" |
+    "Sound" |
+    "SoundSetProperty" |
+    "FabricProperty" |
+    "Name";
+
+export type TreeType =
+    TreeTypeTop |
+    TreeTypeClassMember |
+    TreeTypeStmt |
+    TreeTypeExp |
+    TreeTypeType |
+    TreeTypeMisc;
 
 // Children of parse trees defined while compiling
 export interface ModuleNode extends Tree {

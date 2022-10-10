@@ -325,7 +325,7 @@ primary
  }
  / super "(" white a:argList? ")" white { return new Tree("SuperCall", location(), {args: a}); }
  / this { return new Tree("This", location(), {}); }
- / caller { return new tree("Caller", location(), {}); }
+ / caller { return new Tree("Caller", location(), {}); }
  / "@js" white "(" white a:varDeclList? ")" white "{" b:jsBlock "}" white ":" white c:type {
      return new Tree("JavaScriptExpression", location(), {pass: a, body: b, type: c});
  }

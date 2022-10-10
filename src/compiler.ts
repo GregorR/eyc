@@ -114,7 +114,9 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
     const exports = Object.create(null);
 
     for (const c of module.parsed.children) {
-        switch (c.type) {
+        const cType = <types.TreeTypeTop> c.type;
+        switch (cType) {
+            case "InlineImportDecl":
             case "ImportDecl":
                 if (!c.children.exportClause)
                     break; // Not exported
@@ -138,6 +140,7 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
             }
 
             case "SpritesheetDecl":
+            case "SoundSetDecl":
             case "FabricDecl":
                 if (!c.children.exportClause)
                     break; // Not exported
@@ -167,8 +170,10 @@ function resolveExports(eyc: types.EYC, module: types.Module) {
                 break;
 
             default:
-                throw new EYCTypeError(c,
-                                       "Cannot resolve exports of " + c.type);
+                ((x: never) => {
+                    throw new EYCTypeError(c,
+                        `Cannot resolve exports of ${x}`);
+                })(cType);
         }
     }
 
@@ -1471,7 +1476,7 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
             resType = typeNameToType(eyc, exp.module.parsed, exp.children.type);
             break;
 
-        case "Suggestion":
+        case "SuggestionLiteral":
         {
             console.log(exp);
             throw new Error("Unimplemented (Suggestion)");
