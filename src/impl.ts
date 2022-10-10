@@ -1117,7 +1117,7 @@ export async function eyc(
     },
 
     // Frontend indirectors
-    newStage: function(w: number, h: number, exStr: string) {
+    newStage: function(w: number, h: number, scale: number, exStr: string) {
         const beId = this.freshId();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let ex: any = null;
@@ -1125,7 +1125,7 @@ export async function eyc(
             ex = JSON.parse(exStr);
         } catch (ex) {}
         frontendP = frontendP.then(async () => {
-            const feId = await this.ext.newStage(w, h, ex);
+            const feId = await this.ext.newStage(w, h, scale, ex);
             stages[beId] = feId;
         }).catch(console.error);
         return beId;

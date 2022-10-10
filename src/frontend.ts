@@ -22,6 +22,9 @@
 declare let PIXI: any;
 
 let pixiApp: any = null;
+let pixiProps = {
+    scale: 64
+};
 
 // Check for mandatory features
 if (typeof HTMLCanvasElement === "undefined" ||
@@ -140,6 +143,7 @@ export async function go(): Promise<void> {
                 // Create the PIXI app. We (currently?) only support one stage.
                 await loadPixiApp({w: msg.w, h: msg.h});
                 loader = PIXI.Loader.shared;
+                pixiProps.scale = msg.s || 64;
 
                 // Tell them it's ready
                 w.postMessage({c: "newStage", id: "stage0"});
@@ -175,6 +179,7 @@ export async function go(): Promise<void> {
                     props.w *= props.scale;
                     props.h *= props.scale;
                     data.frames[key] = {
+                        scale: props.scale,
                         frame: {
                             x: props.x, y: props.y,
                             w: props.w, h: props.h,
@@ -208,7 +213,10 @@ export async function go(): Promise<void> {
                     const ss = spritesheets[msg.ss];
                     if (!ss)
                         break;
-                    if (!ss.textures[msg.s])
+                    const ssd = spritesheetDatas[msg.ss];
+                    if (!ssd)
+                        break;
+                    if (!ss.textures[msg.s] || !ssd.frames[msg.s])
                         break;
 
                     // Create the sprite
@@ -217,6 +225,7 @@ export async function go(): Promise<void> {
                     pixiApp.stage.addChild(sprite);
                     sprite.x = msg.x;
                     sprite.y = msg.y;
+                    sprite.scale.set(pixiProps.scale / ssd.frames[msg.s].scale);
                 } while (false);
 
                 // Inform the user

@@ -160,7 +160,7 @@ export interface EYC {
 
     // Frontend interaction
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    newStage(w: number, h: number, ex: string): string;
+    newStage(w: number, h: number, scale: number, ex: string): string;
     loadSpritesheet(spritesheet: Spritesheet): string;
     addSprite(
         stageId: string, spritesheet: string, sprite: string, x: number,
@@ -177,7 +177,9 @@ export interface EYCExt {
     fetch: (resource: string) => Promise<string>;
 
     // Create a new frontend stage
-    newStage: (w: number, h: number, ex: unknown) => Promise<string>;
+    newStage: (
+        w: number, h: number, scale: number, ex: unknown
+    ) => Promise<string>;
 
     // Load in this spritesheet
     loadSpritesheet: (desc: unknown) => Promise<string>;
