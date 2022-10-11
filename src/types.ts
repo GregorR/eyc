@@ -657,6 +657,7 @@ export type SSAOp =
     "eq-tuple-tuple" |
     "eq-map-map" |
     "eq-map-null" |
+    "eq-null-map" |
     "eq-set-set" |
     "eq-set-null" |
     "eq-null-set" |

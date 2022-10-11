@@ -3177,14 +3177,9 @@ class MethodCompilationState {
             const ssa = ir[iri];
             ssa.target = "$" + ssa.idx;
 
-            switch (ssa.type) {
-                case "set-values-array":
-                    ssa.expr = "(Array.from(" + ssa.arg(ir) +
-                        ".values()).sort(eyc.cmp." +
-                        (<types.SetType> ir[ssa.a1].ctx.ctype).valueType.type +
-                        "))";
-                    break;
-
+            const ssaType = <types.SSAOp> ssa.type;
+            switch (ssaType) {
+                // "IfStatement" |
                 case "if":
                     ssa.skip = true;
                     ssa.stmts.push("if (" + ssa.arg(ir) + ") {\n");
@@ -3195,6 +3190,16 @@ class MethodCompilationState {
                     ssa.stmts.push("else {\n");
                     break;
 
+                case "fi":
+                case "esle":
+                case "pool":
+                case "ni-rof":
+                    ssa.skip = true;
+                    ssa.stmts.push("}\n");
+                    break;
+
+
+                // "WhileStatement" |
                 case "loop":
                     ssa.skip = true;
                     ssa.stmts.push("while (true) {\n");
@@ -3205,6 +3210,10 @@ class MethodCompilationState {
                     ssa.stmts.push("if (" + ssa.arg(ir) + ") break;\n");
                     break;
 
+
+                // "ForStatement" |
+
+                // "ForInStatement" |
                 case "for-in-array":
                 case "for-in-string":
                 {
@@ -3219,6 +3228,29 @@ class MethodCompilationState {
                     break;
                 }
 
+                case "for-in-set": throw new EYCTypeError(ssa.ctx, "No compiler for for-in-set");
+
+                case "map-keys-array":
+                {
+                    /* NOTE: The resulting array is *not* an EYC array, and
+                     * cannot be used as one! */
+                    ssa.expr = "(Array.from(" + ssa.arg(ir) +
+                        ".keys()).sort(eyc.cmp." +
+                        (<types.MapType> ssa.ctx.ctype).keyType.type + "))";
+                    break;
+                }
+
+
+                case "set-values-array":
+                    ssa.expr = "(Array.from(" + ssa.arg(ir) +
+                        ".values()).sort(eyc.cmp." +
+                        (<types.SetType> ir[ssa.a1].ctx.ctype).valueType.type +
+                        "))";
+                    break;
+
+                case "set-tuple-values-array": throw new EYCTypeError(ssa.ctx, "No compiler for set-tuple-values-array");
+
+                // "ForInMapStatement" |
                 case "for-in-array-idx":
                 case "for-in-string-idx":
                 {
@@ -3233,30 +3265,16 @@ class MethodCompilationState {
                     break;
                 }
 
-                case "map-keys-array":
-                {
-                    /* NOTE: The resulting array is *not* an EYC array, and
-                     * cannot be used as one! */
-                    ssa.expr = "(Array.from(" + ssa.arg(ir) +
-                        ".keys()).sort(eyc.cmp." +
-                        (<types.MapType> ssa.ctx.ctype).keyType.type + "))";
-                    break;
-                }
 
-                case "fi":
-                case "esle":
-                case "pool":
-                case "ni-rof":
-                    ssa.skip = true;
-                    ssa.stmts.push("}\n");
-                    // } } } make matching happy
-                    break;
-
+                // "ReturnStatement" |
                 case "return":
                     ssa.skip = true;
                     ssa.stmts.push("return " + ssa.arg(ir) + ";\n");
                     break;
 
+
+                // "ExtendStatement" |
+                // "RetractStatement" |
                 case "extend":
                 case "retract":
                     ssa.expr = "(" + ssa.arg(ir) + "." + ssa.type + "(" +
@@ -3273,32 +3291,13 @@ class MethodCompilationState {
                         "})";
                     break;
 
+
+                // "AssignmentExp" |
+                case "array-concatenate": throw new EYCTypeError(ssa.ctx, "No compiler for array-concatenate");
                 case "array-append":
                 {
                     const arr = ssa.arg(ir, 1, false);
                     ssa.expr = "(" + arr + ".push(" + ssa.arg(ir, 2) + ")," + arr + ")";
-                    break;
-                }
-
-                case "map-assign":
-                {
-                    const val = ssa.arg(ir, 2, false);
-                    // map-assign's target is actually a map-pair
-                    const mapPair = ir[ssa.a1];
-                    const idx = mapPair.arg(ir, 2);
-                    const map = mapPair.arg(ir, 1);
-                    ssa.expr = "(" + map + ".set(" + idx + "," + val + ")," + val + ")";
-                    break;
-                }
-
-                case "map-tuple-assign":
-                {
-                    const val = ssa.arg(ir, 2, false);
-                    const mapPair = ir[ssa.a1];
-                    const idx = mapPair.arg(ir, 2, false);
-                    const map = mapPair.arg(ir, 1);
-                    ssa.expr = "(" + map + ".set(eyc.tupleStr(" + idx +
-                        "),{key:" + idx + ",value:" + val + "})," + val + ")";
                     break;
                 }
 
@@ -3318,28 +3317,42 @@ class MethodCompilationState {
                     break;
                 }
 
-                case "in-object-map":
-                {
-                    const l = ssa.arg(ir, 1, false);
-                    ssa.expr = "(" + ssa.arg(ir, 2) + ".has(" + l + "))";
-                    break;
-                }
+                case "set-tuple-add": throw new EYCTypeError(ssa.ctx, "No compiler for set-tuple-add");
+                case "set-tuple-delete": throw new EYCTypeError(ssa.ctx, "No compiler for set-tuple-delete");
 
-                case "is-object-class":
-                {
-                    ssa.expr = "(!!(" + ssa.arg(ir, 1) +
-                        ".type[" + ssa.arg(ir, 2) + ".prefix]))";
-                    break;
-                }
-
+                // "EqExp" |
                 case "eq-object-object":
                 case "eq-object-null":
+                case "eq-null-object":
+                case "eq-array-array":
+                case "eq-array-null":
+                case "eq-null-array":
+                case "eq-map-map":
+                case "eq-map-null":
+                case "eq-null-map":
+                case "eq-set-set":
+                case "eq-set-null":
+                case "eq-null-set":
                 case "eq-num-num":
                 case "eq-string-string":
+                case "eq-bool-bool":
+                case "eq-null-null":
                 case "ne-object-object":
                 case "ne-object-null":
+                case "ne-null-object":
+                case "ne-array-array":
+                case "ne-array-null":
+                case "ne-null-array":
+                case "ne-map-map":
+                case "ne-map-null":
+                case "ne-null-map":
+                case "ne-set-set":
+                case "ne-set-null":
+                case "ne-null-set":
                 case "ne-num-num":
                 case "ne-string-string":
+                case "ne-bool-bool":
+                case "ne-null-null":
                 {
                     const r = ssa.arg(ir, 2);
                     const l = ssa.arg(ir, 1);
@@ -3348,6 +3361,45 @@ class MethodCompilationState {
                     break;
                 }
 
+                case "eq-tuple-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for eq-tuple-tuple");
+                case "eq-suggestion-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for eq-suggestion-suggestion");
+                case "ne-tuple-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for ne-tuple-tuple");
+                case "ne-suggestion-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for ne-suggestion-suggestion");
+
+                // "RelExp" |
+                case "le-object-object": throw new EYCTypeError(ssa.ctx, "No compiler for le-object-object");
+                case "le-array-array": throw new EYCTypeError(ssa.ctx, "No compiler for le-array-array");
+                case "le-tuple-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for le-tuple-tuple");
+                case "le-map-map": throw new EYCTypeError(ssa.ctx, "No compiler for le-map-map");
+                case "le-set-set": throw new EYCTypeError(ssa.ctx, "No compiler for le-set-set");
+                case "le-num-num":
+                case "lt-num-num":
+                case "ge-num-num":
+                case "gt-num-num":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    const op = ssa.ex || ssa.ctx.children.op;
+                    ssa.expr = "(" + l + op + r + ")";
+                    break;
+                }
+
+                case "le-string-string": throw new EYCTypeError(ssa.ctx, "No compiler for le-string-string");
+                case "le-bool-bool": throw new EYCTypeError(ssa.ctx, "No compiler for le-bool-bool");
+                case "lt-object-object": throw new EYCTypeError(ssa.ctx, "No compiler for lt-object-object");
+                case "lt-array-array": throw new EYCTypeError(ssa.ctx, "No compiler for lt-array-array");
+                case "lt-tuple-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for lt-tuple-tuple");
+                case "lt-map-map": throw new EYCTypeError(ssa.ctx, "No compiler for lt-map-map");
+                case "lt-set-set": throw new EYCTypeError(ssa.ctx, "No compiler for lt-set-set");
+                case "lt-string-string": throw new EYCTypeError(ssa.ctx, "No compiler for lt-string-string");
+                case "lt-bool-bool": throw new EYCTypeError(ssa.ctx, "No compiler for lt-bool-bool");
+                case "ge-object-object": throw new EYCTypeError(ssa.ctx, "No compiler for ge-object-object");
+                case "ge-array-array": throw new EYCTypeError(ssa.ctx, "No compiler for ge-array-array");
+                case "ge-tuple-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for ge-tuple-tuple");
+                case "ge-map-map": throw new EYCTypeError(ssa.ctx, "No compiler for ge-map-map");
+                case "ge-set-set": throw new EYCTypeError(ssa.ctx, "No compiler for ge-set-set");
+                case "ge-string-string": throw new EYCTypeError(ssa.ctx, "No compiler for ge-string-string");
+                case "ge-bool-bool": throw new EYCTypeError(ssa.ctx, "No compiler for ge-bool-bool");
                 case "gt-object-object":
                 {
                     const r = ssa.arg(ir, 2);
@@ -3357,24 +3409,29 @@ class MethodCompilationState {
                     break;
                 }
 
-                case "lt-num-num":
-                case "le-num-num":
-                case "gt-num-num":
-                case "ge-num-num":
-                case "add-num-num":
-                case "add-string-string":
-                case "sub-num-num":
-                case "mul-num-num":
-                case "div-num-num":
-                case "mod-num-num":
+                case "gt-array-array": throw new EYCTypeError(ssa.ctx, "No compiler for gt-array-array");
+                case "gt-tuple-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for gt-tuple-tuple");
+                case "gt-map-map": throw new EYCTypeError(ssa.ctx, "No compiler for gt-map-map");
+                case "gt-set-set": throw new EYCTypeError(ssa.ctx, "No compiler for gt-set-set");
+                case "gt-string-string": throw new EYCTypeError(ssa.ctx, "No compiler for gt-string-string");
+                case "gt-bool-bool": throw new EYCTypeError(ssa.ctx, "No compiler for gt-bool-bool");
+                case "in-object-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-object-array");
+                case "in-array-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-array-array");
+                case "in-tuple-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-tuple-array");
+                case "in-map-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-map-array");
+                case "in-set-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-set-array");
+                case "in-suggestion-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-suggestion-array");
+                case "in-num-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-num-array");
+                case "in-string-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-string-array");
+                case "in-bool-array": throw new EYCTypeError(ssa.ctx, "No compiler for in-bool-array");
+                case "in-object-map":
                 {
-                    const r = ssa.arg(ir, 2);
-                    const l = ssa.arg(ir, 1);
-                    const op = ssa.ex || ssa.ctx.children.op;
-                    ssa.expr = "(" + l + op + r + ")";
+                    const l = ssa.arg(ir, 1, false);
+                    ssa.expr = "(" + ssa.arg(ir, 2) + ".has(" + l + "))";
                     break;
                 }
 
+                case "in-array-map": throw new EYCTypeError(ssa.ctx, "No compiler for in-array-map");
                 case "in-tuple-map":
                 {
                     const r = ssa.arg(ir, 2);
@@ -3383,6 +3440,31 @@ class MethodCompilationState {
                     break;
                 }
 
+                case "in-map-map": throw new EYCTypeError(ssa.ctx, "No compiler for in-map-map");
+                case "in-set-map": throw new EYCTypeError(ssa.ctx, "No compiler for in-set-map");
+                case "in-suggestion-map": throw new EYCTypeError(ssa.ctx, "No compiler for in-suggestion-map");
+                case "in-num-map": throw new EYCTypeError(ssa.ctx, "No compiler for in-num-map");
+                case "in-string-map": throw new EYCTypeError(ssa.ctx, "No compiler for in-string-map");
+                case "in-bool-map": throw new EYCTypeError(ssa.ctx, "No compiler for in-bool-map");
+                case "in-object-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-object-set");
+                case "in-array-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-array-set");
+                case "in-tuple-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-tuple-set");
+                case "in-map-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-map-set");
+                case "in-set-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-set-set");
+                case "in-suggestion-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-suggestion-set");
+                case "in-num-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-num-set");
+                case "in-string-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-string-set");
+                case "in-bool-set": throw new EYCTypeError(ssa.ctx, "No compiler for in-bool-set");
+                case "is-object-class":
+                {
+                    ssa.expr = "(!!(" + ssa.arg(ir, 1) +
+                        ".type[" + ssa.arg(ir, 2) + ".prefix]))";
+                    break;
+                }
+
+
+                // "AddExp" |
+                case "add-array-array": throw new EYCTypeError(ssa.ctx, "No compiler for add-array-array");
                 case "add-suggestion-suggestion":
                 {
                     const tmp = "$$" + (this.varCtr++);
@@ -3396,17 +3478,85 @@ class MethodCompilationState {
                     break;
                 }
 
+                case "add-num-num":
+                case "add-string-string":
+                case "sub-num-num":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    const op = ssa.ex || ssa.ctx.children.op;
+                    ssa.expr = "(" + l + op + r + ")";
+                    break;
+                }
+
+
+                // "MulExp" |
+                case "mul-num-num":
+                case "div-num-num":
+                case "mod-num-num":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    const op = ssa.ex || ssa.ctx.children.op;
+                    ssa.expr = "(" + l + op + r + ")";
+                    break;
+                }
+
+
+                // "UnExp" |
                 case "neg-num":
                     ssa.expr = "(-" + ssa.arg(ir) + ")";
                     break;
 
+                case "not-object": throw new EYCTypeError(ssa.ctx, "No compiler for not-object");
+                case "not-array": throw new EYCTypeError(ssa.ctx, "No compiler for not-array");
+                case "not-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for not-tuple");
+                case "not-map": throw new EYCTypeError(ssa.ctx, "No compiler for not-map");
+                case "not-set": throw new EYCTypeError(ssa.ctx, "No compiler for not-set");
+                case "not-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for not-suggestion");
+                case "not-num": throw new EYCTypeError(ssa.ctx, "No compiler for not-num");
+                case "not-string": throw new EYCTypeError(ssa.ctx, "No compiler for not-string");
                 case "not-bool":
                     ssa.expr = "(!" + ssa.arg(ir) + ")";
                     break;
 
-                case "call-call-super":
-                case "call-call":
+                case "not-null": throw new EYCTypeError(ssa.ctx, "No compiler for not-null");
+
+                // "CastExp" |
+                case "string-from-object":
+                case "string-from-array":
+                    ssa.expr = "(" + ssa.arg(ir) + ".id)";
+                    break;
+
+                case "string-from-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for string-from-tuple");
+                case "string-from-map": throw new EYCTypeError(ssa.ctx, "No compiler for string-from-map");
+                case "string-from-set": throw new EYCTypeError(ssa.ctx, "No compiler for string-from-set");
+                case "string-from-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for string-from-suggestion");
+                case "string-from-num":
+                case "string-from-bool":
+                    ssa.expr = '(""+' + ssa.arg(ir) + ")";
+                    break;
+
+                case "string-from-string": throw new EYCTypeError(ssa.ctx, "No compiler for string-from-string");
+                case "string-from-null": throw new EYCTypeError(ssa.ctx, "No compiler for string-from-null");
+                case "bool-from-object": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-object");
+                case "bool-from-array": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-array");
+                case "bool-from-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-tuple");
+                case "bool-from-map": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-map");
+                case "bool-from-set": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-set");
+                case "bool-from-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-suggestion");
+                case "bool-from-num": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-num");
+                case "bool-from-string": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-string");
+                case "bool-from-bool":
+                    ssa.expr = "(" + ssa.arg(ir) + ")";
+                    break;
+
+                case "bool-from-null": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-null");
+
+                // "CallExp" |
                 case "call-call-static":
+                case "call-call":
+                case "call-call-super":
                 {
                     // Find the head
                     const head = ssa.a1;
@@ -3464,9 +3614,12 @@ class MethodCompilationState {
                         "source:self," +
                         "method:" + JSON.stringify(meth) + "," +
                         "args:[" + args.join(",") + "]})";
+                    // }
                     break;
                 }
 
+
+                // "IndexExp" |
                 case "array-index":
                 {
                     /* Defaulting is different for numbers, because 0 and NaN
@@ -3498,11 +3651,25 @@ class MethodCompilationState {
                     break;
                 }
 
-                case "string-index":
+                case "map-assign":
                 {
-                    const r = ssa.arg(ir, 2);
-                    const l = ssa.arg(ir, 1);
-                    ssa.expr = "(" + l + "[" + r + ']||"")';
+                    const val = ssa.arg(ir, 2, false);
+                    // map-assign's target is actually a map-pair
+                    const mapPair = ir[ssa.a1];
+                    const idx = mapPair.arg(ir, 2);
+                    const map = mapPair.arg(ir, 1);
+                    ssa.expr = "(" + map + ".set(" + idx + "," + val + ")," + val + ")";
+                    break;
+                }
+
+                case "map-tuple-assign":
+                {
+                    const val = ssa.arg(ir, 2, false);
+                    const mapPair = ir[ssa.a1];
+                    const idx = mapPair.arg(ir, 2, false);
+                    const map = mapPair.arg(ir, 1);
+                    ssa.expr = "(" + map + ".set(eyc.tupleStr(" + idx +
+                        "),{key:" + idx + ",value:" + val + "})," + val + ")";
                     break;
                 }
 
@@ -3538,6 +3705,33 @@ class MethodCompilationState {
                     break;
                 }
 
+                case "set-tuple-get": throw new EYCTypeError(ssa.ctx, "No compiler for set-tuple-get");
+                case "string-index":
+                {
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    ssa.expr = "(" + l + "[" + r + ']||"")';
+                    break;
+                }
+
+
+                // "SuggestionExtendExp" |
+
+                // "DotExp" |
+                case "field-assign":
+                {
+                    const target = ssa.arg(ir, 1, false);
+                    const value = ssa.arg(ir, 2, false);
+                    const left = ssa.ctx.children.expression;
+                    const name = ssa.ctx.children.id.children.text;
+                    const jsnm = left.ctype.instanceOf.fieldNames[name];
+
+                    ssa.expr = "(" + JSON.stringify(jsnm) + "in " + target + "?" +
+                        target + "." + jsnm + "=" + value + ":" +
+                        value + ")";
+                    break;
+                }
+
                 case "field":
                 {
                     const left = ssa.ctx.children.expression;
@@ -3564,20 +3758,6 @@ class MethodCompilationState {
                     break;
                 }
 
-                case "field-assign":
-                {
-                    const target = ssa.arg(ir, 1, false);
-                    const value = ssa.arg(ir, 2, false);
-                    const left = ssa.ctx.children.expression;
-                    const name = ssa.ctx.children.id.children.text;
-                    const jsnm = left.ctype.instanceOf.fieldNames[name];
-
-                    ssa.expr = "(" + JSON.stringify(jsnm) + "in " + target + "?" +
-                        target + "." + jsnm + "=" + value + ":" +
-                        value + ")";
-                    break;
-                }
-
                 case "array-length":
                 case "string-length":
                 {
@@ -3586,6 +3766,8 @@ class MethodCompilationState {
                     break;
                 }
 
+
+                // "SuggestionLiteral" |
                 case "suggestion-tail":
                 {
                     const head = ssa.a1;
@@ -3613,6 +3795,8 @@ class MethodCompilationState {
                     break;
                 }
 
+
+                // "NewExp" |
                 case "new-object":
                     ssa.expr = "(new eyc.Object(self.prefix))";
                     break;
@@ -3631,6 +3815,7 @@ class MethodCompilationState {
                     break;
                 }
 
+                case "new-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for new-tuple");
                 case "new-map":
                 {
                     const mapType = <types.MapType> ssa.ctx.ctype;
@@ -3649,6 +3834,11 @@ class MethodCompilationState {
                     break;
                 }
 
+                case "new-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for new-suggestion");
+                case "new-num": throw new EYCTypeError(ssa.ctx, "No compiler for new-num");
+                case "new-string": throw new EYCTypeError(ssa.ctx, "No compiler for new-string");
+                case "new-bool": throw new EYCTypeError(ssa.ctx, "No compiler for new-bool");
+                case "new-null": throw new EYCTypeError(ssa.ctx, "No compiler for new-null");
                 case "with":
                     ssa.skip = true;
                     ssa.stmts.push("(function(self) {\n");
@@ -3659,11 +3849,17 @@ class MethodCompilationState {
                     ssa.stmts.push("})(" + ssa.arg(ir) + ");\n");
                     break;
 
+
+                // "This" |
                 case "this":
                     ssa.skip = true;
                     ssa.target = ssa.expr = "self";
                     break;
 
+
+                // "Caller" |
+
+                // "JavaScriptExpression" |
                 case "javascript-call":
                 {
                     // Find the head
@@ -3685,6 +3881,8 @@ class MethodCompilationState {
                     break;
                 }
 
+
+                // "NullLiteral" |
                 case "null":
                     ssa.skip = true;
                     ssa.target = ssa.expr = "(eyc.nil)";
@@ -3693,8 +3891,10 @@ class MethodCompilationState {
                 case "default":
                     ssa.skip = true;
                     ssa.target = ssa.expr = "(" + (<types.Type> ssa.ctx.ctype).default() + ")";
-                    break
+                    break;
 
+
+                // "HexLiteral" |
                 case "hex-literal":
                 {
                     const text = ssa.ctx.children.text;
@@ -3724,32 +3924,37 @@ class MethodCompilationState {
                     break;
                 }
 
+
+                // "B64Literal" |
+                case "b64-literal": throw new EYCTypeError(ssa.ctx, "No compiler for b64-literal");
+
+                // "DecLiteral" |
                 case "dec-literal":
                     ssa.expr = "(" + (ssa.ctx.children.text.replace(/^0*/, "")||"0") + ")";
                     break;
 
+                case "compile-time-literal":
+                    ssa.skip = true;
+                    ssa.target = ssa.expr = ssa.ex;
+                    break;
+
+
+                // "StringLiteral" |
                 case "string-literal":
                     ssa.expr = "(" + ssa.ctx.children.text + ")";
                     break;
 
-                case "string-from-object":
-                case "string-from-array":
-                    ssa.expr = "(" + ssa.arg(ir) + ".id)";
-                    break;
 
-                case "string-from-num":
-                case "string-from-bool":
-                    ssa.expr = '(""+' + ssa.arg(ir) + ")";
-                    break;
-
+                // "BoolLiteral" |
                 case "bool-literal":
                     ssa.expr = "(" + ssa.ctx.children.text + ")";
                     break;
 
-                case "bool-from-bool":
-                    ssa.expr = "(" + ssa.arg(ir) + ")";
-                    break;
 
+                // "ArrayLiteral" |
+                case "array-literal": throw new EYCTypeError(ssa.ctx, "No compiler for array-literal");
+
+                // "TupleLiteral" |
                 case "tuple-literal-tail":
                 {
                     // Find the head
@@ -3768,20 +3973,8 @@ class MethodCompilationState {
                     break;
                 }
 
-                case "var":
-                case "compile-time-literal":
-                    ssa.skip = true;
-                    ssa.target = ssa.expr = ssa.ex;
-                    break;
 
-                case "var-assign":
-                    ssa.expr = "(" + ssa.ex + "=" + ssa.arg(ir) + ")";
-                    break;
-
-                case "class":
-                    ssa.expr = "(eyc.classes." + (<types.EYCClass> ssa.ex).prefix + ")";
-                    break;
-
+                // "ID";
                 case "spritesheet":
                     ssa.expr = "(eyc.loadSpritesheet(eyc.spritesheets[" +
                         JSON.stringify((<types.Spritesheet> ssa.ex).prefix) + "]))";
@@ -3791,19 +3984,35 @@ class MethodCompilationState {
                     ssa.expr = `([${ssa.arg(ir)},${JSON.stringify(ssa.ex.name)}])`;
                     break;
 
-                case "arg":
+                case "class":
+                    ssa.expr = "(eyc.classes." + (<types.EYCClass> ssa.ex).prefix + ")";
+                    break;
+
+                case "var-assign":
+                    ssa.expr = "(" + ssa.ex + "=" + ssa.arg(ir) + ")";
+                    break;
+
+                case "var":
+                    ssa.skip = true;
+                    ssa.target = ssa.expr = ssa.ex;
+                    break;
+
+
                 case "call-head":
-                case "javascript-head":
+                case "arg":
                 case "map-pair":
+                case "javascript-head":
                 case "suggestion-head":
                 case "tuple-literal-head":
                     // No code
                     ssa.skip = true;
                     break;
 
+
                 default:
-                    throw new EYCTypeError(ssa.ctx,
-                                           "No compiler for " + ssa.type);
+                    ((x: never) => {
+                        throw new EYCTypeError(ssa.ctx, "Unreachable");
+                    })(ssaType);
             }
         }
     }
