@@ -1980,7 +1980,7 @@ class SSA {
     stmts: string[];
     expr: string;
 
-    constructor(public ctx: types.Tree, public type: string,
+    constructor(public ctx: types.Tree, public type: types.SSAOp,
                 public idx: number, public a1: number = -1,
                 public a2: number = -1) {
         this.target = "$" + this.idx;
@@ -2120,7 +2120,7 @@ class MethodCompilationState {
                 const cond = this.compileSSA(ir, symbols,
                                              node.children.condition);
                 const bool = new SSA(node,
-                    "bool-from-" + node.children.condition.ctype.type,
+                    <types.SSAOp> ("bool-from-" + node.children.condition.ctype.type),
                     ir.length, cond);
                 ir.push(bool);
                 const iff = new SSA(node, "if", ir.length, bool.idx);
@@ -2159,7 +2159,8 @@ class MethodCompilationState {
                 if (node.children.condition) {
                     const c = this.compileSSA(ir, s2, node.children.condition);
                     const cf = new SSA(
-                        node, "not-" + node.children.condition.ctype.type,
+                        node,
+                        <types.SSAOp> ("not-" + node.children.condition.ctype.type),
                         ir.length, c);
                     ir.push(cf);
                     ir.push(new SSA(node, "break", ir.length, cf.idx));
@@ -2206,7 +2207,7 @@ class MethodCompilationState {
 
                     case "set":
                     {
-                        let op: string;
+                        let op: types.SSAOp;
 
                         // Special case for sets of tuples
                         if ((<types.SetType> node.children.collection.ctype)
@@ -2290,8 +2291,9 @@ class MethodCompilationState {
                     case "string":
                     {
                         // Loop over the indices
-                        loopHead = new SSA(node, "for-in-" + cType + "-idx",
-                                           ir.length, coll);
+                        loopHead = new SSA(node,
+                            <types.SSAOp> ("for-in-" + cType + "-idx"),
+                            ir.length, coll);
                         loopHead.ex = keyNm;
                         ir.push(loopHead);
 
@@ -2300,8 +2302,8 @@ class MethodCompilationState {
                         varr.ex = keyNm;
                         ir.push(varr);
                         const getter = new SSA(node.children.value,
-                                               cType + "-index", ir.length,
-                                               coll, varr.idx);
+                            <types.SSAOp> (cType + "-index"), ir.length, coll,
+                            varr.idx);
                         ir.push(getter);
                         const setter = new SSA(node, "var-assign", ir.length,
                                                getter.idx);
@@ -2405,7 +2407,7 @@ class MethodCompilationState {
                     const setType = <types.SetType> node.children.target.ctype;
 
                     // Adding or removing from a set
-                    let op = "";
+                    let op: types.SSAOp;
                     if (setType.valueType.isTuple) {
                         if (node.children.op === "-=")
                             op = "set-tuple-delete";
@@ -2429,7 +2431,7 @@ class MethodCompilationState {
                 } else if (node.children.target.ctype.isArray &&
                            node.children.op === "+=") {
                     // And for array concatenation
-                    let op = "";
+                    let op: types.SSAOp;
                     if (node.children.target.ctype.equals(
                         node.children.value.ctype)) {
                         // array-array concatenation
@@ -2477,7 +2479,7 @@ class MethodCompilationState {
 
                     // Then put them together
                     value = ir.length;
-                    const cv = new SSA(node, op, value, tv.idx, rv);
+                    const cv = new SSA(node, <types.SSAOp> op, value, tv.idx, rv);
                     cv.ex = node.children.op[0];
                     ir.push(cv);
                 } else {
@@ -2507,7 +2509,8 @@ class MethodCompilationState {
                 if (node.children.op === "||") {
                     // Only pass if it's false
                     const not = new SSA(node,
-                        "not-" + node.children.left.ctype.type, ir.length, l);
+                        <types.SSAOp> ("not-" + node.children.left.ctype.type),
+                        ir.length, l);
                     ir.push(not);
                     iff = new SSA(node, "if", ir.length, not.idx);
                     ir.push(iff);
@@ -2515,7 +2518,7 @@ class MethodCompilationState {
                 } else { // &&
                     // Only pass if it's true
                     const bool = new SSA(node,
-                        "bool-from-" + node.children.left.ctype.type,
+                        <types.SSAOp> ("bool-from-" + node.children.left.ctype.type),
                         ir.length, l);
                     ir.push(bool);
                     iff = new SSA(node, "if", ir.length, bool.idx);
@@ -2526,8 +2529,8 @@ class MethodCompilationState {
                 // Right
                 const r = this.compileSSA(ir, symbols, node.children.right);
                 const boolr = new SSA(node,
-                    "bool-from-" + node.children.right.ctype.type, ir.length,
-                    r);
+                    <types.SSAOp> ("bool-from-" + node.children.right.ctype.type),
+                    ir.length, r);
                 ir.push(boolr);
 
                 // Set the result
@@ -2539,8 +2542,8 @@ class MethodCompilationState {
                 ir.push(new SSA(node, "fi", ir.length, iff.idx));
                 ir.push(new SSA(node, "else", ir.length, iff.idx));
                 const booll = new SSA(node,
-                    "bool-from-" + node.children.left.ctype.type, ir.length,
-                    l);
+                    <types.SSAOp> ("bool-from-" + node.children.left.ctype.type),
+                    ir.length, l);
                 ir.push(booll);
                 const set2 = new SSA(node, "var-assign", ir.length, booll.idx);
                 set2.ex = target;
@@ -2580,9 +2583,9 @@ class MethodCompilationState {
                 const l = this.compileSSA(ir, symbols, node.children.left);
                 const r = this.compileSSA(ir, symbols, node.children.right);
                 ir.push(new SSA(node,
-                    op + "-" +
+                    <types.SSAOp> (op + "-" +
                     node.children.left.ctype.type + "-" +
-                    node.children.right.ctype.type,
+                    node.children.right.ctype.type),
                     ir.length, l, r
                 ));
                 break;
@@ -2607,7 +2610,7 @@ class MethodCompilationState {
                 const s = this.compileSSA(ir, symbols,
                                           node.children.expression);
                 ir.push(new SSA(node,
-                    type + "-" + node.children.expression.ctype.type,
+                    <types.SSAOp> (type + "-" + node.children.expression.ctype.type),
                     ir.length, s
                 ));
                 break;
@@ -2620,7 +2623,8 @@ class MethodCompilationState {
                     const sub = this.compileSSA(ir, symbols,
                                                 node.children.expression);
                     ir.push(new SSA(node,
-                        "string-from-" + node.children.expression.ctype.type,
+                        <types.SSAOp> (
+                            "string-from-" + node.children.expression.ctype.type),
                         ir.length, sub));
                 } else {
                     // Just pass thru
@@ -2701,7 +2705,8 @@ class MethodCompilationState {
                     case "array":
                     case "tuple":
                         ir.push(new SSA(node,
-                            node.children.expression.ctype.type + "-index",
+                            <types.SSAOp> (
+                                node.children.expression.ctype.type + "-index"),
                             ir.length, target, index));
                         break;
 
@@ -2712,8 +2717,9 @@ class MethodCompilationState {
                         if ((<types.MapType> node.children.expression.ctype)
                             .keyType.isTuple)
                             tuple = "-tuple";
-                        ir.push(new SSA(node, "map" + tuple + "-get", ir.length,
-                                        target, index));
+                        ir.push(new SSA(node,
+                            <types.SSAOp> ("map" + tuple + "-get"),
+                            ir.length, target, index));
                         break;
                     }
 
@@ -2724,8 +2730,9 @@ class MethodCompilationState {
                         if ((<types.SetType> node.children.expression.ctype)
                             .valueType.isTuple)
                             tuple = "-tuple";
-                        ir.push(new SSA(node, "set" + tuple + "-get", ir.length,
-                                        target, index));
+                        ir.push(new SSA(node,
+                            <types.SSAOp> ("set" + tuple + "-get"),
+                            ir.length, target, index));
                         break;
                     }
 
@@ -2808,8 +2815,9 @@ class MethodCompilationState {
                         // Must be length
                         console.assert(node.children.id.children.text ===
                                        "length");
-                        ir.push(new SSA(node, expType + "-length", ir.length,
-                                        target));
+                        ir.push(new SSA(node,
+                            <types.SSAOp> (expType + "-length"),
+                            ir.length, target));
                         break;
 
                     case "module":
@@ -2876,7 +2884,7 @@ class MethodCompilationState {
                         // Intentional fallthrough
 
                     default:
-                        ret = new SSA(node, "new-" + cType,
+                        ret = new SSA(node, <types.SSAOp> ("new-" + cType),
                                       ir.length);
                         ir.push(ret);
                 }
@@ -3050,10 +3058,12 @@ class MethodCompilationState {
                         const mapPair = new SSA(node, "map-pair", ir.length,
                                                 target, index);
                         ir.push(mapPair);
-                        const assg = new SSA(node, "map" + tuple + "-assign",
-                                             -1, mapPair.idx);
-                        const val = new SSA(node, "map" + tuple + "-get", -1,
-                                            target, index);
+                        const assg = new SSA(node,
+                            <types.SSAOp> ("map" + tuple + "-assign"),
+                            -1, mapPair.idx);
+                        const val = new SSA(node,
+                            <types.SSAOp> ("map" + tuple + "-get"),
+                            -1, target, index);
                         return {
                             assg, val,
                             patch: (x) => {
@@ -3140,7 +3150,7 @@ class MethodCompilationState {
 
             // Transform it to a suggestion operation
             const type = ssa.type;
-            ssa.type = "suggestion-" + type;
+            ssa.type = <types.SSAOp> ("suggestion-" + type);
 
             // Then add the corresponding suggestion part
             ir.push(new SSA(node, "arg", ir.length, head.idx, idx));
@@ -3168,10 +3178,6 @@ class MethodCompilationState {
             ssa.target = "$" + ssa.idx;
 
             switch (ssa.type) {
-                case "param":
-                    ssa.expr = ssa.ex;
-                    break;
-
                 case "set-values-array":
                     ssa.expr = "(Array.from(" + ssa.arg(ir) +
                         ".values()).sort(eyc.cmp." +

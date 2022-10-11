@@ -604,6 +604,266 @@ export type TreeType =
     TreeTypeType |
     TreeTypeMisc;
 
+// SSA ops
+export type SSAOp =
+    // "Block" |
+    // "VarDecl" |
+    // "IfStatement" |
+    "if" |
+    "else" |
+    "fi" |
+    "esle" |
+    // "WhileStatement" |
+    "loop" |
+    "break" |
+    "pool" |
+    // "ForStatement" |
+    // "ForInStatement" |
+    "for-in-array" |
+    "for-in-set" |
+    "for-in-string" |
+    "ni-rof" |
+    "map-keys-array" |
+    "set-values-array" |
+    "set-tuple-values-array" |
+    // "ForInMapStatement" |
+    "for-in-array-idx" |
+    "for-in-string-idx" |
+    // "ReturnStatement" |
+    "return" |
+    // "ExtendStatement" |
+    "extend" |
+    "suggestion-extend" |
+    // "RetractStatement" |
+    "retract" |
+    "suggestion-retract" |
+    // "ExpStatement";
+    // "AssignmentExp" |
+    "array-concatenate" |
+    "array-append" |
+    "set-add" |
+    "set-delete" |
+    "set-tuple-add" |
+    "set-tuple-delete" |
+    // "OrExp" |
+    // "AndExp" |
+    // "EqExp" |
+    "eq-object-object" |
+    "eq-object-null" |
+    "eq-null-object" |
+    "eq-array-array" |
+    "eq-array-null" |
+    "eq-null-array" |
+    "eq-tuple-tuple" |
+    "eq-map-map" |
+    "eq-map-null" |
+    "eq-set-set" |
+    "eq-set-null" |
+    "eq-null-set" |
+    "eq-suggestion-suggestion" |
+    "eq-num-num" |
+    "eq-string-string" |
+    "eq-bool-bool" |
+    "eq-null-null" |
+    "ne-object-object" |
+    "ne-object-null" |
+    "ne-null-object" |
+    "ne-array-array" |
+    "ne-array-null" |
+    "ne-null-array" |
+    "ne-tuple-tuple" |
+    "ne-map-map" |
+    "ne-map-null" |
+    "ne-null-map" |
+    "ne-set-set" |
+    "ne-set-null" |
+    "ne-null-set" |
+    "ne-suggestion-suggestion" |
+    "ne-num-num" |
+    "ne-string-string" |
+    "ne-bool-bool" |
+    "ne-null-null" |
+    // "RelExp" |
+    "le-object-object" |
+    "le-array-array" |
+    "le-tuple-tuple" |
+    "le-map-map" |
+    "le-set-set" |
+    "le-num-num" |
+    "le-string-string" |
+    "le-bool-bool" |
+    "lt-object-object" |
+    "lt-array-array" |
+    "lt-tuple-tuple" |
+    "lt-map-map" |
+    "lt-set-set" |
+    "lt-num-num" |
+    "lt-string-string" |
+    "lt-bool-bool" |
+    "ge-object-object" |
+    "ge-array-array" |
+    "ge-tuple-tuple" |
+    "ge-map-map" |
+    "ge-set-set" |
+    "ge-num-num" |
+    "ge-string-string" |
+    "ge-bool-bool" |
+    "gt-object-object" |
+    "gt-array-array" |
+    "gt-tuple-tuple" |
+    "gt-map-map" |
+    "gt-set-set" |
+    "gt-num-num" |
+    "gt-string-string" |
+    "gt-bool-bool" |
+    "in-object-array" |
+    "in-array-array" |
+    "in-tuple-array" |
+    "in-map-array" |
+    "in-set-array" |
+    "in-suggestion-array" |
+    "in-num-array" |
+    "in-string-array" |
+    "in-bool-array" |
+    "in-object-map" |
+    "in-array-map" |
+    "in-tuple-map" |
+    "in-map-map" |
+    "in-set-map" |
+    "in-suggestion-map" |
+    "in-num-map" |
+    "in-string-map" |
+    "in-bool-map" |
+    "in-object-set" |
+    "in-array-set" |
+    "in-tuple-set" |
+    "in-map-set" |
+    "in-set-set" |
+    "in-suggestion-set" |
+    "in-num-set" |
+    "in-string-set" |
+    "in-bool-set" |
+    "is-object-class" |
+    // "AddExp" |
+    "add-array-array" |
+    "add-suggestion-suggestion" |
+    "add-num-num" |
+    "add-string-string" |
+    "sub-num-num" |
+    // "MulExp" |
+    "mul-num-num" |
+    "div-num-num" |
+    "mod-num-num" |
+    // "UnExp" |
+    "neg-num" |
+    "not-object" |
+    "not-array" |
+    "not-tuple" |
+    "not-map" |
+    "not-set" |
+    "not-suggestion" |
+    "not-num" |
+    "not-string" |
+    "not-bool" |
+    "not-null" |
+    // "CastExp" |
+    "string-from-object" |
+    "string-from-array" |
+    "string-from-tuple" |
+    "string-from-map" |
+    "string-from-set" |
+    "string-from-suggestion" |
+    "string-from-num" |
+    "string-from-string" |
+    "string-from-bool" |
+    "string-from-null" |
+    "bool-from-object" |
+    "bool-from-array" |
+    "bool-from-tuple" |
+    "bool-from-map" |
+    "bool-from-set" |
+    "bool-from-suggestion" |
+    "bool-from-num" |
+    "bool-from-string" |
+    "bool-from-bool" |
+    "bool-from-null" |
+    // "PostIncExp" |
+    // "PostDecExp" |
+    // "CallExp" |
+    "call-head" |
+    "arg" |
+    "call-call-static" |
+    "call-call" |
+    "suggestion-call-call" |
+    // "IndexExp" |
+    "array-index" |
+    "tuple-index" |
+    "map-pair" |
+    "map-assign" |
+    "map-tuple-assign" |
+    "map-get" |
+    "map-tuple-get" |
+    "set-get" |
+    "set-tuple-get" |
+    "string-index" |
+    // "SuggestionExtendExp" |
+    // "DotExp" |
+    "field-assign" |
+    "field" |
+    "array-length" |
+    "string-length" |
+    // "SuggestionLiteral" |
+    "suggestion-head" |
+    "suggestion-tail" |
+    "suggestion-literal" |
+    // "NewExp" |
+    "new-object" |
+    "new-array" |
+    "new-tuple" |
+    "new-map" |
+    "new-set" |
+    "new-suggestion" |
+    "new-num" |
+    "new-string" |
+    "new-bool" |
+    "new-null" |
+    "with" |
+    "htiw" |
+    // "SuperCall" |
+    "call-call-super" |
+    // "This" |
+    "this" |
+    // "Caller" |
+    // "JavaScriptExpression" |
+    "javascript-head" |
+    "javascript-call" |
+    // "NullLiteral" |
+    "null" |
+    "default" | // any default value
+    // "HexLiteral" |
+    "hex-literal" |
+    // "B64Literal" |
+    "b64-literal" |
+    // "DecLiteral" |
+    "dec-literal" |
+    "compile-time-literal" |
+    // "StringLiteral" |
+    "string-literal" |
+    // "BoolLiteral" |
+    "bool-literal" |
+    // "ArrayLiteral" |
+    "array-literal" |
+    // "TupleLiteral" |
+    "tuple-literal-head" |
+    "tuple-literal-tail" |
+    // "ID";
+    "spritesheet" |
+    "sprite" |
+    "class" |
+    "var-assign" |
+    "var";
+
+
 // Children of parse trees defined while compiling
 export interface ModuleNode extends Tree {
     // What this module exports

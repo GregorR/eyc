@@ -145,7 +145,6 @@ export async function go(): Promise<void> {
                 const scW = Math.ceil(window.screen.width / msg.w);
                 const scH = Math.ceil(window.screen.height / msg.h);
                 const scale = Math.max(scW, scH) * window.devicePixelRatio;
-                console.log(scale);
 
                 // Create the PIXI app. We (currently?) only support one stage.
                 await loadPixiApp({w: msg.w * scale, h: msg.h * scale});
