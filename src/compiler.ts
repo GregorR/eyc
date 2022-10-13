@@ -1237,6 +1237,15 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
                 case "++":
                 case "--":
+                    typeCheckLValue(eyc, methodDecl, ctx, symbols,
+                                    exp.children.expression);
+                    if (!subExpType.isNum) {
+                        throw new EYCTypeError(exp,
+                            "Increment/decrement is only valid on numbers");
+                    }
+                    resType = subExpType;
+                    break;
+
                 case "+":
                     throw new EYCTypeError(exp,
                         "No UnExp type checker for " + exp.children.op);
@@ -2631,6 +2640,35 @@ class MethodCompilationState {
 
                     case "++":
                     case "--":
+                    {
+                        // The target is written to
+                        const target = this.compileLExp(ir, symbols,
+                                                        node.children.expression);
+
+                        // Get the value
+                        const tv = target.val;
+                        tv.idx = ir.length;
+                        ir.push(tv);
+
+                        // Add/subtract one
+                        const one = new SSA(node, "compile-time-literal", ir.length);
+                        one.ex = "1";
+                        ir.push(one);
+                        const add = new SSA(node,
+                            (node.children.op === "--") ? "sub-num-num" : "add-num-num",
+                            ir.length, tv.idx, one.idx);
+                        add.ex = (node.children.op === "--") ? "-" : "+";
+                        ir.push(add);
+
+                        // Assign it
+                        target.patch(add.idx);
+                        target.assg.idx = ir.length;
+                        ir.push(target.assg);
+
+                        // Result is *post* value
+                        return add.idx;
+                    }
+
                     case "+":
                         throw new EYCTypeError(node,
                             `No compiler for unary ${node.children.op}`);

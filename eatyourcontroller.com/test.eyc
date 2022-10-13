@@ -30,17 +30,20 @@ export main class Main : Stage {
             "wall.e", "wall.sw", "wall.s", "wall.se"
         ];
 
-        num y = 0, x = 0;
         string r = robots.Robots : string;
-        while (y < 18) {
-            x = 0;
-            while (x < 32) {
+        for (num y = 0; y < 18; y++) {
+            for (num x = 0; x < 32; ++x) {
+                ObjectSprite os = new;
+                os.staticSprite = tuple(r, parts[Math.floor(this.rand() * parts.length)]);
+                os.x = x;
+                os.y = y;
+                this.addObject(os);
+                /*
                 this.addSprite(
                     tuple(r, parts[Math.floor(this.rand() * parts.length)]),
                     x, y, "{}");
-                x = x + 1;
+                */
             }
-            y = y + 1;
         }
     }
 }
