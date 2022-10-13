@@ -24,15 +24,23 @@ export main class Main : Stage {
     override mutating void init() {
         super();
         Console.log("Hello!");
-        this.addSprite(robots.Robots.wall.nesw, 0, 0, "{}");
-        this.addSprite(robots.Robots.wall.nw, 1, 0, "{}");
-        this.addSprite(robots.Robots.wall.n, 2, 0, "{}");
-        this.addSprite(robots.Robots.wall.ne, 3, 0, "{}");
-        this.addSprite(robots.Robots.wall.w, 1, 1, "{}");
-        this.addSprite(robots.Robots.wall.c, 2, 1, "{}");
-        this.addSprite(robots.Robots.wall.e, 3, 1, "{}");
-        this.addSprite(robots.Robots.wall.sw, 1, 2, "{}");
-        this.addSprite(robots.Robots.wall.s, 2, 2, "{}");
-        this.addSprite(robots.Robots.wall.se, 3, 2, "{}");
+
+        array(string) parts = [
+            "wall.nesw", "wall.nw", "wall.n", "wall.ne", "wall.w", "wall.c",
+            "wall.e", "wall.sw", "wall.s", "wall.se"
+        ];
+
+        num y = 0, x = 0;
+        string r = robots.Robots : string;
+        while (y < 18) {
+            x = 0;
+            while (x < 32) {
+                this.addSprite(
+                    tuple(r, parts[Math.floor(this.rand() * parts.length)]),
+                    x, y, "{}");
+                x = x + 1;
+            }
+            y = y + 1;
+        }
     }
 }

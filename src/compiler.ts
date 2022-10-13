@@ -825,7 +825,14 @@ function typeCheckStatement(
             break;
         }
 
-        case "WhileStatement": throw new EYCTypeError(stmt, "Cannot type check WhileStatement");
+        case "WhileStatement":
+        {
+            typeCheckExpression(eyc, methodDecl, ctx, symbols,
+                                stmt.children.condition);
+            typeCheckStatement(eyc, methodDecl, ctx, symbols,
+                               stmt.children.body);
+            break;
+        }
 
         case "ForStatement":
         {
@@ -2141,7 +2148,30 @@ class MethodCompilationState {
                 break;
             }
 
-            case "WhileStatement": throw new EYCTypeError(node, "No compiler for WhileStatement");
+            case "WhileStatement":
+            {
+                const s2 = Object.create(symbols);
+
+                // Begin the loop
+                const loop = new SSA(node, "loop", ir.length);
+                ir.push(loop);
+
+                // Condition
+                const c = this.compileSSA(ir, s2, node.children.condition);
+                const cf = new SSA(
+                    node,
+                    <types.SSAOp> (`not-${node.children.condition.ctype.type}`),
+                    ir.length, c);
+                ir.push(cf);
+                ir.push(new SSA(node, "break", ir.length, cf.idx));
+
+                // Body
+                this.compileSSA(ir, s2, node.children.body);
+
+                // And loop
+                ir.push(new SSA(node, "pool", ir.length, loop.idx));
+                break;
+            }
 
             case "ForStatement":
             {
@@ -2982,12 +3012,17 @@ class MethodCompilationState {
                 ir.push(new SSA(node, "bool-literal", ir.length));
                 break;
 
-            case "ArrayLiteral": throw new EYCTypeError(node, "No compiler for ArrayLiteral");
-
+            case "ArrayLiteral":
             case "TupleLiteral":
             {
-                // Structurally similar to a call, just builds a tuple instead
-                const head = new SSA(node, "tuple-literal-head", ir.length);
+                let type = "array";
+                if (nodeType === "TupleLiteral")
+                    type = "tuple";
+
+                /* Structurally similar to a call, just builds an array/tuple
+                 * instead */
+                const head = new SSA(
+                    node, <types.SSAOp> `${type}-literal-head`, ir.length);
                 ir.push(head);
                 const args: number[] = [];
                 for (const c of node.children.elements.children) {
@@ -2995,8 +3030,9 @@ class MethodCompilationState {
                     args.push(ir.length);
                     ir.push(new SSA(node, "arg", ir.length, head.idx, arg));
                 }
-                ir.push(new SSA(node, "tuple-literal-tail", ir.length,
-                                head.idx));
+                ir.push(new SSA(
+                    node, <types.SSAOp> `${type}-literal-tail`, ir.length,
+                    head.idx));
                 break;
             }
 
@@ -3523,6 +3559,12 @@ class MethodCompilationState {
                 case "not-null": throw new EYCTypeError(ssa.ctx, "No compiler for not-null");
 
                 // "CastExp" |
+                case "string-from-spritesheet":
+                    /* The actual value a spritesheet evaluates to is a string
+                     * anyway */
+                    ssa.expr = ssa.arg(ir);
+                    break;
+
                 case "string-from-object":
                 case "string-from-array":
                     ssa.expr = "(" + ssa.arg(ir) + ".id)";
@@ -3952,7 +3994,34 @@ class MethodCompilationState {
 
 
                 // "ArrayLiteral" |
-                case "array-literal": throw new EYCTypeError(ssa.ctx, "No compiler for array-literal");
+                case "array-literal-tail":
+                {
+                    // Find the head
+                    const head = ssa.a1;
+
+                    // Get the elements
+                    const els: string[] = [];
+                    for (let j = iri - 1; j > head; j--) {
+                        const sssa = ir[j];
+                        if (sssa.type === "arg" && sssa.a1 === head)
+                            els.unshift(sssa.arg(ir, 2, false));
+                    }
+
+                    // Need a temporary
+                    const tmp = "$$" + (this.varCtr++);
+                    this.vars.push(tmp);
+
+                    // Build the array
+                    ssa.expr = `(${tmp}=[${els.join(",")}],` +
+                        `${tmp}.prefix=self.prefix,` +
+                        `${tmp}.id=self.prefix+"$"+eyc.freshId(),` +
+                        `${tmp}.valueType=` +
+                        JSON.stringify((<types.ArrayType>
+                                        ssa.ctx.ctype).valueType.basicType()) +
+                        "," +
+                        `${tmp})`;
+                    break;
+                }
 
                 // "TupleLiteral" |
                 case "tuple-literal-tail":
@@ -4003,6 +4072,7 @@ class MethodCompilationState {
                 case "map-pair":
                 case "javascript-head":
                 case "suggestion-head":
+                case "array-literal-head":
                 case "tuple-literal-head":
                     // No code
                     ssa.skip = true;
@@ -4011,7 +4081,7 @@ class MethodCompilationState {
 
                 default:
                     ((x: never) => {
-                        throw new EYCTypeError(ssa.ctx, "Unreachable");
+                        throw new EYCTypeError(ssa.ctx, `Unreachable ${x}`);
                     })(ssaType);
             }
         }

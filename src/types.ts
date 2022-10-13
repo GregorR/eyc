@@ -768,6 +768,7 @@ export type SSAOp =
     "not-bool" |
     "not-null" |
     // "CastExp" |
+    "string-from-spritesheet" |
     "string-from-object" |
     "string-from-array" |
     "string-from-tuple" |
@@ -853,7 +854,8 @@ export type SSAOp =
     // "BoolLiteral" |
     "bool-literal" |
     // "ArrayLiteral" |
-    "array-literal" |
+    "array-literal-head" |
+    "array-literal-tail" |
     // "TupleLiteral" |
     "tuple-literal-head" |
     "tuple-literal-tail" |
