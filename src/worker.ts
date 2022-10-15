@@ -84,6 +84,17 @@ const eycExtWorker: types.EYCExt = {
         return (await awaitReply("addSprite", {
             st: stageId, ss: spritesheet, s: sprite
         })).id;
+    },
+
+    moveSprite: async function(
+        stageId: string, sprite: string, x: number, y: number
+    ) {
+        postMessage({
+            c: "moveSprite", st: stageId, s: sprite, x, y
+        });
+        return (await awaitReply("moveSprite", {
+            st: stageId, s: sprite
+        }));
     }
 };
 

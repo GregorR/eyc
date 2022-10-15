@@ -198,6 +198,9 @@ export interface EYC {
         stageId: string, spritesheet: string, sprite: string, x: number,
         y: number, ex: string
     ): string;
+    moveSprite(
+        stageId: string, sprite: string, x: number, y: number
+    ): void;
 
     // External features which must be provided by a user of EYC
     ext: EYCExt;
@@ -219,6 +222,11 @@ export interface EYCExt {
         stageId: string, spritesheet: string, sprite: string, x: number,
         y: number, ex: any
     ) => Promise<string>;
+
+    // Move this (added) sprite
+    moveSprite: (
+        stageId: string, sprite: string, x: number, y: number
+    ) => Promise<void>;
 }
 
 // A compiled EYC function

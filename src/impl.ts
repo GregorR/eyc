@@ -1124,10 +1124,10 @@ export async function eyc(
         try {
             ex = JSON.parse(exStr);
         } catch (ex) {}
-        frontendP = frontendP.then(async () => {
-            const feId = await this.ext.newStage(w, h, ex);
+        const feIdP = this.ext.newStage(w, h, ex).then(feId => {
             stages[beId] = feId;
-        }).catch(console.error);
+        });
+        frontendP = frontendP.then(() => feIdP).catch(console.error);
         return beId;
     },
 
@@ -1156,10 +1156,10 @@ export async function eyc(
         }
         spriteblockToDesc("", spritesheet.sprites);
 
-        frontendP = frontendP.then(async () => {
-            const feId = await this.ext.loadSpritesheet(desc);
+        const feIdP = this.ext.loadSpritesheet(desc).then(feId => {
             spritesheetsToFeId[spritesheet.prefix] = feId;
-        }).catch(console.error);
+        });
+        frontendP = frontendP.then(() => feIdP).catch(console.error);
         return spritesheet.prefix;
     },
 
@@ -1172,7 +1172,15 @@ export async function eyc(
         try {
             ex = JSON.parse(exStr);
         } catch (ex) {}
-        frontendP = frontendP.then(async () => {
+
+        const go = async () => {
+            // We may need to wait for the frontend promise
+            if (!(stageId in stages) || !(spritesheet in spritesheetsToFeId)) {
+                frontendP = frontendP.then(go).catch(console.error);
+                return;
+            }
+
+            // BE -> FE
             if (stageId in stages)
                 stageId = stages[stageId];
             else
@@ -1181,11 +1189,42 @@ export async function eyc(
                 spritesheet = spritesheetsToFeId[spritesheet];
             else
                 spritesheet = "";
-            const feId = await this.ext.addSprite(stageId, spritesheet, sprite,
-                                                  x, y, ex);
-            sprites[beId] = feId;
-        }).catch(console.error);
-        return beId
+            console.log(`addSprite ${stageId} ${spritesheet}`);
+
+            // Then do it
+            const feIdP = this.ext.addSprite(
+                stageId, spritesheet, sprite, x, y, ex
+            ).then(feId => sprites[beId] = feId);
+
+            frontendP = frontendP.then(() => feIdP).catch(console.error);
+            await feIdP;
+        }
+
+        go();
+
+        return beId;
+    },
+
+    moveSprite: async function(
+        stageId: string, sprite: string, x: number, y: number
+    ) {
+        // We may need to wait for the frontend promise
+        if (!(stageId in stages) || !(sprite in sprites))
+            await frontendP;
+
+        // BE -> FE
+        if (stageId in stages)
+            stageId = stages[stageId];
+        else
+            stageId = "";
+        if (sprite in sprites)
+            sprite = sprites[sprite];
+        else
+            sprite = "";
+
+        // Then do it
+        const p = this.ext.moveSprite(stageId, sprite, x, y);
+        frontendP = frontendP.then(p).catch(console.error);
     },
 
 
@@ -1194,7 +1233,8 @@ export async function eyc(
         fetch: null,
         newStage: null,
         loadSpritesheet: null,
-        addSprite: null
+        addSprite: null,
+        moveSprite: null
     }
 
     };

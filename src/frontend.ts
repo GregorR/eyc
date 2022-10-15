@@ -129,6 +129,7 @@ export async function go(): Promise<void> {
     const id = 0;
     let loader = null;
 
+    let frontendPromise: Promise<unknown> = Promise.all([]);
     const spritesheetTextures: Record<string, string> = Object.create(null);
     const spritesheetDatas: Record<string, any> = Object.create(null);
     const spritesheets: Record<string, any> = Object.create(null);
@@ -147,7 +148,10 @@ export async function go(): Promise<void> {
                 const scale = Math.max(scW, scH) * window.devicePixelRatio;
 
                 // Create the PIXI app. We (currently?) only support one stage.
-                await loadPixiApp({w: msg.w * scale, h: msg.h * scale});
+                frontendPromise = frontendPromise.then(async () => {
+                    await loadPixiApp({w: msg.w * scale, h: msg.h * scale});
+                });
+                await frontendPromise;
                 loader = PIXI.Loader.shared;
                 pixiProps.scale = scale;
 
@@ -160,7 +164,10 @@ export async function go(): Promise<void> {
             {
                 // PIXI must have already been loaded!
                 const url = msg.d.url;
-                await new Promise(res => loader.add(url).load(res));
+                frontendPromise = frontendPromise.then(async () => {
+                    await new Promise(res => loader.add(url).load(res));
+                });
+                await frontendPromise;
                 const rsc = loader.resources[url];
                 const bt = rsc.texture.baseTexture;
                 bt.scaleMode = PIXI.SCALE_MODES.NEAREST;
@@ -196,7 +203,10 @@ export async function go(): Promise<void> {
                 }
                 const pss = spritesheets[id] = new PIXI.Spritesheet(bt, data);
 
-                await new Promise(res => pss.parse(res));
+                frontendPromise = frontendPromise.then(async () => {
+                    await new Promise(res => pss.parse(res));
+                });
+                await frontendPromise;
 
                 w.postMessage({c: "loadSpritesheet", p: msg.d.prefix, id});
                 break;
@@ -220,7 +230,8 @@ export async function go(): Promise<void> {
 
                     // Create the sprite
                     id = `sprite${spriteIdx++}`;
-                    const sprite = new PIXI.Sprite(ss.textures[msg.s]);
+                    const sprite = sprites[id] =
+                        new PIXI.Sprite(ss.textures[msg.s]);
                     pixiApp.stage.addChild(sprite);
                     sprite.scale.set(pixiProps.scale / ssd.frames[msg.s].scale);
                     sprite.x = msg.x * pixiProps.scale;
@@ -232,6 +243,19 @@ export async function go(): Promise<void> {
                     c: "addSprite", st: msg.st, ss: msg.ss, s: msg.s, id});
                 break;
             }
+
+            case "moveSprite":
+                do {
+                    const sprite = sprites[msg.s];
+                    if (!sprite)
+                        break;
+                    sprite.x = msg.x * pixiProps.scale;
+                    sprite.y = msg.y * pixiProps.scale;
+                } while (false);
+
+                w.postMessage({
+                    c: "moveSprite", st: msg.st, s: msg.s});
+                break;
 
             default:
                 console.error("Unrecognized command " + msg.c);
