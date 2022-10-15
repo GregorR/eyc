@@ -39,9 +39,12 @@ export main class Main : Stage {
                 os.y = y;
                 this.addObject(os);
 
-                extend os : Motile;
-                Motile mos = os : Motile;
-                mos.vx = 0x0.2 * this.rand();
+                if (this.rand() < 0.2) {
+                    extend os : Motile;
+                    Motile mos = os : Motile;
+                    mos.vx = 0x0.2 * this.rand() - 0x0.1;
+                    mos.vy = 0x0.2 * this.rand() - 0x0.1;
+                }
             }
         }
     }

@@ -592,16 +592,21 @@ export class Object : Root {
  */
 export class ObjectSprite : Object {
     /**
-     * React by moving into place. FIXME: This should probably only fire if the
-     * sprite actually moved.
+     * React by moving into place.
      */
     override mutating this suggestion react() {
-        return super() suggest {
-            this.stage.moveSprite(
-                this.dynamicSprite, this.x + this.spriteOffsetX,
-                this.y + this.spriteOffsetY
-            );
-        };
+        if (this.x != this.lastX || this.y != this.lastY) {
+            this.lastX = this.x;
+            this.lastY = this.y;
+            return super() suggest {
+                this.stage.moveSprite(
+                        this.dynamicSprite, this.x + this.spriteOffsetX,
+                        this.y + this.spriteOffsetY
+                        );
+            };
+        } else {
+            return super();
+        }
     }
 
     /**
@@ -642,6 +647,9 @@ export class ObjectSprite : Object {
 
     // The dynamic sprite currently used to display this object
     string dynamicSprite;
+
+    // The *previous* position of this sprite
+    num lastX, lastY;
 
     // An optional (and usually unwanted) sprite offset
     num spriteOffsetX, spriteOffsetY;
