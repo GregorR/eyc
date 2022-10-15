@@ -596,14 +596,12 @@ export class ObjectSprite : Object {
      * sprite actually moved.
      */
     override mutating this suggestion react() {
-        /* FIXME
         return super() suggest {
             this.stage.moveSprite(
                 this.dynamicSprite, this.x + this.spriteOffsetX,
                 this.y + this.spriteOffsetY
             );
         };
-        */
     }
 
     /**

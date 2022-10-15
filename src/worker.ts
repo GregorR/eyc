@@ -27,6 +27,12 @@ const settings = {
 };
 let eyc: types.EYC = null;
 
+// The main frame ticks
+let mainTick: any = null;
+
+// A tick event can only happen once a frame event has happened
+let hadFrame = false;
+
 // How we filter replies
 interface ReplyFilter {
     pattern: any;
@@ -57,6 +63,12 @@ const eycExtWorker: types.EYCExt = {
                 throw new Error("Status code " + response.status);
             return response.text();
         });
+    },
+
+    frame: async function() {
+        postMessage({c: "frame"});
+        await awaitReply("frame");
+        hadFrame = true;
     },
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,6 +136,18 @@ onmessage = function(ev) {
                         const main = new eyc.Object("main");
                         main.extend(emodule.main.klass.prefix);
                         main.methods.$$core$Program$init(eyc, main, eyc.nil);
+                        eyc.frame();
+
+                        // And start it ticking
+                        if (mainTick)
+                            clearInterval(mainTick);
+                        mainTick = setInterval(() => {
+                            if (!hadFrame)
+                                return;
+                            hadFrame = false;
+                            main.methods.$$core$Stage$tick(eyc, main, eyc.nil);
+                            eyc.frame();
+                        }, 1000/60);
                     }
                     break;
                 }

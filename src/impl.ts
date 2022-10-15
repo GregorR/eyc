@@ -1131,6 +1131,12 @@ export async function eyc(
         return beId;
     },
 
+    frame: function() {
+        frontendP = frontendP.then(async () => {
+            await this.ext.frame();
+        }).catch(console.error);
+    },
+
     loadSpritesheet: function(spritesheet: types.Spritesheet) {
         if (spritesheetsLoaded[spritesheet.prefix])
             return spritesheet.prefix;
@@ -1231,6 +1237,7 @@ export async function eyc(
     ext: {
         fetch: null,
         newStage: null,
+        frame: null,
         loadSpritesheet: null,
         addSprite: null,
         moveSprite: null

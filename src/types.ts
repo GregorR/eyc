@@ -193,6 +193,7 @@ export interface EYC {
     // Frontend interaction
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newStage(w: number, h: number, ex: string): string;
+    frame(): void;
     loadSpritesheet(spritesheet: Spritesheet): string;
     addSprite(
         stageId: string, spritesheet: string, sprite: string, x: number,
@@ -213,6 +214,9 @@ export interface EYCExt {
 
     // Create a new frontend stage
     newStage: (w: number, h: number, ex: unknown) => Promise<string>;
+
+    // Fire and wait for queued frame actions
+    frame: () => Promise<void>;
 
     // Load in this spritesheet
     loadSpritesheet: (desc: unknown) => Promise<string>;

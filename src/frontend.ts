@@ -129,6 +129,9 @@ export async function go(): Promise<void> {
     const id = 0;
     let loader = null;
 
+    // Certain actions must be synchronous to have frames
+    let frameActions: (() => unknown)[] = [];
+
     let frontendPromise: Promise<unknown> = Promise.all([]);
     const spritesheetTextures: Record<string, string> = Object.create(null);
     const spritesheetDatas: Record<string, any> = Object.create(null);
@@ -140,6 +143,13 @@ export async function go(): Promise<void> {
     w.onmessage = async ev => {
         const msg = ev.data;
         switch (msg.c) {
+            case "frame":
+                for (const fa of frameActions)
+                    fa();
+                frameActions = [];
+                w.postMessage({c: "frame"});
+                break;
+
             case "newStage":
             {
                 // Figure out the scaling
@@ -232,10 +242,10 @@ export async function go(): Promise<void> {
                     id = `sprite${spriteIdx++}`;
                     const sprite = sprites[id] =
                         new PIXI.Sprite(ss.textures[msg.s]);
-                    pixiApp.stage.addChild(sprite);
                     sprite.scale.set(pixiProps.scale / ssd.frames[msg.s].scale);
                     sprite.x = msg.x * pixiProps.scale;
                     sprite.y = msg.y * pixiProps.scale;
+                    frameActions.push(() => pixiApp.stage.addChild(sprite));
                 } while (false);
 
                 // Inform the user
@@ -249,8 +259,10 @@ export async function go(): Promise<void> {
                     const sprite = sprites[msg.s];
                     if (!sprite)
                         break;
-                    sprite.x = msg.x * pixiProps.scale;
-                    sprite.y = msg.y * pixiProps.scale;
+                    frameActions.push(() => {
+                        sprite.x = msg.x * pixiProps.scale;
+                        sprite.y = msg.y * pixiProps.scale;
+                    });
                 } while (false);
 
                 w.postMessage({

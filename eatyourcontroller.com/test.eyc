@@ -38,14 +38,10 @@ export main class Main : Stage {
                 os.x = x;
                 os.y = y;
                 this.addObject(os);
-                this.moveSprite(os.dynamicSprite,
-                    x + 0x0.2 * (this.rand() - 0.5),
-                    y + 0x0.2 * (this.rand() - 0.5));
-                /*
-                this.addSprite(
-                    tuple(r, parts[Math.floor(this.rand() * parts.length)]),
-                    x, y, "{}");
-                */
+
+                extend os : Motile;
+                Motile mos = os : Motile;
+                mos.vx = 0x0.2 * this.rand();
             }
         }
     }
