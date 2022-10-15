@@ -1189,7 +1189,6 @@ export async function eyc(
                 spritesheet = spritesheetsToFeId[spritesheet];
             else
                 spritesheet = "";
-            console.log(`addSprite ${stageId} ${spritesheet}`);
 
             // Then do it
             const feIdP = this.ext.addSprite(
