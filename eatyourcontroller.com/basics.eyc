@@ -1,4 +1,4 @@
-Copyright (c) 2020, 2021 Gregor Richards;
+Copyright (c) 2020-2022 Gregor Richards;
 
 /*
  * Basic components required for many 2D games
@@ -175,10 +175,35 @@ export class NWayWall : Wall {
     }
 }
 
+/* Walls where the sprite is defined differently based on the blocking
+ * direction(s) */
+export class MultiWall : Wall {
+    mutating this void initMultiWall(string blocking) {
+        this.init(tuple("", ""), blocking);
+        this.staticSprite = this.getSprite(blocking);
+    }
+
+    tuple(string, string) getSprite(string blocking) {
+        // Override this
+        return tuple("", "");
+    }
+}
+
 // Non-interactive background sprites
 export class Background : ObjectSprite {
     mutating this void init(tuple(string, string) sprite) {
         this.staticSprite = sprite;
+    }
+}
+
+/* Object factory based on label and surrounding sprite labels, used by
+ * fabric-based stages. Override this for your particular family of sprites.
+ * context is of the form [nw, n, ne, w, self, e, sw, s, se] */
+export class ObjectContextFactory {
+    mutating this Object get(
+        string label, array(string) layer, num x, num y
+    ) {
+        return null;
     }
 }
 
@@ -220,24 +245,32 @@ export class GarmentStage : Stage {
     // Initialize the mapping (override this)
     mutating void initMapping() {}
 
-    // Initialize by loading a garment
-    mutating void initGarment(array(array(string)) layout) {
+    /* Initialize by loading a garment. Make sure you call this BEFORE super()
+     * while doing init */
+    override mutating void init() {
         // First, figure out the width and height of the layout
-        this.w = layout[0][0].length;
-        this.h = layout[0].length;
-        this.init();
+        this.w = this.layout[0][0].length;
+        this.h = this.layout[0].length;
+
+        // Initialize the stage
+        super();
+
+        // Load in the mapping
+        this.initMapping();
 
         // Now add the objects
-        for (num z, array(string) layer in layout) {
+        for (num z, array(string) layer in this.layout) {
             for (num y, string row in layer) {
                 for (num x, string el in row) {
-                    Object o = this.mapping[el];
-                    if (o != null) {
-                        o = Serialize.clone(o) : Object;
-                        o.x = x;
-                        o.y = y;
-                        o.z = layout.length - z;
-                        this.addObject(o);
+                    ObjectContextFactory ocf = this.mapping[el];
+                    if (ocf != null) {
+                        Object o = ocf.get(el, layer, x, y);
+                        if (o != null) {
+                            o.x = x;
+                            o.y = y;
+                            o.z = this.layout.length - z;
+                            this.addObject(o);
+                        }
                     }
                 }
             }
@@ -245,5 +278,8 @@ export class GarmentStage : Stage {
     }
 
     // The mapping of fabric characters to objects
-    map(string, Object) mapping;
+    map(string, ObjectContextFactory) mapping;
+
+    // The garment, to be set by some subclass
+    array(array(string)) layout;
 }

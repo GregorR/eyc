@@ -20,6 +20,17 @@ alias basics.*;
 
 import /eatyourcontroller.com/assets/0x72robots/rgbiih as robots;
 
+fabric Test test.txt;
+
+export main class Main : robots.RobotsStage {
+    override mutating void init() {
+        this.layout = [Test];
+        super();
+        Console.log("Hello!");
+    }
+}
+
+/*
 export main class Main : Stage {
     override mutating void init() {
         super();
@@ -31,8 +42,8 @@ export main class Main : Stage {
         ];
 
         string r = robots.Robots : string;
-        for (num y = 0; y < 18; y++) {
-            for (num x = 0; x < 32; ++x) {
+        for (num y = 0; y < this.h; y++) {
+            for (num x = 0; x < this.w; ++x) {
                 ObjectSprite os = new;
                 os.staticSprite = tuple(r, parts[Math.floor(this.rand() * parts.length)]);
                 os.x = x;
@@ -49,3 +60,4 @@ export main class Main : Stage {
         }
     }
 }
+*/

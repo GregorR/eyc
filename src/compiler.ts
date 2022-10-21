@@ -2804,10 +2804,13 @@ class MethodCompilationState {
                         break;
                     }
 
+                    case "string":
+                        ir.push(new SSA(node, "string-index", ir.length, target, index));
+                        break;
+
                     case "object":
                     case "suggestion":
                     case "num":
-                    case "string":
                     case "bool":
                     case "void":
                     case "null":
@@ -3087,6 +3090,13 @@ class MethodCompilationState {
                     const ssa = new SSA(node, "class", ir.length);
                     ssa.ex = node.ctype;
                     ir.push(ssa);
+                    break;
+                }
+                if (node.ctype.isSpritesheet) {
+                    // Just get the spritesheet directly
+                    const spritesheet = new SSA(node, "spritesheet", ir.length);
+                    spritesheet.ex = node.ctype;
+                    ir.push(spritesheet);
                     break;
                 }
                 if (id in this.ccs.symbols) {

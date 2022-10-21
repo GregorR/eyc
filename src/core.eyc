@@ -292,8 +292,8 @@ export class Stage : Program {
      * Initialize the stage, mainly by connecting to the frontend.
      */
     override mutating void init() {
-        this.extStage = @js (w=this.w, h=this.h, ex=this.ex) {
-            return eyc.newStage(w, h, ex);
+        this.extStage = @js (dw=this.dw, dh=this.dh, ex=this.ex) {
+            return eyc.newStage(dw, dh, ex);
         } : string;
     }
 
@@ -465,7 +465,12 @@ export class Stage : Program {
     }
 
     /**
-     * The width and height of the stage in tiles.
+     * The display width and height of the stage in tiles.
+     */
+    num dw = 32, dh = 18;
+
+    /**
+     * The total width and height of the stage in tiles.
      */
     num w = 32, h = 18;
 

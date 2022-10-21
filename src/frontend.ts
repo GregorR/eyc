@@ -160,10 +160,10 @@ export async function go(): Promise<void> {
                 // Create the PIXI app. We (currently?) only support one stage.
                 frontendPromise = frontendPromise.then(async () => {
                     await loadPixiApp({w: msg.w * scale, h: msg.h * scale});
+                    loader = PIXI.Loader.shared;
+                    pixiProps.scale = scale;
                 });
                 await frontendPromise;
-                loader = PIXI.Loader.shared;
-                pixiProps.scale = scale;
 
                 // Tell them it's ready
                 w.postMessage({c: "newStage", id: "stage0"});
