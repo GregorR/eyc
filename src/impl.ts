@@ -960,7 +960,11 @@ export async function eyc(
                     const step = <any> Object.create(mo);
                     step.proto = mo;
                     mo = step;
-                    Object.assign(mo, eyc.classes[t].methods);
+
+                    // Rebind all the methods so super() works
+                    const ma = eyc.classes[t].methods;
+                    for (const mk in ma)
+                        mo[mk] = ma[mk].bind(mo);
                 }
                 this.methods = eyc.methodTables[ms] = mo || Object.create(null);
 
