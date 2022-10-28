@@ -74,10 +74,12 @@ export class Wall : ObjectSprite {
     }
 
     // Interaction = "get outta my way!"
-    override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
+    override suggestion interact(
+        array(tuple(Interaction, Interaction)) interactions
+    ) {
         suggestion ret = super(interactions);
         for (tuple(Interaction, Interaction) ip in interactions) {
-            Interaction i = ip[0];
+            Interaction i = ip[1];
             Motile other = i.from : Motile;
             string dirs = i.dir(0x.4);
 
@@ -130,7 +132,7 @@ export class NWayWall : Wall {
     override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
         suggestion ret = super(interactions);
         for (tuple(Interaction, Interaction) ip in interactions) {
-            Interaction i = ip[0];
+            Interaction i = ip[1];
             Motile other = i.from : Motile;
             if (other is Motile) {
                 string dirs = i.dir(0x.4);
