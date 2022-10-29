@@ -452,12 +452,29 @@ async function resolveSpritesheetDeclTypes(
                 if (name === "default") {
                     // New defaults
                     defaults = props;
+
+                } else if (props.frames > 1) {
+                    // Animated sprite. Define each constituent part.
+                    const sprites: types.Sprite[] = [];
+                    for (let i = 1; i <= props.frames; i++) {
+                        sprites.push(new eyc.Sprite(
+                            spritesheet, `${prefix}${name}.${i}`,
+                            Object.assign({}, props)));
+                        props.x += props.w;
+                    }
+
+                    sb.members[name] = new eyc.AnimatedSprite(
+                        spritesheet, prefix + name, sprites);
+                    defaults.x = props.x + props.w;
+                    defaults.y = props.y;
+
                 } else {
                     // Define the sprite
                     sb.members[name] = new eyc.Sprite(
                         spritesheet, prefix + name, props);
-                    defaults.x = props.x + 1;
+                    defaults.x = props.x + props.w;
                     defaults.y = props.y;
+
                 }
 
             } else if (c.type === "SpriteBlock") {
@@ -1468,14 +1485,22 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
                     spriteblock = <types.Spriteblock> subExpType;
 
                 // Look for this name
-                if (!(name in spriteblock.members))
-                    throw new EYCTypeError(exp, `Cannot find sprite/block ${name}`);
+                if (!(name in spriteblock.members)) {
+                    throw new EYCTypeError(
+                        exp, `Cannot find sprite/block ${name}`);
+                }
 
                 const el = spriteblock.members[name];
-                if (el.isSprite)
-                    resType = new eyc.TupleType([eyc.stringType, eyc.stringType]);
-                else // Spriteblock
+                if (el.isSpriteblock) {
                     resType = <types.Spriteblock> el;
+                } else if (el.isAnimatedSprite) {
+                    resType = new eyc.ArrayType(
+                        new eyc.TupleType([
+                            eyc.stringType, eyc.stringType]));
+                } else { // sprite
+                    resType = new eyc.TupleType(
+                        [eyc.stringType, eyc.stringType]);
+                }
                 break;
             }
 
@@ -2867,8 +2892,13 @@ class MethodCompilationState {
                              * block, so just refer to the relevant sprite
                              * sheet */
                             return target;
-                        } else { // sprite
-                            const ssa = new SSA(node, "sprite", ir.length, target);
+                        } else { // sprite or animated sprite
+                            const ssa = new SSA(
+                                node,
+                                node.ctype.isArray
+                                    ? "animated-sprite"
+                                    : "sprite",
+                                ir.length, target);
                             let sb: types.Spriteblock = expCType;
                             if (expCType.isSpritesheet)
                                 sb = (<types.Spritesheet> expCType).sprites;
@@ -2893,6 +2923,7 @@ class MethodCompilationState {
 
                     case "module":
                     case "sprite":
+                    case "animated-sprite":
                     case "soundset":
                     case "sound":
                     case "garment":
@@ -4111,6 +4142,19 @@ class MethodCompilationState {
                     ssa.expr = "(eyc.loadSpritesheet(eyc.spritesheets[" +
                         JSON.stringify((<types.Spritesheet> ssa.ex).prefix) + "]))";
                     break;
+
+                case "animated-sprite":
+                {
+                    // Result is an array of tuples. Build it up part by part.
+                    const ss = ssa.arg(ir, 1, false);
+                    const res: string[] = [];
+                    const as: types.AnimatedSprite = ssa.ex;
+                    for (const s of as.sprites) {
+                        res.push(`[${ss},${JSON.stringify(s.name)}]`);
+                    }
+                    ssa.expr = `([${res.join(",")}])`;
+                    break;
+                }
 
                 case "sprite":
                     ssa.expr = `([${ssa.arg(ir)},${JSON.stringify(ssa.ex.name)}])`;

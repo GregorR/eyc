@@ -257,6 +257,26 @@ export async function eyc(
         }
     },
 
+    // Animated sprites
+    AnimatedSprite: class implements types.AnimatedSprite {
+        type: types.EYCElementType;
+        isAnimatedSprite: boolean;
+        name: string;
+        sheet: types.Spritesheet;
+        sprites: types.Sprite[];
+
+        constructor(
+            sheet: types.Spritesheet, name: string,
+            sprites: types.Sprite[]
+        ) {
+            this.type = "animated-sprite";
+            this.isAnimatedSprite = true;
+            this.name = name;
+            this.sheet = sheet;
+            this.sprites = sprites;
+        }
+    },
+
     // Sprite blocks in the runtime
     Spriteblock: class implements types.Spriteblock {
         type: types.EYCElementType;
@@ -1155,11 +1175,21 @@ export async function eyc(
         function spriteblockToDesc(prefix: string, spriteblock: types.Spriteblock) {
             for (const key in spriteblock.members) {
                 const part = spriteblock.members[key];
-                if ((<types.Sprite> part).isSprite) {
-                    desc.sprites[prefix + key] = (<types.Sprite> part).props;
+                if (part.isSpriteblock) {
+                    spriteblockToDesc(
+                        `${prefix}${key}.`, <types.Spriteblock> part);
 
-                } else { // spriteblock
-                    spriteblockToDesc(`${prefix}${key}.`, <types.Spriteblock> part);
+                } else if (part.isAnimatedSprite) {
+                    /* The frontend doesn't care, just add each constituent
+                     * sprite */
+                    const sprites = (<types.AnimatedSprite> part).sprites;
+                    for (let i = 0; i < sprites.length; i++) {
+                        desc.sprites[`${prefix}${key}.${i+1}`] =
+                            sprites[i].props;
+                    }
+
+                } else { // sprite
+                    desc.sprites[prefix + key] = (<types.Sprite> part).props;
 
                 }
             }

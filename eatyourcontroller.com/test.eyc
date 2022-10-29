@@ -56,23 +56,10 @@ export main class Main : robots.RobotsStage {
 
 class OrangeRobot : MirrorSprite, AnimatedSprite {
     mutating this void init() {
-        this.animationFrames = this.idleFrames = [
-            robots.Robots.robots.orange1,
-            robots.Robots.robots.orange2,
-            robots.Robots.robots.orange3,
-            robots.Robots.robots.orange4
-        ];
-
-        this.walkFrames = [
-            robots.Robots.robots.orangew1,
-            robots.Robots.robots.orangew2,
-            robots.Robots.robots.orangew3,
-            robots.Robots.robots.orangew4,
-            robots.Robots.robots.orangew5,
-            robots.Robots.robots.orangew6,
-            robots.Robots.robots.orangew7,
-            robots.Robots.robots.orangew8
-        ];
+        this.animationFrames = this.idleFrames = robots.Robots.robots.orange;
+        this.walkFrames = robots.Robots.robots.orangew;
+        for (tuple(string, string) s in this.animationFrames)
+            Console.log(s[1]);
     }
 
     override mutating this suggestion react() {

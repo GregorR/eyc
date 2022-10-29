@@ -23,6 +23,7 @@ export interface EYCElement {
     isSpritesheet?: boolean;
     isSpriteblock?: boolean;
     isSprite?: boolean;
+    isAnimatedSprite?: boolean;
     isType?: boolean;
     isObject?: boolean;
     isArray?: boolean;
@@ -45,6 +46,7 @@ export type EYCElementTypeVirt =
     "spritesheet" |
     "spriteblock" |
     "sprite" |
+    "animated-sprite" |
     "soundset" |
     "sound" |
     "garment" |
@@ -93,6 +95,12 @@ export interface EYC {
 
     Sprite: {
         new (sheet: Spritesheet, name: string, props: SpriteProperties): Sprite
+    };
+
+    AnimatedSprite: {
+        new (
+            sheet: Spritesheet, name: string, sprites: Sprite[]
+        ): AnimatedSprite
     };
 
     Spriteblock: {new (): Spriteblock};
@@ -307,10 +315,17 @@ export interface SpriteProperties {
     speed: number;
 }
 
+export interface AnimatedSprite extends EYCElement {
+    isAnimatedSprite: boolean;
+    name: string;
+    sheet: Spritesheet;
+    sprites: Sprite[];
+}
+
 // Spritesheets have namespaces called "blocks"
 export interface Spriteblock extends Resource {
     isSpriteblock: boolean;
-    members: Record<string, Sprite | Spriteblock>;
+    members: Record<string, Sprite | AnimatedSprite | Spriteblock>;
 }
 
 export interface Spritesheet extends Resource {
@@ -889,6 +904,7 @@ export type SSAOp =
     "tuple-literal-tail" |
     // "ID";
     "spritesheet" |
+    "animated-sprite" |
     "sprite" |
     "class" |
     "var-assign" |
