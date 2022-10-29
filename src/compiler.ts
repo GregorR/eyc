@@ -1614,13 +1614,13 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "ArrayLiteral":
         {
-            const elTypes = exp.children.elements.children.map(
-                (c: types.Tree) => typeCheckExpression(
-                    eyc, methodDecl, ctx, symbols, c));
-            if (elTypes.length === 0) {
+            if (!exp.children.elements) {
                 throw new EYCTypeError(exp,
                     "Empty array literals do not have a type. Use 'new'.");
             }
+            const elTypes = exp.children.elements.children.map(
+                (c: types.Tree) => typeCheckExpression(
+                    eyc, methodDecl, ctx, symbols, c));
             const elType = elTypes[0];
             for (let ei = 1; ei < elTypes.length; ei++) {
                 // FIXME: mutual supertype
@@ -2755,6 +2755,7 @@ class MethodCompilationState {
                 ir.push(target.assg);
 
                 // Result is *pre* value
+                // FIXME: DOESN'T WORK
                 return tv.idx;
             }
 
