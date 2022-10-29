@@ -322,15 +322,16 @@ export class Stage : Program {
             this.enforce(s, null);
 
         // Step 2: Actions
-        this.tiles = new;
         sa = new;
-        for reverse (Object o in this.objects) {
+        for reverse (Object o in this.objects)
             sa += o.act();
+        for (suggestion s in sa)
+            this.enforce(s, null);
+        this.tiles = new;
+        for (Object o in this.objects) {
             if (!o.free)
                 this.addObjectMap(o);
         }
-        for (suggestion s in sa)
-            this.enforce(s, null);
 
         // Step 3: Determine interactions
         map(Object, set(Object)) interactionsFound = new;
