@@ -498,10 +498,10 @@ export class Stage : Program {
      */
     tuple(num, num, num, num) range(Object o) {
         return tuple (
-            Math.floor((o.y+o.bby1)/8),
-            Math.floor((o.y+o.bby2)/8),
-            Math.floor((o.x+o.bbx1)/8),
-            Math.floor((o.x+o.bbx2)/8)
+            Math.floor((o.y+o.bby1)/2),
+            Math.floor((o.y+o.bby2)/2),
+            Math.floor((o.x+o.bbx1)/2),
+            Math.floor((o.x+o.bbx2)/2)
         );
     }
 
