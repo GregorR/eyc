@@ -38,28 +38,49 @@ export main class Main : robots.RobotsStage {
         };
         this.addObject(g);
 
-        OrangeRobot m = new {
-            this.init();
-            this.x = 30;
-            this.vx = -0x.04;
-            this.z = 1;
-            this.bbx1 = 0x.1;
-            this.bbx2 = 0x.f;
-            this.bby1 = 0x.1;
-            this.bby2 = 0x1.f;
-        };
-        this.addObject(m);
+        num x = 30;
+        for (string nm in [
+            "orange", "cyan", "red", "black", "magenta", "teal", "purple",
+            "green", "yellow"
+        ]) {
+            Robot r = new {
+                this.init(nm);
+                this.x = x;
+                x -= 0x1.11;
+                this.vx = -0x.04;
+                this.z = 1;
+                this.bbx1 = 0x.1;
+                this.bbx2 = 0x.f;
+                this.bby1 = 0x.1;
+                this.bby2 = 0x1.f;
+            };
+            this.addObject(r);
+        }
 
         Console.log("Hello!");
     }
 }
 
-class OrangeRobot : MirrorSprite, AnimatedSprite {
-    mutating this void init() {
-        this.animationFrames = this.idleFrames = robots.Robots.robots.orange;
-        this.walkFrames = robots.Robots.robots.orangew;
-        for (tuple(string, string) s in this.animationFrames)
-            Console.log(s[1]);
+class Robot : MirrorSprite, AnimatedSprite {
+    mutating this void init(string nm) {
+        array(tuple(string, string)) idle =
+        this.animationFrames = this.idleFrames =  new {
+            num len = robots.Robots.robots.orange.length;
+            for (num i = 1; i <= len; i++) {
+                this += tuple(robots.Robots : string,
+                              "robots." + nm + "." + (i : string));
+            }
+        };
+        this.walkFrames = new {
+            num len = robots.Robots.robots.orangew.length;
+            for (num i = 1; i <= 8; i++) {
+                num j = i;
+                if (nm == "black")
+                    j = (j - 1) % 4 + 1;
+                this += tuple(robots.Robots : string,
+                              "robots." + nm + "w." + (j : string));
+            }
+        };
     }
 
     override mutating this suggestion react() {
