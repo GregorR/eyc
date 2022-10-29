@@ -3445,10 +3445,25 @@ class MethodCompilationState {
                     break;
                 }
 
-                case "eq-tuple-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for eq-tuple-tuple");
-                case "eq-suggestion-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for eq-suggestion-suggestion");
-                case "ne-tuple-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for ne-tuple-tuple");
-                case "ne-suggestion-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for ne-suggestion-suggestion");
+                case "eq-tuple-tuple":
+                case "eq-suggestion-suggestion":
+                {
+                    const type = ssa.ctx.children.left.ctype.type;
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    ssa.expr = `(eyc.cmp.${type}(${l},${r})===0)`;
+                    break;
+                }
+
+                case "ne-tuple-tuple":
+                case "ne-suggestion-suggestion":
+                {
+                    const type = ssa.ctx.children.left.ctype.type;
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1);
+                    ssa.expr = `(eyc.cmp.${type}(${l},${r})!==0)`;
+                    break;
+                }
 
                 // "RelExp" |
                 case "le-object-object": throw new EYCTypeError(ssa.ctx, "No compiler for le-object-object");

@@ -254,6 +254,32 @@ export async function go(): Promise<void> {
                 break;
             }
 
+            case "updateSprite":
+                do {
+                    const sprite = sprites[msg.id];
+                    if (!sprite)
+                        break;
+                    const ss = spritesheets[msg.ss];
+                    if (!ss)
+                        break;
+                    const ssd = spritesheetDatas[msg.ss];
+                    if (!ssd)
+                        break;
+                    if (!ss.textures[msg.s] || !ssd.frames[msg.s])
+                        break;
+
+                    frameActions.push(
+                        () => sprite.texture = ss.textures[msg.s]
+                    );
+                } while (false);
+
+                // Inform the user
+                w.postMessage({
+                    c: "updateSprite", st: msg.st, id: msg.id, ss: msg.ss,
+                    s: msg.s
+                });
+                break;
+
             case "moveSprite":
                 do {
                     const sprite = sprites[msg.s];

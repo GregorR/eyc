@@ -31,6 +31,13 @@ export class Root {
     }
 
     /**
+     * Get the current timestamp (attainable from ANY object).
+     */
+    num ts() {
+        return @js () { return eyc.ts; } : num;
+    }
+
+    /**
      * Get a random number (from this object).
      */
     num rand() {
@@ -527,6 +534,18 @@ export class Stage : Program {
     }
 
     /**
+     * Update the displayed (static) sprite for a (dynamic) sprite in the
+     * frontend.
+     */
+    mutating string updateSprite(
+        string dynamic, tuple(string, string) staticS
+    ) {
+        @js (extStage=this.extStage, dynamic, staticS) {
+            eyc.updateSprite(extStage, dynamic, staticS[0], staticS[1]);
+        } : void;
+    }
+
+    /**
      * Move a sprite on the stage.
      */
     mutating void moveSprite(string sprite, num x, num y) {
@@ -826,18 +845,29 @@ export class ObjectSprite : Object {
      * React by moving into place.
      */
     override mutating this suggestion react() {
+        suggestion ret = super();
+
         if (this.x != this.lastX || this.y != this.lastY) {
             this.lastX = this.x;
             this.lastY = this.y;
-            return super() suggest {
+            ret = ret suggest {
                 this.stage.moveSprite(
-                        this.dynamicSprite, this.x + this.spriteOffsetX,
-                        this.y + this.spriteOffsetY
-                        );
+                    this.dynamicSprite, this.x + this.spriteOffsetX,
+                    this.y + this.spriteOffsetY
+                );
             };
-        } else {
-            return super();
         }
+
+        tuple(string, string) ss = this.staticSprite();
+        if (ss != this.lastStaticSprite) {
+            this.lastStaticSprite = ss;
+            ret = ret suggest {
+                this.stage.updateSprite(
+                    this.dynamicSprite, ss);
+            };
+        }
+
+        return ret;
     }
 
     /**
@@ -845,9 +875,10 @@ export class ObjectSprite : Object {
      */
     override mutating void addedToStage(Stage stage) {
         super(stage);
+        tuple(string, string) ss = this.lastStaticSprite = this.staticSprite();
         this.dynamicSprite = stage.addSprite(
-            this.staticSprite, this.x + this.spriteOffsetX,
-            this.y + this.spriteOffsetY, this.spriteEx
+            ss, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY,
+            this.spriteEx
         );
     }
 
@@ -865,13 +896,19 @@ export class ObjectSprite : Object {
      */
     mutating this void cloneSprite(ObjectSprite other) {
         this.cloneObject(other);
-        this.staticSprite = other.staticSprite;
         this.spriteOffsetX = other.spriteOffsetX;
         this.spriteOffsetY = other.spriteOffsetY;
     }
 
-    // The (static) sprite to use to display this object
-    tuple(string, string) staticSprite;
+    /**
+     * The (static) sprite to use to display this object. Override this.
+     */
+    tuple(string, string) staticSprite() {
+        return tuple("", "");
+    }
+
+    // The last used static sprite (for animation)
+    tuple(string, string) lastStaticSprite;
 
     // Extra properties of the sprite
     string spriteEx;

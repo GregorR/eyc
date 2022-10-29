@@ -28,14 +28,14 @@ export class Gravity : Object {
     ) {
         suggestion ret = super(interactions);
 
-        num absGX = Math.abs(this.gx);
-        num absGY = Math.abs(this.gy);
         num signGX = Math.sign(this.gx);
         num signGY = Math.sign(this.gy);
-        num absTX = Math.abs(this.termx);
-        num absTY = Math.abs(this.termy);
-        if (absTX == 0) absTX = 1/0;
-        if (absTY == 0) absTY = 1/0;
+        num absGX = this.gx * signGX;
+        num absGY = this.gy * signGY;
+        num absTX = this.termx * signGX;
+        num absTY = this.termy * signGY;
+        if (absTX <= 0) absTX = 1/0;
+        if (absTY <= 0) absTY = 1/0;
 
         for (tuple(Interaction, Interaction) ip in interactions) {
             Motile o = ip[0].to : Motile;
@@ -97,8 +97,7 @@ export class Wall : ObjectSprite {
         };
     }
 
-    mutating this void init(tuple(string, string) sprite, string blocking) {
-        this.staticSprite = sprite;
+    mutating this void init(string blocking) {
         this.setBlocking(blocking);
         this.bbx1 = 0;
         this.bbx2 = 1;
@@ -212,21 +211,37 @@ export class NWayWall : Wall {
  * direction(s) */
 export class MultiWall : Wall {
     mutating this void initMultiWall(string blocking) {
-        this.init(tuple("", ""), blocking);
-        this.staticSprite = this.getSprite(blocking);
+        this.init(blocking);
+        this.multiWallStaticSprite = this.getSprite(blocking);
     }
 
+    // Override this
     tuple(string, string) getSprite(string blocking) {
-        // Override this
         return tuple("", "");
     }
+
+    override tuple(string, string) staticSprite() {
+        return this.multiWallStaticSprite;
+    }
+
+    tuple(string, string) multiWallStaticSprite;
 }
 
-// Non-interactive background sprites
-export class Background : ObjectSprite {
-    mutating this void init(tuple(string, string) sprite) {
-        this.staticSprite = sprite;
+// Animated objects
+export class AnimatedSprite : ObjectSprite {
+    // Choose based on the frame
+    override tuple(string, string) staticSprite() {
+        return this.animationFrames[
+            Math.floor(this.ts() / this.animationSpeed) %
+            this.animationFrames.length
+        ];
     }
+
+    // Animation frames
+    array(tuple(string, string)) animationFrames;
+
+    // Speed of the animation in game frames per animation frame
+    num animationSpeed = 8;
 }
 
 /* Object factory based on label and surrounding sprite labels, used by

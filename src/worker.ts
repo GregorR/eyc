@@ -98,6 +98,17 @@ const eycExtWorker: types.EYCExt = {
         })).id;
     },
 
+    updateSprite: async function(
+        stageId: string, id: string, spritesheet: string, sprite: string
+    ) {
+        postMessage({
+            c: "updateSprite", st: stageId, id, ss: spritesheet, s: sprite
+        });
+        return (await awaitReply("updateSprite", {
+            st: stageId, id
+        })).id;
+    },
+
     moveSprite: async function(
         stageId: string, sprite: string, x: number, y: number
     ) {
@@ -145,6 +156,7 @@ onmessage = function(ev) {
                             if (!hadFrame)
                                 return;
                             hadFrame = false;
+                            eyc.ts++;
                             main.methods.$$core$Stage$tick(eyc, main, eyc.nil);
                             eyc.frame();
                         }, 1000/60);

@@ -199,6 +199,9 @@ export interface EYC {
         stageId: string, spritesheet: string, sprite: string, x: number,
         y: number, ex: string
     ): string;
+    updateSprite(
+        stageId: string, id: string, spritesheet: string, sprite: string
+    ): string;
     moveSprite(
         stageId: string, sprite: string, x: number, y: number
     ): void;
@@ -225,6 +228,11 @@ export interface EYCExt {
     addSprite: (
         stageId: string, spritesheet: string, sprite: string, x: number,
         y: number, ex: any
+    ) => Promise<string>;
+
+    // Update this sprite's image
+    updateSprite: (
+        stageId: string, id: string, spritesheet: string, sprite: string
     ) => Promise<string>;
 
     // Move this (added) sprite

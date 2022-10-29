@@ -1214,6 +1214,38 @@ export async function eyc(
         return beId;
     },
 
+    updateSprite: function(
+        stageId: string, id: string, spritesheet: string, sprite: string
+    ) {
+        // Just do it in the background
+        (async () => {
+            // We may need to wait for the frontend promise
+            if (!(stageId in stages) || !(sprite in sprites))
+                await frontendP;
+
+            // BE -> FE
+            if (stageId in stages)
+                stageId = stages[stageId];
+            else
+                stageId = "";
+            if (id in sprites)
+                id = sprites[id];
+            else
+                id = "";
+            if (spritesheet in spritesheetsToFeId)
+                spritesheet = spritesheetsToFeId[spritesheet];
+            else
+                spritesheet = "";
+
+            // Then do it
+            frontendP = frontendP.then(
+                this.ext.updateSprite(stageId, id, spritesheet, sprite)
+            ).catch(console.error);
+        })();
+
+        return id;
+    },
+
     moveSprite: async function(
         stageId: string, sprite: string, x: number, y: number
     ) {
@@ -1244,6 +1276,7 @@ export async function eyc(
         frame: null,
         loadSpritesheet: null,
         addSprite: null,
+        updateSprite: null,
         moveSprite: null
     }
 
