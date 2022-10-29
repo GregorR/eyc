@@ -339,18 +339,21 @@ export class Stage : Program {
         for (Object o1 in this.objects) {
             if (o1 is Motile) {
                 Motile m = o1 : Motile;
+                num bbw = Math.max(m.bbw(), 0x.1),
+                    bbh = Math.max(m.bbh(), 0x.1);
 
-                // If it's fast-moving, we'll have to do it in stages
-                if (m.vx < 0.5 || m.vx > 0.5 ||
-                    m.vy < 0.5 || m.vy > 0.5) {
+                /* If it's fast-moving (beats its own bounding box), we'll have
+                 * to do it in stages */
+                if (m.vx < -bbw || m.vx > bbw ||
+                    m.vy < -bbh || m.vy > bbh) {
                     num tx = m.x, ty = m.y,
 
                         fx = tx - m.vx,
                         fy = ty - m.vy,
 
                         steps = Math.max(
-                            Math.ceil(Math.abs(m.vx) / 0.5),
-                            Math.ceil(Math.abs(m.vy) / 0.5)
+                            Math.ceil(Math.abs(m.vx) / bbw),
+                            Math.ceil(Math.abs(m.vy) / bbh)
                         ),
 
                         sx = m.vx / steps, sy = m.vy / steps;
@@ -614,6 +617,20 @@ export class Object : Root {
      */
     mutating void removedFromStage(Stage stage) {
         this.stage = null;
+    }
+
+    /**
+     * Get the *bounding box* width of this object.
+     */
+    num bbw() {
+        return this.bbx2 - this.bbx1;
+    }
+
+    /**
+     * Get the *bounding box* height of this object.
+     */
+    num bbh() {
+        return this.bby2 - this.bby1;
     }
 
     /**
