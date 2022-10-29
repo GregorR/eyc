@@ -32,14 +32,14 @@ export main class Main : robots.RobotsStage {
         Gravity g = new {
             this.z = 1;
             this.gy = 0x.4;
-            this.termy = 1.5;
+            this.termy = 2;
             this.bbx2 = w;
             this.bby2 = h;
         };
         this.addObject(g);
 
         Motile m = new {
-            this.vx = 0x1;
+            this.vx = 2;
             this.z = 1;
             this.bbx2 = 1;
             this.bby2 = 1;

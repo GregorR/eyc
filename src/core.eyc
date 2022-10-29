@@ -333,49 +333,44 @@ export class Stage : Program {
             this.enforce(s, null);
 
         // Step 3: Determine interactions
+        map(Object, set(Object)) interactionsFound = new;
         map(Object, array(tuple(Interaction, Interaction))) interactions = new;
         for (Object o1 in this.objects) {
-            tuple(num, num, num, num) range = this.range(o1);
-            num o1x1 = o1.x + o1.bbx1,
-                o1x2 = o1.x + o1.bbx2,
-                o1y1 = o1.y + o1.bby1,
-                o1y2 = o1.y + o1.bby2;
+            if (o1 is Motile) {
+                Motile m = o1 : Motile;
 
-            // Add this object to the interaction map
-            if (!(o1 in interactions))
-                interactions[o1] = new;
-            array(tuple(Interaction, Interaction)) o1i = interactions[o1];
+                // If it's fast-moving, we'll have to do it in stages
+                if (m.vx < 0.5 || m.vx > 0.5 ||
+                    m.vy < 0.5 || m.vy > 0.5) {
+                    num tx = m.x, ty = m.y,
 
-            // Look for objects we interact with
-            for (num y = range[0]; y <= range[1]; y++) {
-                for (num x = range[2]; x <= range[3]; x++) {
-                    for (Object o2 in this.tiles[tuple(x, y)]) {
-                        if (o1 is Object && o2 is Object && o2 > o1) {
-                            num o2x1 = o2.x + o2.bbx1,
-                                o2x2 = o2.x + o2.bbx2,
-                                o2y1 = o2.y + o2.bby1,
-                                o2y2 = o2.y + o2.bby2;
+                        fx = tx - m.vx,
+                        fy = ty - m.vy,
 
-                            if ((o1.z == o2.z) &&
-                                !(o1x2 <= o2x1 || o2x2 <= o1x1 ||
-                                  o1y2 <= o2y1 || o2y2 <= o1y1)) {
-                                // Add o2 to the interaction map
-                                if (!(o2 in interactions))
-                                    interactions[o2] = new;
-                                array(tuple(Interaction, Interaction)) o2i = interactions[o2];
+                        steps = Math.max(
+                            Math.ceil(Math.abs(m.vx) / 0.5),
+                            Math.ceil(Math.abs(m.vy) / 0.5)
+                        ),
 
-                                // Add the interaction pair to the arrays
-                                Interaction i1 = new {
-                                    this.init(o1, o2);
-                                }, i2 = new {
-                                    this.init(o2, o1);
-                                };
-                                o1i += tuple(i1, i2);
-                                o2i += tuple(i2, i1);
-                            }
-                        }
+                        sx = m.vx / steps, sy = m.vy / steps;
+
+                    m.x = fx;
+                    m.y = fy;
+                    for (num step = 0; step <= steps; step++) {
+                        this.determineInteractions(interactionsFound,
+                            interactions, m);
+                        m.x += sx;
+                        m.y += sy;
                     }
+                    m.x = tx;
+                    m.y = ty;
+
+                } else {
+                    this.determineInteractions(interactionsFound, interactions,
+                        o1);
                 }
+            } else {
+                this.determineInteractions(interactionsFound, interactions, o1);
             }
         }
 
@@ -398,6 +393,66 @@ export class Stage : Program {
             sa += o.react();
         for (suggestion s in sa)
             this.enforce(s, null);
+    }
+
+    /**
+     * Determine the appropriate interactions for this object in this state.
+     * Called repeatedly for fast-moving motile objects.
+     */
+    mutating void determineInteractions(
+        map(Object, set(Object)) interactionsFound,
+        map(Object, array(tuple(Interaction, Interaction))) interactions,
+        Object o1
+    ) {
+        tuple(num, num, num, num) range = this.range(o1);
+        num o1x1 = o1.x + o1.bbx1,
+            o1x2 = o1.x + o1.bbx2,
+            o1y1 = o1.y + o1.bby1,
+            o1y2 = o1.y + o1.bby2;
+
+        // Add this object to the interaction map
+        if (!(o1 in interactionsFound))
+            interactionsFound[o1] = new;
+        if (!(o1 in interactions))
+            interactions[o1] = new;
+        set(Object) o1f = interactionsFound[o1];
+        array(tuple(Interaction, Interaction)) o1i = interactions[o1];
+
+        // Look for objects we interact with
+        for (num y = range[0]; y <= range[1]; y++) {
+            for (num x = range[2]; x <= range[3]; x++) {
+                for (Object o2 in this.tiles[tuple(x, y)]) {
+                    if (o1 != o2 && !o1f[o2]) {
+                        num o2x1 = o2.x + o2.bbx1,
+                            o2x2 = o2.x + o2.bbx2,
+                            o2y1 = o2.y + o2.bby1,
+                            o2y2 = o2.y + o2.bby2;
+
+                        if ((o1.z == o2.z) &&
+                            !(o1x2 <= o2x1 || o2x2 <= o1x1 ||
+                              o1y2 <= o2y1 || o2y2 <= o1y1)) {
+                            // Add o2 to the interaction map
+                            if (!(o2 in interactionsFound))
+                                interactionsFound[o2] = new;
+                            if (!(o2 in interactions))
+                                interactions[o2] = new;
+                            interactionsFound[o2] += o1;
+                            array(tuple(Interaction, Interaction)) o2i = interactions[o2];
+
+                            // Add the interaction pair to the arrays
+                            Interaction i1 = new {
+                                this.init(o1, o2);
+                            }, i2 = new {
+                                this.init(o2, o1);
+                            };
+                            o1i += tuple(i1, i2);
+                            o1f += o2;
+                            o2i += tuple(i2, i1);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -557,7 +612,7 @@ export class Object : Root {
      * management)
      */
     mutating void removedFromStage(Stage stage) {
-        this.stage = stage;
+        this.stage = null;
     }
 
     /**
@@ -655,38 +710,60 @@ export class Motile : Object {
      * nw n ne
      *  w o e
      * sw s se
+     * NOTE: This is written to avoid string manipulation and just use
+     * constants.
      */
     string dir() {
-        string ret = "";
-        if (this.vy < 0)
-            ret = "n";
-        else if (this.vy > 0)
-            ret = "s";
-        if (this.vx < 0)
-            ret += "w";
-        else if (this.vx > 0)
-            ret += "e";
-        if (ret == "")
-            return "o";
-        return ret;
+        if (this.vy < 0) {
+            if (this.vx < 0)
+                return "nw";
+            else if (this.vx > 0)
+                return "ne";
+            else
+                return "n";
+        } else if (this.vy > 0) {
+            if (this.vx < 0)
+                return "sw";
+            else if (this.vx > 0)
+                return "se";
+            else
+                return "s";
+        } else { // vy == 0
+            if (this.vx < 0)
+                return "w";
+            else if (this.vx > 0)
+                return "e";
+            else
+                return "o";
+        }
     }
 
     /**
      * Reverse of .dir(), the direction this object is coming from.
      */
     string dirRev() {
-        string ret = "";
-        if (this.vy < 0)
-            ret = "s";
-        else if (this.vy > 0)
-            ret = "n";
-        if (this.vx < 0)
-            ret += "e";
-        else if (this.vx > 0)
-            ret += "w";
-        if (ret == "")
-            return "o";
-        return ret;
+        if (this.vy < 0) {
+            if (this.vx < 0)
+                return "se";
+            else if (this.vx > 0)
+                return "sw";
+            else
+                return "s";
+        } else if (this.vy > 0) {
+            if (this.vx < 0)
+                return "ne";
+            else if (this.vx > 0)
+                return "nw";
+            else
+                return "n";
+        } else { // vy == 0
+            if (this.vx < 0)
+                return "e";
+            else if (this.vx > 0)
+                return "w";
+            else
+                return "o";
+        }
     }
 
     /**
