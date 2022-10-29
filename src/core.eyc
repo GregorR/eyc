@@ -734,7 +734,7 @@ export class Object : Root {
     /**
      * Location of this object on the stage, and its bounding box.
      */
-    num x, y, z, bbx1, bbx2, bby1, bby2;
+    num x, y, z, bbx1, bbx2 = 1, bby1, bby2 = 1;
 }
 
 /**

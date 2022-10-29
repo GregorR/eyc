@@ -20,11 +20,11 @@ alias basics.*;
 
 import /eatyourcontroller.com/assets/0x72robots/rgbiih as robots;
 
-fabric Test test.txt;
+garment Test test.txt;
 
 export main class Main : robots.RobotsStage {
     override mutating void init() {
-        this.layout = [Test];
+        this.layout = Test;
         super();
         num w = this.w;
         num h = this.h;
@@ -32,7 +32,7 @@ export main class Main : robots.RobotsStage {
         Gravity g = new {
             this.z = 1;
             this.gy = 0x.1;
-            this.termy = 2;
+            this.termY = 2;
             this.bbx2 = w;
             this.bby2 = h;
         };

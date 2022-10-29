@@ -23,6 +23,13 @@ alias core.*;
 /* Gravity is simply an object over the whole map (or any subarea that has
  * gravity) */
 export class Gravity : Object {
+    // Gravity has its own special name
+    override string preinteract(Interaction interaction) {
+        super(interaction);
+        return "gravity";
+    }
+
+    // Interact by accelearting everything
     override suggestion interact(
         array(tuple(Interaction, Interaction)) interactions
     ) {
@@ -32,8 +39,8 @@ export class Gravity : Object {
         num signGY = Math.sign(this.gy);
         num absGX = this.gx * signGX;
         num absGY = this.gy * signGY;
-        num absTX = this.termx * signGX;
-        num absTY = this.termy * signGY;
+        num absTX = this.termX * signGX;
+        num absTY = this.termY * signGY;
         if (absTX <= 0) absTX = 1/0;
         if (absTY <= 0) absTY = 1/0;
 
@@ -46,7 +53,7 @@ export class Gravity : Object {
                 if (absGX != 0) {
                     if (absOX >= absTX - absGX) {
                         ret = ret suggest {
-                            o.accelerateX(this.termx - o.vx);
+                            o.accelerateX(this.termX - o.vx);
                         };
                     } else {
                         ret = ret suggest {
@@ -58,7 +65,7 @@ export class Gravity : Object {
                 if (absGY != 0) {
                     if (absOY >= absTY - absGY) {
                         ret = ret suggest {
-                            o.accelerateY(this.termy - o.vy);
+                            o.accelerateY(this.termY - o.vy);
                         };
                     } else {
                         ret = ret suggest {
@@ -76,7 +83,7 @@ export class Gravity : Object {
     num gx, gy;
 
     // Terminal velocity
-    num termx, termy;
+    num termX, termY;
 }
 
 // Impassable walls
@@ -163,7 +170,9 @@ export class Wall : ObjectSprite {
  * objects, and only if they're moving in the wall's blocking direction */
 export class NWayWall : Wall {
     // Check for momentum before blocking
-    override suggestion interact(array(tuple(Interaction, Interaction)) interactions) {
+    override suggestion interact(
+        array(tuple(Interaction, Interaction)) interactions
+    ) {
         suggestion ret = super(interactions);
         for (tuple(Interaction, Interaction) ip in interactions) {
             Interaction i = ip[1];
