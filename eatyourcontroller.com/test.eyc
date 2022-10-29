@@ -26,6 +26,28 @@ export main class Main : robots.RobotsStage {
     override mutating void init() {
         this.layout = [Test];
         super();
+        num w = this.w;
+        num h = this.h;
+
+        Gravity g = new {
+            this.z = 1;
+            this.gy = 0x.4;
+            this.termy = 1.5;
+            this.bbx2 = w;
+            this.bby2 = h;
+        };
+        this.addObject(g);
+
+        Motile m = new {
+            this.vx = 0x1;
+            this.z = 1;
+            this.bbx2 = 1;
+            this.bby2 = 1;
+        };
+        extend m : ObjectSprite;
+        (m : ObjectSprite).staticSprite = robots.Robots.wall.nsew;
+        this.addObject(m);
+
         Console.log("Hello!");
     }
 }

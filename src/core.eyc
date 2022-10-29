@@ -113,6 +113,18 @@ export class Math : Root {
             return -x;
         return x;
     }
+
+    /**
+     * Sign.
+     * @static
+     */
+    num sign(num x) {
+        if (x > 0)
+            return 1;
+        else if (x < 0)
+            return -1;
+        return x;
+    }
 }
 
 /**
@@ -563,6 +575,38 @@ export class Object : Root {
     }
 
     /**
+     * Move this object in the X axis to the minimum of its current location and
+     * the given location.
+     */
+    mutating this void minX(num to) {
+        this.x = Math.min(this.x, to);
+    }
+
+    /**
+     * Move this object in the Y axis to the minimum of its current location and
+     * the given location.
+     */
+    mutating this void minY(num to) {
+        this.y = Math.min(this.y, to);
+    }
+
+    /**
+     * Move this object in the X axis to the maximum of its current location and
+     * the given location.
+     */
+    mutating this void maxX(num to) {
+        this.x = Math.max(this.x, to);
+    }
+
+    /**
+     * Move this object in the Y axis to the maximum of its current location and
+     * the given location.
+     */
+    mutating this void maxY(num to) {
+        this.y = Math.max(this.y, to);
+    }
+
+    /**
      * Objects aren't inherently clonable, but this helper method is provided
      * for clonable objects. Don't use it in non-clonable objects!
      */
@@ -590,6 +634,93 @@ export class Object : Root {
      * Location of this object on the stage, and its bounding box.
      */
     num x, y, z, bbx1, bbx2, bby1, bby2;
+}
+
+/**
+ * Objects that move with velocity.
+ */
+export class Motile : Object {
+    /**
+     * The action of a motile object is to move.
+     */
+    override mutating this suggestion act() {
+        suggestion ret = super();
+        this.x += this.vx;
+        this.y += this.vy;
+        return ret;
+    }
+
+    /**
+     * The direction of motion, one of
+     * nw n ne
+     *  w o e
+     * sw s se
+     */
+    string dir() {
+        string ret = "";
+        if (this.vy < 0)
+            ret = "n";
+        else if (this.vy > 0)
+            ret = "s";
+        if (this.vx < 0)
+            ret += "w";
+        else if (this.vx > 0)
+            ret += "e";
+        if (ret == "")
+            return "o";
+        return ret;
+    }
+
+    /**
+     * Reverse of .dir(), the direction this object is coming from.
+     */
+    string dirRev() {
+        string ret = "";
+        if (this.vy < 0)
+            ret = "s";
+        else if (this.vy > 0)
+            ret = "n";
+        if (this.vx < 0)
+            ret += "e";
+        else if (this.vx > 0)
+            ret += "w";
+        if (ret == "")
+            return "o";
+        return ret;
+    }
+
+    /**
+     * Accessor for acceleration in suggestions.
+     */
+    mutating this void accelerateX(num by) {
+        this.vx += by;
+    }
+
+    /**
+     * Accessor for acceleration in suggestions.
+     */
+    mutating this void accelerateY(num by) {
+        this.vy += by;
+    }
+
+    /**
+     * *Stop* this object in X.
+     */
+    mutating this void stopX() {
+        this.vx = 0;
+    }
+
+    /**
+     * *Stop* this object in Y.
+     */
+    mutating this void stopY() {
+        this.vy = 0;
+    }
+
+    /**
+     * Velocity.
+     */
+    num vx, vy;
 }
 
 /**
@@ -693,6 +824,15 @@ export class Interaction : Root {
      * direction is 'n', then from is above to.
      */
     string dir(num corner) {
+        if (this.from is Motile) {
+            // It's the direction the object is coming from
+            return (this.from : Motile).dirRev();
+        } else if (this.to is Motile) {
+            // It's the direction this object is going towards
+            return (this.to : Motile).dir();
+        }
+
+        // Need to look for overlaps
         num o1x1 = this.from.x + this.from.bbx1,
             o1x2 = this.from.x + this.from.bbx2,
             o1y1 = this.from.y + this.from.bby1,

@@ -20,24 +20,63 @@ PERFORMANCE OF THIS SOFTWARE.
 
 alias core.*;
 
-// Objects that move with velocity
-export class Motile : Object {
-    override mutating this suggestion act() {
-        suggestion ret = super();
-        this.x += this.vx;
-        this.y += this.vy;
+/* Gravity is simply an object over the whole map (or any subarea that has
+ * gravity) */
+export class Gravity : Object {
+    override suggestion interact(
+        array(tuple(Interaction, Interaction)) interactions
+    ) {
+        suggestion ret = super(interactions);
+
+        num absGX = Math.abs(this.gx);
+        num absGY = Math.abs(this.gy);
+        num signGX = Math.sign(this.gx);
+        num signGY = Math.sign(this.gy);
+        num absTX = Math.abs(this.termx);
+        num absTY = Math.abs(this.termy);
+        if (absTX == 0) absTX = 1/0;
+        if (absTY == 0) absTY = 1/0;
+
+        for (tuple(Interaction, Interaction) ip in interactions) {
+            Motile o = ip[0].to : Motile;
+            if (o is Motile) {
+                num absOX = o.vx * signGX;
+                num absOY = o.vy * signGY;
+
+                if (absGX != 0) {
+                    if (absOX >= absTX - absGX) {
+                        ret = ret suggest {
+                            o.accelerateX(this.termx - o.vx);
+                        };
+                    } else {
+                        ret = ret suggest {
+                            o.accelerateX(this.gx);
+                        };
+                    }
+                }
+
+                if (absGY != 0) {
+                    if (absOY >= absTY - absGY) {
+                        ret = ret suggest {
+                            o.accelerateY(this.termy - o.vy);
+                        };
+                    } else {
+                        ret = ret suggest {
+                            o.accelerateY(this.gy);
+                        };
+                    }
+                }
+            }
+        }
+
         return ret;
     }
 
-    mutating this void accelerateX(num by) {
-        this.vx += by;
-    }
+    // Gravity (in both x and y directions)
+    num gx, gy;
 
-    mutating this void accelerateY(num by) {
-        this.vy += by;
-    }
-
-    num vx, vy;
+    // Terminal velocity
+    num termx, termy;
 }
 
 // Impassable walls
@@ -87,31 +126,27 @@ export class Wall : ObjectSprite {
             for (string dir in dirs) {
                 if (this.blocking[dir]) {
                     if (dir == "n") {
-                        num over = this.y + this.bby1 - other.y - other.bby2;
                         ret = ret suggest {
-                            other.moveY(-over);
-                            other.accelerateY(-other.vy);
+                            other.minY(this.y + this.bby1 - other.bby2);
+                            other.stopY();
                         };
 
                     } else if (dir == "e") {
-                        num over = other.x + other.bbx1 - this.x - this.bbx2;
                         ret = ret suggest {
-                            other.moveX(over);
-                            other.accelerateX(-other.vx);
+                            other.maxX(this.x + this.bbx2 - other.bbx1);
+                            other.stopX();
                         };
 
                     } else if (dir == "s") {
-                        num over = other.y + other.bby1 - this.y - this.bby2;
                         ret = ret suggest {
-                            other.moveY(over);
-                            other.accelerateY(-other.vy);
+                            other.maxY(this.y + this.bbx2 - other.bbx1);
+                            other.stopY();
                         };
 
                     } else if (dir == "w") {
-                        num over = this.x + this.bbx1 - other.x - other.bbx2;
                         ret = ret suggest {
-                            other.moveX(-over);
-                            other.accelerateX(-other.vx);
+                            other.minX(this.x + this.bbx1 - other.bbx2);
+                            other.stopX();
                         };
 
                     }
@@ -141,31 +176,27 @@ export class NWayWall : Wall {
                 for (string dir in dirs) {
                     if (this.blocking[dir]) {
                         if (dir == "n" && other.vy > 0) {
-                            num over = this.y + this.bby1 - other.y - other.bby2;
                             ret = ret suggest {
-                                other.moveY(-over);
-                                other.accelerateY(-other.vy);
+                                other.minY(this.y + this.bby1 - other.bby2);
+                                other.stopY();
                             };
 
                         } else if (dir == "e" && other.vx < 0) {
-                            num over = other.x + other.bbx1 - this.x - this.bbx2;
                             ret = ret suggest {
-                                other.moveX(over);
-                                other.accelerateX(-other.vx);
+                                other.maxX(this.x + this.bbx2 - other.bbx1);
+                                other.stopX();
                             };
 
                         } else if (dir == "s" && other.vy < 0) {
-                            num over = other.y + other.bby1 - this.y - this.bby2;
                             ret = ret suggest {
-                                other.moveY(over);
-                                other.accelerateY(-other.vy);
+                                other.maxY(this.y + this.bbx2 - other.bbx1);
+                                other.stopY();
                             };
 
                         } else if (dir == "w" && other.vx > 0) {
-                            num over = this.x + this.bbx1 - other.x - other.bbx2;
                             ret = ret suggest {
-                                other.moveX(-over);
-                                other.accelerateX(-other.vx);
+                                other.minX(this.x + this.bbx1 - other.bbx2);
+                                other.stopX();
                             };
 
                         }
