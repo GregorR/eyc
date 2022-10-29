@@ -117,7 +117,18 @@ const eycExtWorker: types.EYCExt = {
         });
         return (await awaitReply("moveSprite", {
             st: stageId, s: sprite
-        }));
+        })).s;
+    },
+
+    mirrorSprite: async function(
+        stageId: string, sprite: string, mirror: boolean, vertical: boolean
+    ) {
+        postMessage({
+            c: "mirrorSprite", st: stageId, s: sprite, m: +mirror, v: +vertical
+        });
+        return (await awaitReply("mirrorSprite", {
+            st: stageId, s: sprite
+        })).s;
     }
 };
 

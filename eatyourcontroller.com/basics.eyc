@@ -244,6 +244,33 @@ export class AnimatedSprite : ObjectSprite {
     num animationSpeed = 8;
 }
 
+// Objects with sprites that mirror based on their most recent velocity
+export class MirrorSprite : Motile, ObjectSprite {
+    // React by mirroring
+    override mutating this suggestion react() {
+        suggestion ret = super();
+
+        if (this.vx > 0 && this.mirrored) {
+            this.mirrored = false;
+            ret = ret suggest {
+                this.stage.mirrorSprite(this.dynamicSprite, false, false);
+            };
+
+        } else if (this.vx < 0 && !this.mirrored) {
+            this.mirrored = true;
+            ret = ret suggest {
+                this.stage.mirrorSprite(this.dynamicSprite, true, false);
+            };
+
+        }
+
+        return ret;
+    }
+
+    // Whether the sprite is currently mirrored
+    bool mirrored;
+}
+
 /* Object factory based on label and surrounding sprite labels, used by
  * fabric-based stages. Override this for your particular family of sprites.
  * context is of the form [nw, n, ne, w, self, e, sw, s, se] */

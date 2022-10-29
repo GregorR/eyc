@@ -1214,36 +1214,31 @@ export async function eyc(
         return beId;
     },
 
-    updateSprite: function(
+    updateSprite: async function(
         stageId: string, id: string, spritesheet: string, sprite: string
     ) {
-        // Just do it in the background
-        (async () => {
-            // We may need to wait for the frontend promise
-            if (!(stageId in stages) || !(sprite in sprites))
-                await frontendP;
+        // We may need to wait for the frontend promise
+        if (!(stageId in stages) || !(sprite in sprites))
+            await frontendP;
 
-            // BE -> FE
-            if (stageId in stages)
-                stageId = stages[stageId];
-            else
-                stageId = "";
-            if (id in sprites)
-                id = sprites[id];
-            else
-                id = "";
-            if (spritesheet in spritesheetsToFeId)
-                spritesheet = spritesheetsToFeId[spritesheet];
-            else
-                spritesheet = "";
+        // BE -> FE
+        if (stageId in stages)
+            stageId = stages[stageId];
+        else
+            stageId = "";
+        if (id in sprites)
+            id = sprites[id];
+        else
+            id = "";
+        if (spritesheet in spritesheetsToFeId)
+            spritesheet = spritesheetsToFeId[spritesheet];
+        else
+            spritesheet = "";
 
-            // Then do it
-            frontendP = frontendP.then(
-                this.ext.updateSprite(stageId, id, spritesheet, sprite)
-            ).catch(console.error);
-        })();
-
-        return id;
+        // Then do it
+        frontendP = frontendP.then(
+            this.ext.updateSprite(stageId, id, spritesheet, sprite)
+        ).catch(console.error);
     },
 
     moveSprite: async function(
@@ -1268,6 +1263,28 @@ export async function eyc(
         frontendP = frontendP.then(p).catch(console.error);
     },
 
+    mirrorSprite: async function(
+        stageId: string, sprite: string, mirror: boolean, vertical: boolean
+    ) {
+        // We may need to wait for the frontend promise
+        if (!(stageId in stages) || !(sprite in sprites))
+            await frontendP;
+
+        // BE -> FE
+        if (stageId in stages)
+            stageId = stages[stageId];
+        else
+            stageId = "";
+        if (sprite in sprites)
+            sprite = sprites[sprite];
+        else
+            sprite = "";
+
+        // Then do it
+        const p = this.ext.mirrorSprite(stageId, sprite, mirror, vertical);
+        frontendP = frontendP.then(p).catch(console.error);
+    },
+
 
     // User provided
     ext: {
@@ -1277,7 +1294,8 @@ export async function eyc(
         loadSpritesheet: null,
         addSprite: null,
         updateSprite: null,
-        moveSprite: null
+        moveSprite: null,
+        mirrorSprite: null
     }
 
     };

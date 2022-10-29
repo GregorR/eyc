@@ -40,6 +40,8 @@ export main class Main : robots.RobotsStage {
 
         OrangeRobot m = new {
             this.init();
+            this.x = 30;
+            this.vx = -0x.04;
             this.z = 1;
             this.bbx1 = 0x.1;
             this.bbx2 = 0x.f;
@@ -52,15 +54,37 @@ export main class Main : robots.RobotsStage {
     }
 }
 
-class OrangeRobot : Motile, AnimatedSprite {
+class OrangeRobot : MirrorSprite, AnimatedSprite {
     mutating this void init() {
-        this.animationFrames = [
+        this.animationFrames = this.idleFrames = [
             robots.Robots.robots.orange1,
             robots.Robots.robots.orange2,
             robots.Robots.robots.orange3,
             robots.Robots.robots.orange4
         ];
+
+        this.walkFrames = [
+            robots.Robots.robots.orangew1,
+            robots.Robots.robots.orangew2,
+            robots.Robots.robots.orangew3,
+            robots.Robots.robots.orangew4,
+            robots.Robots.robots.orangew5,
+            robots.Robots.robots.orangew6,
+            robots.Robots.robots.orangew7,
+            robots.Robots.robots.orangew8
+        ];
     }
+
+    override mutating this suggestion react() {
+        if (this.vx == 0 && this.animationFrames != this.idleFrames)
+            this.animationFrames = this.idleFrames;
+        else if (this.vx != 0 && this.animationFrames != this.walkFrames)
+            this.animationFrames = this.walkFrames;
+        return super();
+    }
+
+    array(tuple(string, string)) idleFrames;
+    array(tuple(string, string)) walkFrames;
 }
 
 /*

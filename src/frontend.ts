@@ -295,6 +295,27 @@ export async function go(): Promise<void> {
                     c: "moveSprite", st: msg.st, s: msg.s});
                 break;
 
+            case "mirrorSprite":
+                do {
+                    const sprite = sprites[msg.s];
+                    if (!sprite)
+                        break;
+                    let axis = "x";
+                    if (sprite.v)
+                        axis = "y";
+                    const mult = msg.m ? -1 : 1;
+                    const anchor = msg.m ? 1 : 0;
+                    frameActions.push(() => {
+                        sprite.scale[axis] =
+                            Math.abs(sprite.scale[axis]) * mult;
+                        sprite.anchor[axis] = anchor;
+                    });
+                } while (false);
+
+                w.postMessage({
+                    c: "mirrorSprite", st: msg.st, s: msg.s});
+                break;
+
             default:
                 console.error("Unrecognized command " + msg.c);
         }

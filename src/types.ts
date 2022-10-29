@@ -201,9 +201,12 @@ export interface EYC {
     ): string;
     updateSprite(
         stageId: string, id: string, spritesheet: string, sprite: string
-    ): string;
+    ): void;
     moveSprite(
         stageId: string, sprite: string, x: number, y: number
+    ): void;
+    mirrorSprite(
+        stageId: string, sprite: string, mirror: boolean, vertical: boolean
     ): void;
 
     // External features which must be provided by a user of EYC
@@ -233,11 +236,16 @@ export interface EYCExt {
     // Update this sprite's image
     updateSprite: (
         stageId: string, id: string, spritesheet: string, sprite: string
-    ) => Promise<string>;
+    ) => Promise<void>;
 
     // Move this (added) sprite
     moveSprite: (
         stageId: string, sprite: string, x: number, y: number
+    ) => Promise<void>;
+
+    // Mirror or unmirror this sprite
+    mirrorSprite: (
+        stageId: string, sprite: string, mirror: boolean, vertical: boolean
     ) => Promise<void>;
 }
 

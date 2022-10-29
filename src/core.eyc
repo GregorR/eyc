@@ -555,6 +555,15 @@ export class Stage : Program {
     }
 
     /**
+     * Mirror (unmirror) a sprite.
+     */
+    mutating void mirrorSprite(string sprite, bool mirror, bool vertical) {
+        @js (extStage=this.extStage, sprite, mirror, vertical) {
+            eyc.mirrorSprite(extStage, sprite, mirror, vertical);
+        } : void;
+    }
+
+    /**
      * The display width and height of the stage in tiles.
      */
     num dw = 32, dh = 18;
