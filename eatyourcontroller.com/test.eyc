@@ -47,7 +47,7 @@ export main class Main : robots.RobotsStage {
                 this.init(nm);
                 this.x = x;
                 x -= 0x1.11;
-                this.vx = -0x.04;
+                this.vx = -0x.08;
                 this.z = 1;
                 this.bbx1 = 0x.1;
                 this.bbx2 = 0x.f;
@@ -61,7 +61,7 @@ export main class Main : robots.RobotsStage {
     }
 }
 
-class Robot : MirrorSprite, AnimatedSprite {
+class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
     mutating this void init(string nm) {
         array(tuple(string, string)) idle =
         this.animationFrames = this.idleFrames =  new {
@@ -83,6 +83,12 @@ class Robot : MirrorSprite, AnimatedSprite {
         };
     }
 
+    override mutating this suggestion act() {
+        suggestion ret = super();
+        this.nextVX = this.vx;
+        return ret;
+    }
+
     override mutating this suggestion react() {
         if (this.vx == 0 && this.animationFrames != this.idleFrames)
             this.animationFrames = this.idleFrames;
@@ -91,8 +97,58 @@ class Robot : MirrorSprite, AnimatedSprite {
         return super();
     }
 
+/*
+    override suggestion interact(
+        array(tuple(Interaction, Interaction)) interactions
+    ) {
+        suggestion ret = super(interactions);
+        /* Ignore this if we're falling (FIXME: should have a ground detector
+         * instead) * /
+        if (this.vy > 0.5)
+            return ret;
+
+        for (tuple(Interaction, Interaction) ip in interactions) {
+            Interaction i = ip[1];
+            if (i.type == "solid") {
+                string dir = i.dirNonMotile(0.5);
+                Object wall = i.from;
+
+                // Don't care about n/s component
+                if (dir.length > 1)
+                    dir = dir[1];
+
+                if ((dir == "e" && this.vx > 0 ||
+                     dir == "w" && this.vx < 0) &&
+                    wall.y + wall.bby1 < this.y + this.bby2 - 0x.4 &&
+                    wall.y + wall.bby2 > this.y + this.bby1 + 0x.4) {
+                    // We've been blocked. Turn around.
+                    return ret suggest {
+                        this.setNextVX(-this.vx);
+                    };
+                }
+            }
+        }
+    }
+*/
+
+    override mutating this suggestion react() {
+        suggestion ret = super();
+        if (this.detected("n", "solid") || this.detected("s", "solid")) {
+            if (this.detected("w", "solid") && this.nextVX < 0) {
+                this.vx = -this.nextVX;
+            } else if (this.detected("e", "solid") && this.nextVX > 0) {
+                this.vx = -this.nextVX;
+            } else {
+                this.vx = this.nextVX;
+            }
+        }
+        return ret;
+    }
+
     array(tuple(string, string)) idleFrames;
     array(tuple(string, string)) walkFrames;
+
+    num nextVX;
 }
 
 /*

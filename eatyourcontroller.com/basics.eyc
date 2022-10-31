@@ -20,9 +20,19 @@ PERFORMANCE OF THIS SOFTWARE.
 
 alias core.*;
 
+// Explicitly immobile things (such as gravity)
+export class Immobile : Object {
+    override mutating this void moveX(num by) {}
+    override mutating this void moveY(num by) {}
+    override mutating this void minX(num to) {}
+    override mutating this void minY(num to) {}
+    override mutating this void maxX(num to) {}
+    override mutating this void maxY(num to) {}
+}
+
 /* Gravity is simply an object over the whole map (or any subarea that has
  * gravity) */
-export class Gravity : Object {
+export class Gravity : Immobile {
     // Gravity has its own special name
     override string preinteract(Interaction interaction) {
         super(interaction);
@@ -234,6 +244,133 @@ export class MultiWall : Wall {
     }
 
     tuple(string, string) multiWallStaticSprite;
+}
+
+// Objects capable of detecting surrounding objects
+export class AdjacencyDetector : Object {
+    override mutating this suggestion act() {
+        suggestion ret = super();
+
+        // FIXME: Detect if our width or height changes
+        num w = this.bbx2 - this.bbx1,
+            h = this.bby2 - this.bby1,
+            hw = w / 2,
+            hh = h / 2,
+            qw = hw / 2,
+            qh = hh / 2;
+
+        if (!this.detectors) {
+            // Set up our detectors
+            AdjacencyDetector self = this;
+
+            this.detectors = new {
+                // N
+                this += new AdjacencyDetectorPart {
+                    this.init("n", self.x + self.bbx1 + qw,
+                              self.y + self.bby1 - 0x.1, self.z,
+                              hw, 0x.1);
+                };
+                // E
+                this += new AdjacencyDetectorPart {
+                    this.init("e", self.x + self.bbx2,
+                              self.y + self.bby1 + qh, self.z,
+                              0x.1, hh);
+                };
+                // S
+                this += new AdjacencyDetectorPart {
+                    this.init("s", self.x + self.bbx1 + qw,
+                              self.y + self.bby2, self.z,
+                              hw, 0x.1);
+                };
+                // W
+                this += new AdjacencyDetectorPart {
+                    this.init("w", self.x + self.bbx1 - 0x.1,
+                              self.y + self.bby1 + qh, self.z,
+                              0x.1, hh);
+                };
+            };
+
+            // Get them by direction
+            this.detectorsByDir = new {
+                this["n"] = self.detectors[0];
+                this["e"] = self.detectors[1];
+                this["s"] = self.detectors[2];
+                this["w"] = self.detectors[3];
+            };
+
+            // Add them to the stage
+            for (AdjacencyDetectorPart ad in this.detectors) {
+                ret = ret suggest {
+                    this.stage.addObject(ad);
+                };
+            }
+            // FIXME: remove them when this object is removed
+        }
+
+        // Move our detectors into place
+        array(AdjacencyDetectorPart) add = this.detectors;
+        return ret suggest {
+            // N
+            add[0].moveX(this.x + this.bbx1 + qw - add[0].x);
+            add[0].moveY(this.y + this.bby1 - 0x.1 - add[0].y);
+            // E
+            add[1].moveX(this.x + this.bbx2 - add[1].x);
+            add[1].moveY(this.y + this.bby1 + qh - add[1].y);
+            // S
+            add[2].moveX(this.x + this.bbx1 + qw - add[2].x);
+            add[2].moveY(this.y + this.bby2 - add[2].y);
+            // W
+            add[3].moveX(this.x + this.bbx1 - 0x.1 - add[3].x);
+            add[3].moveY(this.y + this.bby1 + qh - add[3].y);
+        };
+    }
+
+    // Determine what we've detected
+    bool detected(string dir, string type) {
+        return this.detectorsByDir[dir].detected[type];
+    }
+
+    array(AdjacencyDetectorPart) detectors;
+    map(string, AdjacencyDetectorPart) detectorsByDir;
+}
+
+// Helper class for AdjacencyDetector
+class AdjacencyDetectorPart : Object {
+    mutating this void init(string dir, num x, num y, num z, num w, num h) {
+        this.dir = dir;
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.bbx2 = w;
+        this.bby2 = h;
+    }
+
+    override suggestion interact(
+        array(tuple(Interaction, Interaction)) interactions
+    ) {
+        suggestion ret = super(interactions);
+        set(string) detected = new {
+            // Add everything we detect
+            for (tuple(Interaction, Interaction) ip in interactions) {
+                string type = ip[1].type;
+                if (type != "")
+                    this += type;
+            }
+        };
+
+        // Suggestion is to update it
+        return ret suggest {
+            this.setDetected(detected);
+        };
+    }
+
+    // Internal
+    mutating this void setDetected(set(string) to) {
+        this.detected = to;
+    }
+
+    string dir;
+    set(string) detected;
 }
 
 // Animated objects
