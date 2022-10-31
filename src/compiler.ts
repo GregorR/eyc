@@ -3639,11 +3639,14 @@ class MethodCompilationState {
                     ssa.expr = "(-" + ssa.arg(ir) + ")";
                     break;
 
-                case "not-object": throw new EYCTypeError(ssa.ctx, "No compiler for not-object");
-                case "not-array": throw new EYCTypeError(ssa.ctx, "No compiler for not-array");
+                case "not-object":
+                case "not-array":
+                case "not-map":
+                case "not-set":
+                    ssa.expr = `(${ssa.arg(ir)}===eyc.nil)`;
+                    break;
+
                 case "not-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for not-tuple");
-                case "not-map": throw new EYCTypeError(ssa.ctx, "No compiler for not-map");
-                case "not-set": throw new EYCTypeError(ssa.ctx, "No compiler for not-set");
                 case "not-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for not-suggestion");
                 case "not-num": throw new EYCTypeError(ssa.ctx, "No compiler for not-num");
                 case "not-string": throw new EYCTypeError(ssa.ctx, "No compiler for not-string");
@@ -3682,8 +3685,12 @@ class MethodCompilationState {
                 case "bool-from-map": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-map");
                 case "bool-from-set": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-set");
                 case "bool-from-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-suggestion");
-                case "bool-from-num": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-num");
-                case "bool-from-string": throw new EYCTypeError(ssa.ctx, "No compiler for bool-from-string");
+
+                case "bool-from-num":
+                case "bool-from-string":
+                    ssa.expr = `(!!${ssa.arg(ir)})`;
+                    break;
+
                 case "bool-from-bool":
                     ssa.expr = "(" + ssa.arg(ir) + ")";
                     break;
