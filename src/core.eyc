@@ -973,6 +973,15 @@ export class Interaction : Root {
             return (this.to : Motile).dir();
         }
 
+        // Nothing motile, use the non-motile version
+        return this.dirNonMotile(corner);
+    }
+
+    /**
+     * Get the direction of this interaction, ignoring velocity and focusing
+     * only on location.
+     */
+    string dirNonMotile(num corner) {
         // Need to look for overlaps
         num o1x1 = this.from.x + this.from.bbx1,
             o1x2 = this.from.x + this.from.bbx2,
