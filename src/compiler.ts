@@ -638,7 +638,11 @@ function resolveMethodDeclType(
 
     // Now put it in the class
     const name = methodDecl.children.id.children.text;
-    if (name in klass.methodTypes) {
+    if (name in klass.ownMethodTypes) {
+        throw new EYCTypeError(methodDecl,
+            `Multiply declared method ${name}`);
+
+    } else if (name in klass.methodTypes) {
         // This has to be an override
         if (!methodDecl.children.override) {
             throw new EYCTypeError(methodDecl,
@@ -652,6 +656,7 @@ function resolveMethodDeclType(
 
         // The ID is the parent ID
         signature.id = klass.methodTypes[name].id;
+        klass.ownMethodTypes[name] = signature;
 
     } else {
         // This must NOT be an override
@@ -659,7 +664,7 @@ function resolveMethodDeclType(
             throw new EYCTypeError(methodDecl,
                                    "Override method overrides nothing");
         }
-        klass.methodTypes[name] = methodDecl.signature;
+        klass.methodTypes[name] = klass.ownMethodTypes[name] = methodDecl.signature;
 
     }
 }

@@ -522,6 +522,7 @@ export async function eyc(
         methods: Record<string, types.CompiledFunction>;
         fieldNames: Record<string, string>;
         fieldInits: Record<string, types.CompiledFunction>;
+        ownMethodTypes: Record<string, types.Method>;
         ownFieldTypes: Record<string, types.Type>;
 
         constructor(module: types.Module, name: string) {
@@ -541,6 +542,7 @@ export async function eyc(
             // Own methods and fields
             this.methods = Object.create(null);
             this.fieldInits = Object.create(null);
+            this.ownMethodTypes = Object.create(null);
             this.ownFieldTypes = Object.create(null);
 
             eyc.classes[this.prefix] = this;

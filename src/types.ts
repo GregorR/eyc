@@ -396,6 +396,7 @@ export interface EYCClass extends TypeLike {
     methods: Record<string, CompiledFunction>;
     fieldNames: Record<string, string>;
     fieldInits: Record<string, CompiledFunction>;
+    ownMethodTypes: Record<string, Method>;
     ownFieldTypes: Record<string, Type>;
 
     subtypeOf(other: EYCClass): boolean;

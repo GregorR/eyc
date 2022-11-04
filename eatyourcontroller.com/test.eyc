@@ -46,7 +46,7 @@ export main class Main : robots.RobotsStage {
             Robot r = new {
                 this.init(nm);
                 this.x = x;
-                x -= 0x1.11;
+                x -= 0x1.18;
                 this.vx = -0x.08;
                 this.z = 1;
                 this.bbx1 = 0x.1;
@@ -90,11 +90,22 @@ class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
     }
 
     override mutating this suggestion react() {
+        suggestion ret = super();
+
+        if (this.detected("n", "solid") || this.detected("s", "solid")) {
+            if (this.detected("w", "solid") && this.nextVX < 0) {
+                this.vx = -this.nextVX;
+            } else if (this.detected("e", "solid") && this.nextVX > 0) {
+                this.vx = -this.nextVX;
+            }
+        }
+
         if (this.vx == 0 && this.animationFrames != this.idleFrames)
             this.animationFrames = this.idleFrames;
         else if (this.vx != 0 && this.animationFrames != this.walkFrames)
             this.animationFrames = this.walkFrames;
-        return super();
+
+        return ret;
     }
 
 /*
@@ -130,20 +141,6 @@ class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
         }
     }
 */
-
-    override mutating this suggestion react() {
-        suggestion ret = super();
-        if (this.detected("n", "solid") || this.detected("s", "solid")) {
-            if (this.detected("w", "solid") && this.nextVX < 0) {
-                this.vx = -this.nextVX;
-            } else if (this.detected("e", "solid") && this.nextVX > 0) {
-                this.vx = -this.nextVX;
-            } else {
-                this.vx = this.nextVX;
-            }
-        }
-        return ret;
-    }
 
     array(tuple(string, string)) idleFrames;
     array(tuple(string, string)) walkFrames;
