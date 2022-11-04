@@ -232,6 +232,9 @@ export interface EYCExt {
     // Fire and wait for queued frame actions
     frame: () => Promise<void>;
 
+    // Get the state of input devices
+    input: () => Promise<string[]>;
+
     // Load in this spritesheet
     loadSpritesheet: (desc: unknown) => Promise<string>;
 

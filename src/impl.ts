@@ -1323,6 +1323,7 @@ export async function eyc(
         fetch: null,
         newStage: null,
         frame: null,
+        input: null,
         loadSpritesheet: null,
         addSprite: null,
         updateSprite: null,

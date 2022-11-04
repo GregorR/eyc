@@ -38,6 +38,8 @@ export main class Main : robots.RobotsStage {
         };
         this.addObject(g);
 
+        Robot last;
+
         num x = 30;
         for (string nm in [
             "orange", "cyan", "red", "black", "magenta", "teal", "purple",
@@ -54,10 +56,21 @@ export main class Main : robots.RobotsStage {
                 this.bby1 = 0x.1;
                 this.bby2 = 0x1.f;
             };
+            last = r;
             this.addObject(r);
         }
 
+        this.players = [new Player];
+        extend last : SimpleMotion;
+        this.players[0].controlling = last : Playing;
+
         Console.log("Hello!");
+    }
+
+    override mutating void tick() {
+        if (this.players[0].input.up)
+            Console.log("UP");
+        super();
     }
 }
 
@@ -146,6 +159,21 @@ class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
     array(tuple(string, string)) walkFrames;
 
     num nextVX;
+}
+
+class SimpleMotion : Playing, Motile, AdjacencyDetector {
+    override mutating this suggestion takeInput(InputState input) {
+        suggestion ret = super(input);
+        if (input.left)
+            this.vx = -0x.1;
+        else if (input.right)
+            this.vx = 0x.1;
+        else
+            this.vx = 0;
+        if (input.south && this.detected("s", "solid"))
+            this.vy = -1;
+        return ret;
+    }
 }
 
 /*

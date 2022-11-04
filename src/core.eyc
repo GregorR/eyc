@@ -377,9 +377,21 @@ export class Stage : Program {
      * Initialize the stage, mainly by connecting to the frontend.
      */
     override mutating void init() {
+        this.players = new;
         this.extStage = @js (dw=this.dw, dh=this.dh, ex=this.ex) {
             return eyc.newStage(dw, dh, ex);
         } : string;
+    }
+
+    /**
+     * Get input state from players.
+     */
+    mutating void input(array(string) input) {
+        while (this.players.length < input.length)
+            // FIXME: "new" should be enough, compiler bug
+            this.players += new Player;
+        for (num i, string inp in input)
+            this.players[i].takeInput(inp);
     }
 
     /**
@@ -390,7 +402,7 @@ export class Stage : Program {
 
         // Step 1: Players
         for (Player p in this.players)
-            sa += p.tick();
+            sa += p.controlling.takeInput(p.input);
         for (suggestion s in sa)
             this.enforce(s, null);
 
@@ -672,7 +684,7 @@ export class Object : Root {
     /**
      * 1: Play (if this object is controlled by a player, it takes input).
      */
-    suggestion takeInput(InputState input) {}
+    mutating this suggestion takeInput(InputState input) {}
 
     /**
      * 2: Act. Normal, per-tick behavior.
@@ -1116,10 +1128,12 @@ export class Interaction : Root {
  */
 export class Player : Root {
     /**
-     * Each tick, if we're controlling an object, they take our input.
+     * Each tick, we receive input from the player.
      */
-    suggestion tick() {
-        return this.controlling.takeInput(this.input);
+    mutating this void takeInput(string inp) {
+        this.input = new {
+            this.init(inp);
+        };
     }
 
     Playing controlling;
@@ -1138,6 +1152,34 @@ export class Playing : Object {
  * well as a set of pressed buttons.
  */
 export class InputState : Root {
+    /**
+     * Turn this input into press info.
+     */
+    mutating this void init(string inp) {
+        this.pressed = new {
+            for (string i in inp)
+                this += i;
+        };
+        for (string i in inp) {
+            if (i == "u")
+                this.up = true;
+            else if (i == "d")
+                this.down = true;
+            else if (i == "l")
+                this.left = true;
+            else if (i == "r")
+                this.right = true;
+            else if (i == "n")
+                this.north = true;
+            else if (i == "s")
+                this.south = true;
+            else if (i == "e")
+                this.east = true;
+            else if (i == "w")
+                this.west = true;
+        }
+    }
+
     set(string) pressed;
     bool up, down, left, right, north, south, east, west;
 }

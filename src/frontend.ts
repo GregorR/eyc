@@ -26,6 +26,9 @@ let pixiProps = {
     scale: 64
 };
 
+// Current state of user input
+let input: Set<string> = new Set();
+
 // Check for mandatory features
 if (typeof HTMLCanvasElement === "undefined" ||
     typeof Worker === "undefined") {
@@ -129,10 +132,73 @@ export async function go(): Promise<void> {
     const id = 0;
     let loader = null;
 
+    // Set up input
+    window.addEventListener("keydown", ev => {
+        handleKey(ev, true);
+    });
+    window.addEventListener("keyup", ev => {
+        handleKey(ev, false);
+    });
+
+    function handleKey(ev: KeyboardEvent, down: boolean) {
+        let key = "";
+        // FIXME: Obviously implement configurable key mappings
+        switch (ev.key) {
+            case "ArrowUp":
+            case "w":
+                key = "u";
+                break;
+
+            case "ArrowDown":
+            case "s":
+                key = "d";
+                break;
+
+            case "ArrowLeft":
+            case "a":
+                key = "l";
+                break;
+
+            case "ArrowRight":
+            case "d":
+                key = "r";
+                break;
+
+            case "i":
+                key = "n";
+                break;
+
+            case "k":
+                key = "s";
+                break;
+
+            case "l":
+                key = "e";
+                break;
+
+            case "j":
+                key = "w";
+                break;
+
+            default:
+                console.log(`Unknown key ${ev.key}`);
+        }
+
+        if (key) {
+            if (down)
+                input.add(key);
+            else
+                input.delete(key);
+        }
+    }
+
     // Certain actions must be synchronous to have frames
     let frameActions: (() => unknown)[] = [];
 
+    // Synchronization of frontend actions
     let frontendPromise: Promise<unknown> = Promise.all([]);
+
+    // Various maps of identifiers to data structures
     const spritesheetTextures: Record<string, string> = Object.create(null);
     const spritesheetDatas: Record<string, any> = Object.create(null);
     const spritesheets: Record<string, any> = Object.create(null);
@@ -140,6 +206,7 @@ export async function go(): Promise<void> {
     const sprites: Record<string, any> = Object.create(null);
     let spriteIdx = 0;
 
+    // Command input
     w.onmessage = async ev => {
         const msg = ev.data;
         switch (msg.c) {
@@ -149,6 +216,17 @@ export async function go(): Promise<void> {
                 frameActions = [];
                 w.postMessage({c: "frame"});
                 break;
+
+            case "input":
+            {
+                let i = "";
+                for (const b of "udlrnsew") {
+                    if (input.has(b))
+                        i += b;
+                }
+                w.postMessage({c: "input", i: [i]});
+                break;
+            }
 
             case "newStage":
             {

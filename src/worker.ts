@@ -71,6 +71,11 @@ const eycExtWorker: types.EYCExt = {
         hadFrame = true;
     },
 
+    input: async function() {
+        postMessage({c: "input"});
+        return (await awaitReply("input")).i;
+    },
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     newStage: async function(w: number, h: number, ex: any) {
         // Send a message to the host
@@ -163,12 +168,24 @@ onmessage = function(ev) {
                         // And start it ticking
                         if (mainTick)
                             clearInterval(mainTick);
-                        mainTick = setInterval(() => {
+                        mainTick = setInterval(async () => {
                             if (!hadFrame)
                                 return;
                             hadFrame = false;
                             eyc.ts++;
+
+                            /* 1: Get input from the controller(s) and pass that
+                             * in */
+                            const inp: string[] & types.EYCArray = <any> (await eyc.ext.input());
+                            inp.prefix = "main";
+                            inp.id = `main$${eyc.freshId()}`;
+                            inp.valueType = "string";
+                            (<any> main.methods.$$core$Stage$input)(eyc, main, eyc.nil, inp);
+
+                            // 2: Do the frame's actions
                             main.methods.$$core$Stage$tick(eyc, main, eyc.nil);
+
+                            // 3: Request the frame update from the frontend
                             eyc.frame();
                         }, 1000/60);
                     }
