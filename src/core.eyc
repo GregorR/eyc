@@ -112,6 +112,72 @@ export class Math : Root {
     }
 
     /**
+     * Minimum of two numbers in absolute terms. Prefer the given sign if
+     * their absolute value is equal.
+     * @static
+     */
+    num minAbs(num x, num y, num sign) {
+        if (x >= 0 && y >= 0)
+            return Math.min(x, y);
+        else if (x <= 0 && y <= 0)
+            return Math.max(x, y);
+        else
+            return Math.minAbsPrime(x, y, sign);
+    }
+
+    /**
+     * Helper function for minAbs.
+     * @private
+     */
+    num minAbsPrime(num x, num y, num sign) {
+        if (x >= 0) {
+            num ny = -y;
+            if (x < ny)
+                return x;
+            else if (ny < x)
+                return y;
+            else if (sign >= 0)
+                return x;
+            else
+                return y;
+        } else
+            return Math.minAbsPrime(y, x, sign);
+    }
+
+    /**
+     * Maximum of two numbers in absolute terms. Prefer the given sign if
+     * their absolute value is equal.
+     * @static
+     */
+    num maxAbs(num x, num y, num sign) {
+        if (x >= 0 && y >= 0)
+            return Math.max(x, y);
+        else if (x <= 0 && y <= 0)
+            return Math.min(x, y);
+        else
+            return Math.maxAbsPrime(x, y, sign);
+    }
+
+    /**
+     * Helper function for maxAbs.
+     * @private
+     */
+    num maxAbsPrime(num x, num y, num sign) {
+        if (x >= 0) {
+            num ny = -y;
+            if (x > ny)
+                return x;
+            else if (ny > x)
+                return y;
+            else if (sign >= 0)
+                return x;
+            else
+                return y;
+        } else
+            return Math.maxAbsPrime(y, x, sign);
+    }
+
+    /**
      * Absolute value.
      * @static
      */
@@ -611,7 +677,12 @@ export class Object : Root {
     /**
      * 2: Act. Normal, per-tick behavior.
      */
-    mutating this suggestion act() {}
+    mutating this suggestion act() {
+        this.stepVXP = 0;
+        this.stepVXN = 0;
+        this.stepVYP = 0;
+        this.stepVYN = 0;
+    }
 
     /**
      * 3: Determine the kinds of interactions with other objects. e.g., may
@@ -629,7 +700,10 @@ export class Object : Root {
      * 5: React to interaction. This would be the time to, e.g., take damage or
      * be destroyed, or be enhanced in some way.
      */
-    mutating this suggestion react() {}
+    mutating this suggestion react() {
+        this.x += this.stepVXP + this.stepVXN;
+        this.y += this.stepVYP + this.stepVYN;
+    }
 
     /**
      * Called when this object is added to a stage (usually for sprite
@@ -665,46 +739,20 @@ export class Object : Root {
      * Move this object in the X axis.
      */
     mutating this void moveX(num by) {
-        this.x += by;
+        if (by >= 0)
+            this.stepVXP = Math.max(this.stepVXP, by);
+        else
+            this.stepVXN = Math.min(this.stepVXN, by);
     }
 
     /**
      * Move this object in the Y axis.
      */
     mutating this void moveY(num by) {
-        this.y += by;
-    }
-
-    /**
-     * Move this object in the X axis to the minimum of its current location and
-     * the given location.
-     */
-    mutating this void minX(num to) {
-        this.x = Math.min(this.x, to);
-    }
-
-    /**
-     * Move this object in the Y axis to the minimum of its current location and
-     * the given location.
-     */
-    mutating this void minY(num to) {
-        this.y = Math.min(this.y, to);
-    }
-
-    /**
-     * Move this object in the X axis to the maximum of its current location and
-     * the given location.
-     */
-    mutating this void maxX(num to) {
-        this.x = Math.max(this.x, to);
-    }
-
-    /**
-     * Move this object in the Y axis to the maximum of its current location and
-     * the given location.
-     */
-    mutating this void maxY(num to) {
-        this.y = Math.max(this.y, to);
+        if (by >= 0)
+            this.stepVYP = Math.max(this.stepVYP, by);
+        else
+            this.stepVYN = Math.min(this.stepVYN, by);
     }
 
     /**
@@ -735,6 +783,11 @@ export class Object : Root {
      * Location of this object on the stage, and its bounding box.
      */
     num x, y, z, bbx1, bbx2 = 1, bby1, bby2 = 1;
+
+    /**
+     * Movement given to the object this tick, in each axis and direction.
+     */
+    num stepVXP, stepVXN, stepVYP, stepVYN;
 }
 
 /**
@@ -748,6 +801,20 @@ export class Motile : Object {
         suggestion ret = super();
         this.x += this.vx;
         this.y += this.vy;
+        this.stepAXP = 0;
+        this.stepAXN = 0;
+        this.stepAYP = 0;
+        this.stepAYN = 0;
+        return ret;
+    }
+
+    /**
+     * React by applying acceleration.
+     */
+    override mutating this suggestion react() {
+        suggestion ret = super();
+        this.vx += this.stepAXP + this.stepAXN;
+        this.vy += this.stepAYP + this.stepAYN;
         return ret;
     }
 
@@ -816,34 +883,31 @@ export class Motile : Object {
      * Accessor for acceleration in suggestions.
      */
     mutating this void accelerateX(num by) {
-        this.vx += by;
+        if (by >= 0)
+            this.stepAXP = Math.max(this.stepAXP, by);
+        else
+            this.stepAXN = Math.min(this.stepAXN, by);
     }
 
     /**
      * Accessor for acceleration in suggestions.
      */
     mutating this void accelerateY(num by) {
-        this.vy += by;
-    }
-
-    /**
-     * *Stop* this object in X.
-     */
-    mutating this void stopX() {
-        this.vx = 0;
-    }
-
-    /**
-     * *Stop* this object in Y.
-     */
-    mutating this void stopY() {
-        this.vy = 0;
+        if (by >= 0)
+            this.stepAYP = Math.max(this.stepAYP, by);
+        else
+            this.stepAYN = Math.min(this.stepAYN, by);
     }
 
     /**
      * Velocity.
      */
     num vx, vy;
+
+    /**
+     * Acceleration in each direction in each axis this tick.
+     */
+    num stepAXP, stepAXN, stepAYP, stepAYN;
 }
 
 /**

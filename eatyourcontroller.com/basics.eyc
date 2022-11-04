@@ -22,12 +22,12 @@ alias core.*;
 
 // Explicitly immobile things (such as gravity)
 export class Immobile : Object {
-    override mutating this void moveX(num by) {}
-    override mutating this void moveY(num by) {}
-    override mutating this void minX(num to) {}
-    override mutating this void minY(num to) {}
-    override mutating this void maxX(num to) {}
-    override mutating this void maxY(num to) {}
+    override mutating this suggestion react() {
+        // Force our stepwise motion to be nil
+        this.stepVXP = this.stepVXN =
+            this.stepVYP = this.stepVYN = 0;
+        return super();
+    }
 }
 
 /* Gravity is simply an object over the whole map (or any subarea that has
@@ -143,26 +143,26 @@ export class Wall : ObjectSprite {
                 if (this.blocking[dir]) {
                     if (dir == "n") {
                         ret = ret suggest {
-                            other.minY(this.y + this.bby1 - other.bby2);
-                            other.stopY();
+                            other.moveY(this.y + this.bby1 - other.bby2 - other.y);
+                            other.accelerateY(-other.vy);
                         };
 
                     } else if (dir == "e") {
                         ret = ret suggest {
-                            other.maxX(this.x + this.bbx2 - other.bbx1);
-                            other.stopX();
+                            other.moveX(this.x + this.bbx2 - other.bbx1 - other.x);
+                            other.accelerateX(-other.vx);
                         };
 
                     } else if (dir == "s") {
                         ret = ret suggest {
-                            other.maxY(this.y + this.bbx2 - other.bbx1);
-                            other.stopY();
+                            other.moveY(this.y + this.bby2 - other.bby1 - other.y);
+                            other.accelerateY(-other.vy);
                         };
 
                     } else if (dir == "w") {
                         ret = ret suggest {
-                            other.minX(this.x + this.bbx1 - other.bbx2);
-                            other.stopX();
+                            other.moveX(this.x + this.bbx1 - other.bbx2 - other.x);
+                            other.accelerateX(-other.vx);
                         };
 
                     }
@@ -174,56 +174,6 @@ export class Wall : ObjectSprite {
 
     // Directions that this wall is meant to block
     set(string) blocking;
-}
-
-/* N-way walls are similar to walls, but only prevent movement of motile
- * objects, and only if they're moving in the wall's blocking direction */
-export class NWayWall : Wall {
-    // Check for momentum before blocking
-    override suggestion interact(
-        array(tuple(Interaction, Interaction)) interactions
-    ) {
-        suggestion ret = super(interactions);
-        for (tuple(Interaction, Interaction) ip in interactions) {
-            Interaction i = ip[1];
-            Motile other = i.from : Motile;
-            if (other is Motile) {
-                string dirs = i.dir(0x.4);
-
-                // Bump them in the appropriate direction(s)
-                for (string dir in dirs) {
-                    if (this.blocking[dir]) {
-                        if (dir == "n" && other.vy > 0) {
-                            ret = ret suggest {
-                                other.minY(this.y + this.bby1 - other.bby2);
-                                other.stopY();
-                            };
-
-                        } else if (dir == "e" && other.vx < 0) {
-                            ret = ret suggest {
-                                other.maxX(this.x + this.bbx2 - other.bbx1);
-                                other.stopX();
-                            };
-
-                        } else if (dir == "s" && other.vy < 0) {
-                            ret = ret suggest {
-                                other.maxY(this.y + this.bbx2 - other.bbx1);
-                                other.stopY();
-                            };
-
-                        } else if (dir == "w" && other.vx > 0) {
-                            ret = ret suggest {
-                                other.minX(this.x + this.bbx1 - other.bbx2);
-                                other.stopX();
-                            };
-
-                        }
-                    }
-                }
-            }
-        }
-        return ret;
-    }
 }
 
 /* Walls where the sprite is defined differently based on the blocking
@@ -266,36 +216,48 @@ export class AdjacencyDetector : Object {
             this.detectors = new {
                 // N
                 this += new AdjacencyDetectorPart {
-                    this.init("n", self.x + self.bbx1 + qw,
-                              self.y + self.bby1 - 0x.1, self.z,
-                              hw, 0x.1);
+                    this.init("n", self.z, hw, 0x.1);
+                };
+                // NE
+                this += new AdjacencyDetectorPart {
+                    this.init("ne", self.z, 0x.1, 0x.1);
                 };
                 // E
                 this += new AdjacencyDetectorPart {
-                    this.init("e", self.x + self.bbx2,
-                              self.y + self.bby1 + qh, self.z,
-                              0x.1, hh);
+                    this.init("e", self.z, 0x.1, hh);
+                };
+                // SE
+                this += new AdjacencyDetectorPart {
+                    this.init("se", self.z, 0x.1, 0x.1);
                 };
                 // S
                 this += new AdjacencyDetectorPart {
-                    this.init("s", self.x + self.bbx1 + qw,
-                              self.y + self.bby2, self.z,
-                              hw, 0x.1);
+                    this.init("s", self.z, hw, 0x.1);
+                };
+                // SW
+                this += new AdjacencyDetectorPart {
+                    this.init("sw", self.z, 0x.1, 0x.1);
                 };
                 // W
                 this += new AdjacencyDetectorPart {
-                    this.init("w", self.x + self.bbx1 - 0x.1,
-                              self.y + self.bby1 + qh, self.z,
-                              0x.1, hh);
+                    this.init("w", self.z, 0x.1, hh);
+                };
+                // NW
+                this += new AdjacencyDetectorPart {
+                    this.init("nw", self.z, 0x.1, 0x.1);
                 };
             };
 
             // Get them by direction
             this.detectorsByDir = new {
                 this["n"] = self.detectors[0];
-                this["e"] = self.detectors[1];
-                this["s"] = self.detectors[2];
-                this["w"] = self.detectors[3];
+                this["ne"] = self.detectors[1];
+                this["e"] = self.detectors[2];
+                this["se"] = self.detectors[3];
+                this["s"] = self.detectors[4];
+                this["sw"] = self.detectors[5];
+                this["w"] = self.detectors[6];
+                this["nw"] = self.detectors[7];
             };
 
             // Add them to the stage
@@ -311,17 +273,29 @@ export class AdjacencyDetector : Object {
         array(AdjacencyDetectorPart) add = this.detectors;
         return ret suggest {
             // N
-            add[0].moveX(this.x + this.bbx1 + qw - add[0].x);
-            add[0].moveY(this.y + this.bby1 - 0x.1 - add[0].y);
+            add[0].detectorSetX(this.x + this.bbx1 + qw);
+            add[0].detectorSetY(this.y + this.bby1 - 0x.1);
+            // NE
+            add[1].detectorSetX(this.x + this.bbx2);
+            add[1].detectorSetY(this.y + this.bby1 - 0x.1);
             // E
-            add[1].moveX(this.x + this.bbx2 - add[1].x);
-            add[1].moveY(this.y + this.bby1 + qh - add[1].y);
+            add[2].detectorSetX(this.x + this.bbx2);
+            add[2].detectorSetY(this.y + this.bby1 + qh);
+            // SE
+            add[3].detectorSetX(this.x + this.bbx2);
+            add[3].detectorSetY(this.y + this.bby2);
             // S
-            add[2].moveX(this.x + this.bbx1 + qw - add[2].x);
-            add[2].moveY(this.y + this.bby2 - add[2].y);
+            add[4].detectorSetX(this.x + this.bbx1 + qw);
+            add[4].detectorSetY(this.y + this.bby2);
+            // SW
+            add[5].detectorSetX(this.x + this.bbx1 - 0x.1);
+            add[5].detectorSetY(this.y + this.bby2);
             // W
-            add[3].moveX(this.x + this.bbx1 - 0x.1 - add[3].x);
-            add[3].moveY(this.y + this.bby1 + qh - add[3].y);
+            add[6].detectorSetX(this.x + this.bbx1 - 0x.1);
+            add[6].detectorSetY(this.y + this.bby1 + qh);
+            // NW
+            add[7].detectorSetX(this.x + this.bbx1 - 0x.1);
+            add[7].detectorSetY(this.y + this.bby1 - 0x.1);
         };
     }
 
@@ -336,10 +310,8 @@ export class AdjacencyDetector : Object {
 
 // Helper class for AdjacencyDetector
 class AdjacencyDetectorPart : Object {
-    mutating this void init(string dir, num x, num y, num z, num w, num h) {
+    mutating this void init(string dir, num z, num w, num h) {
         this.dir = dir;
-        this.x = x;
-        this.y = y;
         this.z = z;
         this.bbx2 = w;
         this.bby2 = h;
@@ -367,6 +339,14 @@ class AdjacencyDetectorPart : Object {
     // Internal
     mutating this void setDetected(set(string) to) {
         this.detected = to;
+    }
+
+    mutating this void detectorSetX(num to) {
+        this.x = to;
+    }
+
+    mutating this void detectorSetY(num to) {
+        this.y = to;
     }
 
     string dir;
