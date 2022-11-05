@@ -169,24 +169,26 @@ onmessage = function(ev) {
                         if (mainTick)
                             clearInterval(mainTick);
                         mainTick = setInterval(async () => {
-                            if (!hadFrame)
-                                return;
-                            hadFrame = false;
-                            eyc.ts++;
-
                             /* 1: Get input from the controller(s) and pass that
                              * in */
                             const inp: string[] & types.EYCArray = <any> (await eyc.ext.input());
                             inp.prefix = "main";
                             inp.id = `main$${eyc.freshId()}`;
                             inp.valueType = "string";
-                            (<any> main.methods.$$core$Stage$input)(eyc, main, eyc.nil, inp);
+
+                            // 2: Update the frame
+                            let syncFrame = hadFrame;
+                            hadFrame = false;
+                            eyc.ts++;
 
                             // 2: Do the frame's actions
+                            (<any> main.methods.$$core$Stage$input)(eyc, main, eyc.nil, inp);
                             main.methods.$$core$Stage$tick(eyc, main, eyc.nil);
 
-                            // 3: Request the frame update from the frontend
-                            eyc.frame();
+                            /* 3: Request the frame update from the frontend,
+                             * unless we're dropping frames */
+                            if (syncFrame)
+                                eyc.frame();
                         }, 1000/60);
                     }
                     break;
