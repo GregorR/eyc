@@ -160,9 +160,8 @@ export async function eyc(
             main.extend(emodule.main.klass.prefix);
             main.methods.$$core$Program$init(eyc, main, eyc.nil);
             this.frame();
-            frontendP = frontendP.then(() => {
-                hadFrame = true;
-            });
+            await frontendP;
+            hadFrame = true;
 
             // And start it ticking
             mainTick = setInterval(async () => {
