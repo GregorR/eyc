@@ -72,6 +72,9 @@ export type EYCElementType =
     EYCElementTypeVirt | EYCElementTypeType;
 
 export interface EYC {
+    // The main method: run this EYC program
+    go: (url: string) => void;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     compiler: any; // Actually the compiler module
 

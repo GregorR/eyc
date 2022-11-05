@@ -27,12 +27,6 @@ const settings = {
 };
 let eyc: types.EYC = null;
 
-// The main frame ticks
-let mainTick: any = null;
-
-// A tick event can only happen once a frame event has happened
-let hadFrame = false;
-
 // How we filter replies
 interface ReplyFilter {
     pattern: any;
@@ -68,7 +62,6 @@ const eycExtWorker: types.EYCExt = {
     frame: async function() {
         postMessage({c: "frame"});
         await awaitReply("frame");
-        hadFrame = true;
     },
 
     input: async function() {
@@ -150,49 +143,13 @@ onmessage = function(ev) {
                     break;
 
                 case "go":
-                {
                     // Make a fresh EYC instance
                     eyc = await EYC.eyc();
                     eyc.ext = eycExtWorker;
 
-                    // Load the requested URL
-                    const emodule = await eyc.importModule(msg.url);
-
-                    // Create an instance of the main class
-                    if (emodule.main) {
-                        const main = new eyc.Object("main");
-                        main.extend(emodule.main.klass.prefix);
-                        main.methods.$$core$Program$init(eyc, main, eyc.nil);
-                        eyc.frame();
-
-                        // And start it ticking
-                        if (mainTick)
-                            clearInterval(mainTick);
-                        mainTick = setInterval(async () => {
-                            /* 1: Get input from the controller(s) and pass that
-                             * in */
-                            const inp: string[] & types.EYCArray = <any> (await eyc.ext.input());
-                            inp.prefix = "main";
-                            inp.id = `main$${eyc.freshId()}`;
-                            inp.valueType = "string";
-
-                            // 2: Update the frame
-                            let syncFrame = hadFrame;
-                            hadFrame = false;
-                            eyc.ts++;
-
-                            // 2: Do the frame's actions
-                            (<any> main.methods.$$core$Stage$input)(eyc, main, eyc.nil, inp);
-                            main.methods.$$core$Stage$tick(eyc, main, eyc.nil);
-
-                            /* 3: Request the frame update from the frontend,
-                             * unless we're dropping frames */
-                            if (syncFrame)
-                                eyc.frame();
-                        }, 1000/60);
-                    }
+                    // And go
+                    eyc.go(msg.url);
                     break;
-                }
 
                 default:
                     if (replies[msg.c]) {

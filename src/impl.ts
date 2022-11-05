@@ -143,6 +143,57 @@ export async function eyc(
     const sprites: Record<string, string> = Object.create(null);
 
     const eyc: types.EYC = {
+    // Run this program
+    async go(url: string) {
+        // Main clock
+        let mainTick: any = null;
+
+        // Set when we've had a frame
+        let hadFrame = false;
+
+        // Load the requested URL
+        const emodule = await this.importModule(url);
+
+        // Create an instance of the main class
+        if (emodule.main) {
+            const main = new this.Object("main");
+            main.extend(emodule.main.klass.prefix);
+            main.methods.$$core$Program$init(eyc, main, eyc.nil);
+            this.frame();
+            frontendP = frontendP.then(() => {
+                hadFrame = true;
+            });
+
+            // And start it ticking
+            mainTick = setInterval(async () => {
+                /* 1: Get input from the controller(s) and pass that
+                 * in */
+                const inp: string[] & types.EYCArray = <any> (await this.ext.input());
+                inp.prefix = "main";
+                inp.id = `main$${eyc.freshId()}`;
+                inp.valueType = "string";
+
+                // 2: Update the frame
+                let syncFrame = hadFrame;
+                hadFrame = false;
+                this.ts++;
+
+                // 2: Do the frame's actions
+                (<any> main.methods.$$core$Stage$input)(eyc, main, eyc.nil, inp);
+                main.methods.$$core$Stage$tick(eyc, main, eyc.nil);
+
+                /* 3: Request the frame update from the frontend,
+                 * unless we're dropping frames */
+                if (syncFrame) {
+                    this.frame();
+                    frontendP = frontendP.then(() => {
+                        hadFrame = true;
+                    });
+                }
+            }, 1000/60);
+        }
+    },
+
     compiler: compiler,
     counter: [0],
     ts: 0,
