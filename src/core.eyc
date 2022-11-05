@@ -421,46 +421,43 @@ export class Stage : Program {
         // Step 3: Determine interactions
         map(Object, set(Object)) interactionsFound = new;
         map(Object, array(tuple(Interaction, Interaction))) interactions = new;
+        // First, motile objects
         for (Object o1 in this.objects) {
             if (o1 is Motile) {
                 Motile m = o1 : Motile;
                 num bbw = Math.max(m.bbw(), 0x.1),
                     bbh = Math.max(m.bbh(), 0x.1);
 
-                /* If it's fast-moving (beats its own bounding box), we'll have
-                 * to do it in stages */
-                if (m.vx < -bbw || m.vx > bbw ||
-                    m.vy < -bbh || m.vy > bbh) {
-                    num tx = m.x, ty = m.y,
+                // Detect interactions in stages so the directions make sense
+                num tx = m.x, ty = m.y,
 
-                        fx = tx - m.vx,
-                        fy = ty - m.vy,
+                    fx = tx - m.vx,
+                    fy = ty - m.vy,
 
-                        steps = Math.max(
-                            Math.ceil(Math.abs(m.vx) / bbw),
-                            Math.ceil(Math.abs(m.vy) / bbh)
-                        ),
+                    steps = Math.max(
+                        Math.ceil(Math.abs(m.vx) / 0x.1),
+                        Math.ceil(Math.abs(m.vy) / 0x.1)
+                    ),
 
-                        sx = m.vx / steps, sy = m.vy / steps;
+                    sx = m.vx / steps, sy = m.vy / steps;
 
-                    m.x = fx;
-                    m.y = fy;
-                    for (num step = 0; step <= steps; step++) {
-                        this.determineInteractions(interactionsFound,
-                            interactions, m);
-                        m.x += sx;
-                        m.y += sy;
-                    }
-                    m.x = tx;
-                    m.y = ty;
-
-                } else {
-                    this.determineInteractions(interactionsFound, interactions,
-                        o1);
+                m.x = fx;
+                m.y = fy;
+                for (num step = 0; step <= steps; step++) {
+                    this.determineInteractions(interactionsFound,
+                        interactions, m);
+                    m.x += sx;
+                    m.y += sy;
                 }
-            } else {
-                this.determineInteractions(interactionsFound, interactions, o1);
+                m.x = tx;
+                m.y = ty;
+
             }
+        }
+        // Then, any non-motile objects
+        for (Object o1 in this.objects) {
+            if (!(o1 is Motile))
+                this.determineInteractions(interactionsFound, interactions, o1);
         }
 
         // Step 4: Pre-interaction
