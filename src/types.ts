@@ -162,6 +162,7 @@ export interface EYC {
     methodTables: Record<string, Record<string, CompiledFunction>>;
 
     // Other heap types
+    emptyArray: (prefix: string, valueType: string) => EYCArray;
     Map: {
         new (
             prefix: string, keyType: string, valueType: string,

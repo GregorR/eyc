@@ -377,7 +377,6 @@ export class Stage : Program {
      * Initialize the stage, mainly by connecting to the frontend.
      */
     override mutating void init() {
-        this.players = new;
         this.extStage = @js (dw=this.dw, dh=this.dh, ex=this.ex) {
             return eyc.newStage(dw, dh, ex);
         } : string;

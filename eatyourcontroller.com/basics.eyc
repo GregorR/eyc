@@ -309,7 +309,7 @@ export class AdjacencyDetector : Object {
         return this.detectorsByDir[dir].detected[type];
     }
 
-    array(AdjacencyDetectorPart) detectors;
+    array(AdjacencyDetectorPart) detectors = null;
     map(string, AdjacencyDetectorPart) detectorsByDir;
 }
 

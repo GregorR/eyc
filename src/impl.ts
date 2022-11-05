@@ -679,8 +679,13 @@ export async function eyc(
                        (<types.ArrayType> other).valueType, opts);
         }
 
-        default() {
-            return "eyc.nil";
+        default(opts?: types.DefaultValueOpts) {
+            if (opts && opts.build)
+                return "eyc.emptyArray(self.prefix," +
+                    JSON.stringify(this.valueType.basicType()) +
+                    ")";
+            else
+                return "eyc.nil";
         }
 
         basicType() {
@@ -1079,6 +1084,16 @@ export async function eyc(
 
     // Cache for manifested method tables
     methodTables: Object.create(null),
+
+    /* Arrays are usually created manually, but empty arrays can be created with
+     * this helper */
+    emptyArray(prefix: string, valueType: string) {
+        const ret: types.EYCArray = <types.EYCArray> [];
+        ret.prefix = prefix;
+        ret.id = `prefix$${this.freshId()}`;
+        ret.valueType = valueType;
+        return ret;
+    },
 
     // Maps with an ID
     Map: class extends Map<unknown, unknown> implements types.EYCMap {

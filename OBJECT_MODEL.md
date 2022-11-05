@@ -41,7 +41,8 @@ Arrays are JavaScript Arrays. In addition, they have an `id` field, like
 objects, and a `valueType` field, which stores the basic type of the array's
 elements as a string.
 
-The default array is `null`.
+The default array is `null`. Array fields in objects are initialized to an empty
+array, not `null`.
 
 
 # Tuples
