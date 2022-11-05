@@ -110,7 +110,11 @@ class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
                 this.vx = -this.nextVX;
             } else if (this.detected("e", "solid") && this.nextVX > 0) {
                 this.vx = -this.nextVX;
+            } else {
+                this.vx = this.nextVX;
             }
+        } else {
+            this.vx = this.nextVX;
         }
 
         if (this.vx == 0 && this.animationFrames != this.idleFrames)
