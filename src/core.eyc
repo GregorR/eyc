@@ -1024,11 +1024,43 @@ export class Interaction : Root {
     string type;
 
     /**
-     * Initialization.
+     * Intermediate data used to calculate directions.
+     * @private
+     */
+    num o1x1, o1x2, o1y1, o1y2, o2x1, o2x2, o2y1, o2y2,
+        xOverlap, yOverlap;
+
+    /**
+     * Initialization. Also computes the overlap so that the direction of
+     * interaction can be received later.
      */
     mutating this void init(Object f, Object t) {
         this.from = f;
         this.to = t;
+
+        // Information needed for overlaps
+        this.o1x1 = f.x + f.bbx1;
+        this.o1x2 = f.x + f.bbx2;
+        this.o1y1 = f.y + f.bby1;
+        this.o1y2 = f.y + f.bby2;
+        this.o2x1 = t.x + t.bbx1;
+        this.o2x2 = t.x + t.bbx2;
+        this.o2y1 = t.y + t.bby1;
+        this.o2y2 = t.y + t.bby2;
+
+        /* Find what portion overlaps in each axis (NOTE: If one entirely
+         * overlaps the other, then this gives an incorrect result, but in a
+         * harmless way) */
+        num w = t.bbx2 - t.bbx1;
+        this.xOverlap = Math.min(
+            Math.abs(this.o1x2 - this.o2x1),
+            Math.abs(this.o2x2 - this.o1x1)
+        ) / w;
+        num h = t.bby2 - t.bby1;
+        this.yOverlap = Math.min(
+            Math.abs(this.o1y2 - this.o2y1),
+            Math.abs(this.o2y2 - this.o1y1)
+        ) / h;
     }
 
     /**
@@ -1038,45 +1070,23 @@ export class Interaction : Root {
      * sw s se
      *
      * Note that this is the position of *from* relative to *to*, so if the
-     * direction is 'n', then from is above to.
+     * direction is 'n', then from is above to. "Corner" is how much corner
+     * overlap should count, e.g., how far in the corner the object has to be to
+     * get nw instead of n.
      */
     string dir(num corner) {
-        if (this.from is Motile) {
-            // It's the direction the object is coming from
-            return (this.from : Motile).dirRev();
-        } else if (this.to is Motile) {
-            // It's the direction this object is going towards
-            return (this.to : Motile).dir();
-        }
-
-        // Nothing motile, use the non-motile version
-        return this.dirNonMotile(corner);
-    }
-
-    /**
-     * Get the direction of this interaction, ignoring velocity and focusing
-     * only on location.
-     */
-    string dirNonMotile(num corner) {
-        // Need to look for overlaps
-        num o1x1 = this.from.x + this.from.bbx1,
-            o1x2 = this.from.x + this.from.bbx2,
-            o1y1 = this.from.y + this.from.bby1,
-            o1y2 = this.from.y + this.from.bby2,
-            o2x1 = this.to.x + this.from.bbx1,
-            o2x2 = this.to.x + this.to.bbx2,
-            o2y1 = this.to.y + this.to.bby1,
-            o2y2 = this.to.y + this.to.bby2;
-
         string rwe, rns, r;
 
-        /* Find what portion overlaps in each axis (NOTE: If one entirely
-         * overlaps the other, then this gives an incorrect result, but in a
-         * harmless way) */
+        num o1x1 = this.o1x1,
+            o1x2 = this.o1x2,
+            o1y1 = this.o1y1,
+            o1y2 = this.o1y2,
+            o2x1 = this.o2x1,
+            o2x2 = this.o2x2,
+            o2y1 = this.o2y1,
+            o2y2 = this.o2y2;
         num w = this.to.bbx2 - this.to.bbx1;
-        num xOverlap = Math.min(Math.abs(o1x2 - o2x1), Math.abs(o2x2 - o1x1)) / w;
         num h = this.to.bby2 - this.to.bby1;
-        num yOverlap = Math.min(Math.abs(o1y2 - o2y1), Math.abs(o2y2 - o1y1)) / h;
 
         // Find the direction of overlap in each axis
         if (o1x2 < o2x2) {
@@ -1102,11 +1112,11 @@ export class Interaction : Root {
             rns = "s";
 
         // Choose which parts we care about
-        if ((xOverlap < corner && yOverlap < corner) ||
-            (xOverlap >= corner && yOverlap >= corner)) {
+        if ((this.xOverlap < corner && this.yOverlap < corner) ||
+            (this.xOverlap >= corner && this.yOverlap >= corner)) {
             // Corner or huge overlap
             r = rns + rwe;
-        } else if (xOverlap >= corner) {
+        } else if (this.xOverlap >= corner) {
             // Overlap in the X axis = touched in the Y axis
             r = rns;
         } else { // yOverlap >= corner
@@ -1120,7 +1130,6 @@ export class Interaction : Root {
 
         return r;
     }
-
 }
 
 /**

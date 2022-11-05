@@ -136,36 +136,38 @@ export class Wall : ObjectSprite {
         for (tuple(Interaction, Interaction) ip in interactions) {
             Interaction i = ip[1];
             Motile other = i.from : Motile;
-            string dirs = i.dir(0x.4);
+            string dir = i.dir(0x.2);
+            if (this.preferEW)
+                dir = dir[dir.length-1];
+            else
+                dir = dir[0];
 
-            // Bump them in the appropriate direction(s)
-            for (string dir in dirs) {
-                if (this.blocking[dir]) {
-                    if (dir == "n") {
-                        ret = ret suggest {
-                            other.moveY(this.y + this.bby1 - other.bby2 - other.y);
-                            other.accelerateY(-other.vy);
-                        };
+            // Bump them in the appropriate direction
+            if (this.blocking[dir]) {
+                if (dir == "n") {
+                    ret = ret suggest {
+                        other.moveY(this.y + this.bby1 - other.bby2 - other.y);
+                        other.accelerateY(-other.vy);
+                    };
 
-                    } else if (dir == "e") {
-                        ret = ret suggest {
-                            other.moveX(this.x + this.bbx2 - other.bbx1 - other.x);
-                            other.accelerateX(-other.vx);
-                        };
+                } else if (dir == "e") {
+                    ret = ret suggest {
+                        other.moveX(this.x + this.bbx2 - other.bbx1 - other.x);
+                        other.accelerateX(-other.vx);
+                    };
 
-                    } else if (dir == "s") {
-                        ret = ret suggest {
-                            other.moveY(this.y + this.bby2 - other.bby1 - other.y);
-                            other.accelerateY(-other.vy);
-                        };
+                } else if (dir == "s") {
+                    ret = ret suggest {
+                        other.moveY(this.y + this.bby2 - other.bby1 - other.y);
+                        other.accelerateY(-other.vy);
+                    };
 
-                    } else if (dir == "w") {
-                        ret = ret suggest {
-                            other.moveX(this.x + this.bbx1 - other.bbx2 - other.x);
-                            other.accelerateX(-other.vx);
-                        };
+                } else if (dir == "w") {
+                    ret = ret suggest {
+                        other.moveX(this.x + this.bbx1 - other.bbx2 - other.x);
+                        other.accelerateX(-other.vx);
+                    };
 
-                    }
                 }
             }
         }
@@ -174,6 +176,9 @@ export class Wall : ObjectSprite {
 
     // Directions that this wall is meant to block
     set(string) blocking;
+
+    // If set, prefer to block east-west instead of (default) north-south
+    bool preferEW;
 }
 
 /* Walls where the sprite is defined differently based on the blocking
