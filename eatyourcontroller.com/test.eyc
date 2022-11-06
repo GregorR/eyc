@@ -25,10 +25,14 @@ garment Test test.txt;
 
 export main class Main : robots.RobotsStage {
     override mutating once void init() {
+        this.dw = 24;
+        this.dh = 16;
         this.layout = Test;
         super();
         num w = this.w;
         num h = this.h;
+
+        this.addSprite(cota.Forest.bg, 0, 0, -1, "");
 
         Gravity g = new {
             this.z = 1;

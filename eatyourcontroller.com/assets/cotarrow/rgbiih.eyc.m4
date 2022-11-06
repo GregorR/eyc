@@ -48,6 +48,14 @@ spritesheet([[Sprites]], [["rgbiih.png"]], [[]])
 spritesheet([[Outlines]], [["rgbiih-outline.png"]],
             [[, multX=10, multY=10]])
 
+define([[spritebg]], [[
+export sprites $1 $2 {
+    bg (0, 0, 24, 16, scale=8);
+}
+]])
+
+spritebg([[Forest]], [["rgbiih-forest.png"]])
+
 export class COTAOutline : Shadow, ObjectSprite {
     override tuple(string, string) staticSprite() {
         ObjectSprite s = this.shadowed : ObjectSprite;

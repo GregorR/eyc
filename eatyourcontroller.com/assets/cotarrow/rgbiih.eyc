@@ -65,6 +65,14 @@ export sprites Outlines "rgbiih-outline.png" {
 }
 
 
+
+
+
+export sprites Forest "rgbiih-forest.png" {
+    bg (0, 0, 24, 16, scale=8);
+}
+
+
 export class COTAOutline : Shadow, ObjectSprite {
     override tuple(string, string) staticSprite() {
         ObjectSprite s = this.shadowed : ObjectSprite;
