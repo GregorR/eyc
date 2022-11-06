@@ -619,7 +619,7 @@ export class ObjectSprite : Object {
 /**
  * An interaction (or interaction in potentia) between two objects.
  */
-export class Interaction : Root {
+export class Interaction {
     /**
      * The object this interaction is being caused by and happening to. Every
      * interaction comes as a pair, with the other having from and to swapped.
@@ -743,7 +743,7 @@ export class Interaction : Root {
 /**
  * A player. Really just used to interact with the frontend.
  */
-export class Player : Root {
+export class Player {
     /**
      * Each tick, we receive input from the player.
      */
@@ -768,7 +768,7 @@ export class Playing : Object {
  * State of input, as booleans for whether each controller button is pressed as
  * well as a set of pressed buttons.
  */
-export class InputState : Root {
+export class InputState {
     /**
      * Turn this input into press info.
      */
