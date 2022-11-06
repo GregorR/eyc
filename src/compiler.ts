@@ -3630,7 +3630,20 @@ class MethodCompilationState {
 
 
                 // "AddExp" |
-                case "add-array-array": throw new EYCTypeError(ssa.ctx, "No compiler for add-array-array");
+                case "add-array-array":
+                {
+                    const tmp = "$$" + (this.varCtr++);
+                    this.vars.push(tmp);
+                    const r = ssa.arg(ir, 2);
+                    const l = ssa.arg(ir, 1, false);
+                    ssa.expr = `(${tmp}=${l}.concat(${r}),` +
+                        `${tmp}.prefix=self.prefix,` +
+                        `${tmp}.id=self.prefix+"$"+eyc.freshId(),` +
+                        `${tmp}.valueType=${l}.valueType,` +
+                        `${tmp})`;
+                    break;
+                }
+
                 case "add-suggestion-suggestion":
                 {
                     const tmp = "$$" + (this.varCtr++);

@@ -1030,18 +1030,68 @@ export class MultiWall : Wall {
     tuple(string, string) multiWallStaticSprite;
 }
 
-// Objects capable of detecting surrounding objects
-export class AdjacencyDetector : Object {
+/**
+ * Shadow objects follow the location of the object they shadow automatically,
+ * for detection, animation, or any other purpose.
+ */
+export class Shadow : Object {
+    /**
+     * Must be called after the act stage by the shadowed object.
+     */
+    mutating this void shadow() {
+        Shadowed s = this.shadowed;
+
+        this.x = this.shadowCalc(s.x, s.bbx1, s.bbx2, this.shadowX);
+        this.bbx1 = this.shadowCalc(0, s.bbx1, s.bbx2, this.shadowBBX1);
+        this.bbx2 = this.shadowCalc(0, s.bbx1, s.bbx2, this.shadowBBX2);
+
+        this.y = this.shadowCalc(s.y, s.bby1, s.bby2, this.shadowY);
+        this.bby1 = this.shadowCalc(0, s.bby1, s.bby2, this.shadowBBY1);
+        this.bby2 = this.shadowCalc(0, s.bby1, s.bby2, this.shadowBBY2);
+    }
+
+    /**
+     * The shadow calculation is a + x + b(bbx1) + c(bbx2), to allow positioning
+     * relative to both bounding boxes and offset from x (or y).
+     */
+    num shadowCalc(num x, num bb1, num bb2, tuple(num, num, num) params) {
+        return params[0] + x + params[1] * bb1 + params[2] * bb2;
+    }
+
+    // The object that this object shadows
+    Shadowed shadowed;
+
+    // The parameters for this shadow, in each axis, for each property
+    tuple(num, num, num)
+        shadowX, shadowBBX1, shadowBBX2,
+        shadowY, shadowBBY1, shadowBBY2;
+}
+
+/**
+ * To use shadow objects, an object must have this class.
+ */
+export class Shadowed : Object {
     override mutating this suggestion act() {
         suggestion ret = super();
 
-        // FIXME: Detect if our width or height changes
-        num w = this.bbx2 - this.bbx1,
-            h = this.bby2 - this.bby1,
-            hw = w / 2,
-            hh = h / 2,
-            qw = hw / 2,
-            qh = hh / 2;
+        // Update every shadow object
+        for (Shadow s in this.shadows) {
+            ret = ret suggest {
+                s.shadow();
+            };
+        }
+
+        return ret;
+    }
+
+    // Shadow objects associated with this one
+    array(Shadow) shadows;
+}
+
+// Objects capable of detecting surrounding objects
+export class AdjacencyDetector : Shadowed {
+    override mutating this suggestion act() {
+        suggestion ret;
 
         if (!this.detectors) {
             // Set up our detectors
@@ -1050,37 +1100,39 @@ export class AdjacencyDetector : Object {
             this.detectors = new {
                 // N
                 this += new AdjacencyDetectorPart {
-                    this.init("n", self.z, hw, 0x.1);
+                    this.init("n", self, false, false, true, false);
                 };
                 // NE
                 this += new AdjacencyDetectorPart {
-                    this.init("ne", self.z, 0x.1, 0x.1);
+                    this.init("ne", self, true, false, false, false);
                 };
                 // E
                 this += new AdjacencyDetectorPart {
-                    this.init("e", self.z, 0x.1, hh);
+                    this.init("e", self, true, false, false, true);
                 };
                 // SE
                 this += new AdjacencyDetectorPart {
-                    this.init("se", self.z, 0x.1, 0x.1);
+                    this.init("se", self, true, true, false, false);
                 };
                 // S
                 this += new AdjacencyDetectorPart {
-                    this.init("s", self.z, hw, 0x.1);
+                    this.init("s", self, false, true, true, false);
                 };
                 // SW
                 this += new AdjacencyDetectorPart {
-                    this.init("sw", self.z, 0x.1, 0x.1);
+                    this.init("sw", self, false, true, false, false);
                 };
                 // W
                 this += new AdjacencyDetectorPart {
-                    this.init("w", self.z, 0x.1, hh);
+                    this.init("w", self, false, false, false, true);
                 };
                 // NW
                 this += new AdjacencyDetectorPart {
-                    this.init("nw", self.z, 0x.1, 0x.1);
+                    this.init("nw", self, false, false, false, false);
                 };
             };
+
+            this.shadows = this.shadows + (this.detectors : array(Shadow));
 
             // Get them by direction
             this.detectorsByDir = new {
@@ -1103,34 +1155,7 @@ export class AdjacencyDetector : Object {
             // FIXME: remove them when this object is removed
         }
 
-        // Move our detectors into place
-        array(AdjacencyDetectorPart) add = this.detectors;
-        return ret suggest {
-            // N
-            add[0].detectorSetX(this.x + this.bbx1 + qw);
-            add[0].detectorSetY(this.y + this.bby1 - 0x.1);
-            // NE
-            add[1].detectorSetX(this.x + this.bbx2);
-            add[1].detectorSetY(this.y + this.bby1 - 0x.1);
-            // E
-            add[2].detectorSetX(this.x + this.bbx2);
-            add[2].detectorSetY(this.y + this.bby1 + qh);
-            // SE
-            add[3].detectorSetX(this.x + this.bbx2);
-            add[3].detectorSetY(this.y + this.bby2);
-            // S
-            add[4].detectorSetX(this.x + this.bbx1 + qw);
-            add[4].detectorSetY(this.y + this.bby2);
-            // SW
-            add[5].detectorSetX(this.x + this.bbx1 - 0x.1);
-            add[5].detectorSetY(this.y + this.bby2);
-            // W
-            add[6].detectorSetX(this.x + this.bbx1 - 0x.1);
-            add[6].detectorSetY(this.y + this.bby1 + qh);
-            // NW
-            add[7].detectorSetX(this.x + this.bbx1 - 0x.1);
-            add[7].detectorSetY(this.y + this.bby1 - 0x.1);
-        };
+        return super() + ret;
     }
 
     // Determine what we've detected
@@ -1143,12 +1168,35 @@ export class AdjacencyDetector : Object {
 }
 
 // Helper class for AdjacencyDetector
-class AdjacencyDetectorPart : Object {
-    mutating this void init(string dir, num z, num w, num h) {
+class AdjacencyDetectorPart : Shadow {
+    mutating this void init(
+        string dir, AdjacencyDetector shadowed, bool offX, bool offY,
+        bool multX, bool multY
+    ) {
         this.dir = dir;
-        this.z = z;
-        this.bbx2 = w;
-        this.bby2 = h;
+        this.shadowed = shadowed;
+        this.z = shadowed.z;
+
+        if (offX)
+            this.shadowX = tuple(0, 0, 1);
+        else
+            this.shadowX = tuple(-0x.1, 1, 0);
+        if (offY)
+            this.shadowY = tuple(0, 0, 1);
+        else
+            this.shadowY = tuple(-0x.1, 1, 0);
+        if (multX) {
+            this.shadowBBX1 = tuple(0x.1, -0x.4, 0x.4);
+            this.shadowBBX2 = tuple(0x.1, -0x.c, 0x.c);
+        } else {
+            this.shadowBBX2 = tuple(0x.1, 0, 0);
+        }
+        if (multY) {
+            this.shadowBBY1 = tuple(0x.1, -0x.4, 0x.4);
+            this.shadowBBY2 = tuple(0x.1, -0x.c, 0x.c);
+        } else {
+            this.shadowBBY2 = tuple(0x.1, 0, 0);
+        }
     }
 
     override suggestion interact(
@@ -1173,14 +1221,6 @@ class AdjacencyDetectorPart : Object {
     // Internal
     mutating this void setDetected(set(string) to) {
         this.detected = to;
-    }
-
-    mutating this void detectorSetX(num to) {
-        this.x = to;
-    }
-
-    mutating this void detectorSetY(num to) {
-        this.y = to;
     }
 
     string dir;

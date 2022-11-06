@@ -122,7 +122,10 @@ class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
     override mutating this suggestion react() {
         suggestion ret = super();
 
-        if (this.detected("n", "solid") || this.detected("s", "solid")) {
+        if (this.detected("s", "solid") || this.detected("sw", "solid") ||
+            this.detected("se", "solid") ||
+            this.detected("n", "solid") || this.detected("nw", "solid") ||
+            this.detected("ne", "solid")) {
             if (this.detected("w", "solid") && this.nextVX < 0) {
                 this.vx = -this.nextVX;
             } else if (this.detected("e", "solid") && this.nextVX > 0) {
@@ -196,8 +199,11 @@ class SimpleMotion :
             this.vx = 0;
             this.animationSpeed = 30;
         }
-        if (input.south && this.detected("s", "solid"))
+        if (input.south &&
+            (this.detected("s", "solid") || this.detected("sw", "solid") ||
+             this.detected("se", "solid"))) {
             this.vy = -0x.7;
+        }
         return ret;
     }
 
