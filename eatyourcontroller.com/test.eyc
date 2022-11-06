@@ -32,7 +32,7 @@ export main class Main : robots.RobotsStage {
 
         Gravity g = new {
             this.z = 1;
-            this.gy = 0x.1;
+            this.gy = 0x.048;
             this.termY = 2;
             this.bbx2 = w;
             this.bby2 = h;
@@ -187,14 +187,17 @@ class SimpleMotion :
 {
     override mutating this suggestion takeInput(InputState input) {
         suggestion ret = super(input);
-        if (input.left)
-            this.vx = -0x.1;
-        else if (input.right)
-            this.vx = 0x.1;
-        else
+        this.animationSpeed = 5;
+        if (input.left) {
+            this.vx = -0x.3;
+        } else if (input.right) {
+            this.vx = 0x.3;
+        } else {
             this.vx = 0;
+            this.animationSpeed = 30;
+        }
         if (input.south && this.detected("s", "solid"))
-            this.vy = -1;
+            this.vy = -0x.7;
         return ret;
     }
 
