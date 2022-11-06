@@ -19,11 +19,12 @@ alias core.*;
 alias basics.*;
 
 import /eatyourcontroller.com/assets/0x72robots/rgbiih as robots;
+import /eatyourcontroller.com/assets/cotarrow/rgbiih as cota;
 
 garment Test test.txt;
 
 export main class Main : robots.RobotsStage {
-    override mutating void init() {
+    override mutating once void init() {
         this.layout = Test;
         super();
         num w = this.w;
@@ -37,8 +38,6 @@ export main class Main : robots.RobotsStage {
             this.bby2 = h;
         };
         this.addObject(g);
-
-        Robot last;
 
         num x = 30;
         for (string nm in [
@@ -56,13 +55,32 @@ export main class Main : robots.RobotsStage {
                 this.bby1 = 0x.1;
                 this.bby2 = 0x1.f;
             };
-            last = r;
             this.addObject(r);
         }
 
+        SimpleMotion sm = new {
+            this.x = 8;
+            this.z = 1;
+            this.bbx1 = 0x.1;
+            this.bbx2 = 0x.f;
+            this.bby1 = 0x.1;
+            this.bby2 = 0x.f;
+            this.animationFrames = this.idleFrames =
+                cota.Sprites.character.idle;
+            this.walkFrames = cota.Sprites.character.run;
+            /*
+            this.walkFrames = [
+                tuple(cota.Sprites : string, "character.run.1"),
+                tuple(cota.Sprites : string, "character.run.2"),
+                tuple(cota.Sprites : string, "character.run.3"),
+                tuple(cota.Sprites : string, "character.run.4"),
+                tuple(cota.Sprites : string, "character.run.5")
+            ];
+            */
+        };
+        this.addObject(sm);
         this.players = [new Player];
-        extend last : SimpleMotion;
-        this.players[0].controlling = last : Playing;
+        this.players[0].controlling = sm;
 
         Console.log("Hello!");
     }
@@ -76,8 +94,7 @@ export main class Main : robots.RobotsStage {
 
 class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
     mutating this void init(string nm) {
-        array(tuple(string, string)) idle =
-        this.animationFrames = this.idleFrames =  new {
+        this.animationFrames = this.idleFrames = new {
             num len = robots.Robots.robots.orange.length;
             for (num i = 1; i <= len; i++) {
                 this += tuple(robots.Robots : string,
@@ -165,7 +182,9 @@ class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
     num nextVX;
 }
 
-class SimpleMotion : Playing, Motile, AdjacencyDetector {
+class SimpleMotion :
+    Playing, Motile, AdjacencyDetector, AnimatedSprite, MirrorSprite
+{
     override mutating this suggestion takeInput(InputState input) {
         suggestion ret = super(input);
         if (input.left)
@@ -178,6 +197,18 @@ class SimpleMotion : Playing, Motile, AdjacencyDetector {
             this.vy = -1;
         return ret;
     }
+
+    override mutating this suggestion react() {
+        suggestion ret = super();
+        if (this.vx == 0 && this.animationFrames != this.idleFrames)
+            this.animationFrames = this.idleFrames;
+        else if (this.vx != 0 && this.animationFrames != this.walkFrames)
+            this.animationFrames = this.walkFrames;
+        return ret;
+    }
+
+    array(tuple(string, string)) idleFrames;
+    array(tuple(string, string)) walkFrames;
 }
 
 /*

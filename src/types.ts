@@ -148,7 +148,8 @@ export interface EYC {
 
     Method: {
         new (klass: EYCClass, name: string, mutating: boolean,
-             mutatingThis: boolean, retType: Type, paramTypes: Type[]): Method
+             mutatingThis: boolean, once: boolean, retType: Type,
+             paramTypes: Type[]): Method
     };
 
     // The one and true nil
@@ -414,6 +415,7 @@ export interface Method extends TypeLike {
     id: string;
     mutating: boolean;
     mutatingThis: boolean;
+    once: boolean;
     retType: Type;
     paramTypes: Type[];
 }
@@ -888,6 +890,7 @@ export type SSAOp =
     "this" |
     // "Caller" |
     // "JavaScriptExpression" |
+    "javascript" |
     "javascript-head" |
     "javascript-call" |
     // "NullLiteral" |

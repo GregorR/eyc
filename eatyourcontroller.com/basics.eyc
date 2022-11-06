@@ -114,7 +114,7 @@ export class Wall : ObjectSprite {
         };
     }
 
-    mutating this void init(string blocking) {
+    mutating this void initWall(string blocking) {
         this.setBlocking(blocking);
         this.bbx1 = 0;
         this.bbx2 = 1;
@@ -185,7 +185,7 @@ export class Wall : ObjectSprite {
  * direction(s) */
 export class MultiWall : Wall {
     mutating this void initMultiWall(string blocking) {
-        this.init(blocking);
+        this.initWall(blocking);
         this.multiWallStaticSprite = this.getSprite(blocking);
     }
 
@@ -453,7 +453,7 @@ export class GarmentStage : Stage {
 
     /* Initialize by loading a garment. Make sure you call this BEFORE super()
      * while doing init */
-    override mutating void init() {
+    override mutating once void init() {
         // First, figure out the width and height of the layout
         this.w = this.layout[0][0].length;
         this.h = this.layout[0].length;

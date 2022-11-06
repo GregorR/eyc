@@ -891,11 +891,12 @@ export async function eyc(
         id: string;
         mutating: boolean;
         mutatingThis: boolean;
+        once: boolean;
         retType: types.Type;
         paramTypes: types.Type[];
 
         constructor(klass: types.EYCClass, name: string, mutating: boolean,
-                mutatingThis: boolean, retType: types.Type,
+                mutatingThis: boolean, once: boolean, retType: types.Type,
                 paramTypes: types.Type[]) {
             this.type = "method";
             this.isTypeLike = true;
@@ -903,6 +904,7 @@ export async function eyc(
             this.id = klass.prefix + "$" + name;
             this.mutating = mutating;
             this.mutatingThis = mutatingThis;
+            this.once = once;
             this.retType = retType;
             this.paramTypes = paramTypes;
         }
@@ -911,7 +913,8 @@ export async function eyc(
             if (!other.isMethod) return false;
             const otherMethod = <types.Method> other;
             if (this.mutating !== otherMethod.mutating ||
-                this.mutatingThis !== otherMethod.mutatingThis)
+                this.mutatingThis !== otherMethod.mutatingThis ||
+                this.once !== otherMethod.once)
                 return false;
             if (!this.retType.equals(otherMethod.retType))
                 return false;

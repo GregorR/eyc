@@ -355,10 +355,12 @@ export class Console : Root {
 }
 
 /**
- * Abstract class for programs, which can be initialized and then run.
+ * Abstract class for programs, which can be initialized and then run. The usual
+ * convention in EYC is not to override init, but in this case, *do override
+ * init*.
  */
 export class Program : Root {
-    mutating void init() {}
+    mutating once void init() {}
 }
 
 /**
@@ -376,7 +378,7 @@ export class Stage : Program {
     /**
      * Initialize the stage, mainly by connecting to the frontend.
      */
-    override mutating void init() {
+    override mutating once void init() {
         this.extStage = @js (dw=this.dw, dh=this.dh, ex=this.ex) {
             return eyc.newStage(dw, dh, ex);
         } : string;
@@ -526,9 +528,9 @@ export class Stage : Program {
 
                             // Add the interaction pair to the arrays
                             Interaction i1 = new {
-                                this.init(o1, o2);
+                                this.initInteraction(o1, o2);
                             }, i2 = new {
-                                this.init(o2, o1);
+                                this.initInteraction(o2, o1);
                             };
                             o1i += tuple(i1, i2);
                             o1f += o2;
@@ -1030,7 +1032,7 @@ export class Interaction : Root {
      * Initialization. Also computes the overlap so that the direction of
      * interaction can be received later.
      */
-    mutating this void init(Object f, Object t) {
+    mutating this once void initInteraction(Object f, Object t) {
         this.from = f;
         this.to = t;
 
@@ -1137,7 +1139,7 @@ export class Player : Root {
      */
     mutating this void takeInput(string inp) {
         this.input = new {
-            this.init(inp);
+            this.initInputState(inp);
         };
     }
 
@@ -1160,7 +1162,7 @@ export class InputState : Root {
     /**
      * Turn this input into press info.
      */
-    mutating this void init(string inp) {
+    mutating this once void initInputState(string inp) {
         this.pressed = new {
             for (string i in inp)
                 this += i;

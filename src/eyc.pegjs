@@ -127,15 +127,17 @@ memberDeclList
  = a:memberDecl* { return new Tree("MemberDeclList", location(), a); }
 
 memberDecl
- = a:override? b:mutating? c:this? d:type e:id "(" white f:paramList? ")" white g:block {
+ = a:override? b:mutating? c:this? d:once? e:type
+   f:id "(" white g:paramList? ")" white h:block {
      return new Tree("MethodDecl", location(), {
          override: a,
          mutating: b,
          thisClause: c,
-         type: d,
-         id: e,
-         params: f,
-         body: g
+         once: d,
+         type: e,
+         id: f,
+         params: g,
+         body: h
      });
  }
  / a:type b:fieldDeclList ";" white { return new Tree("FieldDecl", location(), {type: a, decls: b}); }
@@ -441,7 +443,6 @@ id
         (a !== "is") &&
         (a !== "import") &&
         (a !== "map") &&
-        (a !== "mutating") &&
         (a !== "new") &&
         (a !== "null") &&
         (a !== "num") &&
@@ -482,6 +483,7 @@ mutating = a:idLike & {return a === "mutating";}
 new = a:idLike & {return a === "new";}
 null = a:idLike & {return a === "null";}
 num = a:idLike & {return a === "num";}
+once = a:idLike & {return a === "once";}
 override = a:idLike & {return a === "override";}
 retract = a:idLike & {return a === "retract";}
 return = a:idLike & {return a === "return";}

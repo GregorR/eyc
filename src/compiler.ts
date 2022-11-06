@@ -614,6 +614,7 @@ function resolveMethodDeclType(
         throw new EYCTypeError(methodDecl,
                                "Cannot have 'this' without 'mutating'");
     }
+    const once = !!methodDecl.children.once;
 
     // The return type
     const retType = typeNameToType(eyc, methodDecl.module.parsed,
@@ -634,7 +635,7 @@ function resolveMethodDeclType(
 
     const signature = methodDecl.signature =
         new eyc.Method(klass, methodDecl.children.id.children.text, mutating,
-                       mutatingThis, retType, paramTypes);
+                       mutatingThis, once, retType, paramTypes);
 
     // Now put it in the class
     const name = methodDecl.children.id.children.text;
@@ -664,8 +665,17 @@ function resolveMethodDeclType(
             throw new EYCTypeError(methodDecl,
                                    "Override method overrides nothing");
         }
-        klass.methodTypes[name] = klass.ownMethodTypes[name] = methodDecl.signature;
+        klass.methodTypes[name] = klass.ownMethodTypes[name] =
+            methodDecl.signature;
 
+    }
+
+    // If it has a "once" clause, add the internal field
+    if (once) {
+        const onceField = `$$once$${klass.prefix}$${name}`;
+        klass.fieldTypes[onceField] = klass.ownFieldTypes[onceField] =
+            eyc.boolType;
+        klass.fieldNames[onceField] = onceField;
     }
 }
 
@@ -767,6 +777,11 @@ function typeCheckMethodDecl(eyc: types.EYC, methodDecl: types.MethodNode) {
                 methodDecl.signature.paramTypes[ai];
         }
     }
+
+    // If it has a "once" clause, the return type must be void
+    if (methodDecl.signature.once &&
+        methodDecl.signature.retType !== eyc.voidType)
+        throw new EYCTypeError(methodDecl, "once methods must return void");
 
     // Type check every statement
     typeCheckStatement(eyc, methodDecl, ctx, symbols, methodDecl.children.body);
@@ -2101,6 +2116,21 @@ class MethodCompilationState {
                 params.push(jsnm);
                 symbols[nm] = jsnm;
             }
+        }
+
+        // Consider compiling the "once" field if applicable
+        if (this.decl.signature.once) {
+            // The field itself
+            const prefix = this.ccs.klass.prefix;
+            const name = this.decl.children.id.children.text;
+            const onceField = `$$once$${prefix}$${name}`;
+            this.ccs.klass.fieldInits[onceField] = <types.CompiledFunction>
+                Function("eyc", "self", "caller", "return false;");
+
+            // Start the code with a check
+            const js = new SSA(this.decl, "javascript", ir.length);
+            js.ex = `if (self.${onceField}) return; self.${onceField} = true;`;
+            ir.push(js);
         }
 
         // Compile to SSA
@@ -4009,6 +4039,11 @@ class MethodCompilationState {
                 // "Caller" |
 
                 // "JavaScriptExpression" |
+                case "javascript":
+                    ssa.skip = true;
+                    ssa.stmts.push(ssa.ex + "\n");
+                    break;
+
                 case "javascript-call":
                 {
                     // Find the head
