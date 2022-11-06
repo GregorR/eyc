@@ -17,6 +17,7 @@
 
 import * as parser from "./parser";
 import * as types from "./types";
+import * as util from "./util";
 
 /* This doesn't do anything, it's just to make sure that the polyfill is loaded
  * if needed, since it's used it compiled code */
@@ -398,6 +399,7 @@ async function resolveSpritesheetDeclTypes(
         x: 0, y: 0,
         w: 1, h: 1,
         scale: 1,
+        multX: 0, multY: 0,
         frames: 1, speed: 1
     };
 
@@ -409,6 +411,7 @@ async function resolveSpritesheetDeclTypes(
         for (const c of (cc || [])) {
             // Must be either id=literal or literal
             let id = idsByPos[idx++];
+            let valBox: types.Tree;
             let val = 0;
             if (c.type === "AssignmentExp") {
                 const target = c.children.target;
@@ -420,18 +423,27 @@ async function resolveSpritesheetDeclTypes(
                     throw new EYCTypeError(c, "Expected id=number");
                 }
                 id = target.children.text;
-                val = JSON.parse(value.children.text);
+                valBox = value;
 
             } else if (c.type === "DecLiteral" ||
                        c.type === "HexLiteral" ||
                        c.type === "B64Literal") {
                 if (!id)
                     throw new EYCTypeError(c, "No name for this positional argument");
-                val = JSON.parse(c.children.text);
+                valBox = c;
 
             } else {
                 throw new EYCTypeError(c, "Expected id=number or number");
 
+            }
+
+            // Extract the value
+            if (valBox.type === "DecLiteral") {
+                val = JSON.parse(valBox.children.text);
+            } else if (valBox.type === "HexLiteral") {
+                val = util.hexToNum(valBox.children.text);
+            } else { // B64Literal
+                throw new EYCTypeError(c, "Unsupported B64 literal");
             }
 
             props[id] = val;
@@ -4093,33 +4105,8 @@ class MethodCompilationState {
 
                 // "HexLiteral" |
                 case "hex-literal":
-                {
-                    const text = ssa.ctx.children.text;
-                    if (text.indexOf(".") >= 0) {
-                        /* Fractional hex literals aren't supported by JS, so
-                         * do it ourselves */
-                        let cur = text;
-                        let val = 0;
-
-                        // Fractional part
-                        // eslint-disable-next-line no-constant-condition
-                        while (true) {
-                            val += parseInt(cur.slice(-1), 16);
-                            val /= 16;
-                            cur = cur.slice(0, -1);
-                            if (cur.slice(-1) === ".")
-                                break;
-                        }
-
-                        // Whole part
-                        val += parseInt("0" + cur.slice(0, -1), 16);
-                        ssa.expr = "(" + val + ")";
-
-                    } else {
-                        ssa.expr = "(0x" + text + ")";
-                    }
+                    ssa.expr = "(" + util.hexToNum(ssa.ctx.children.text) + ")";
                     break;
-                }
 
 
                 // "B64Literal" |

@@ -1084,6 +1084,20 @@ export class Shadowed : Object {
         return ret;
     }
 
+    // When we're added to a stage, add our shadows
+    override mutating void addedToStage(InteractionStage stage) {
+        super(stage);
+        for (Shadow s in this.shadows)
+            stage.addObject(s);
+    }
+
+    // And when we're removed, remove our shadows
+    override mutating void removedFromStage(InteractionStage stage) {
+        super(stage);
+        for (Shadow s in this.shadows)
+            stage.remObject(s);
+    }
+
     // Shadow objects associated with this one
     array(Shadow) shadows;
 }
@@ -1152,7 +1166,6 @@ export class AdjacencyDetector : Shadowed {
                     this.stage.addObject(ad);
                 };
             }
-            // FIXME: remove them when this object is removed
         }
 
         return super() + ret;

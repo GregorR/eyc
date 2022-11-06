@@ -68,6 +68,7 @@ export main class Main : robots.RobotsStage {
             this.animationFrames = this.idleFrames =
                 cota.Sprites.character.idle;
             this.walkFrames = cota.Sprites.character.run;
+            this.initCOTAOutlined();
             /*
             this.walkFrames = [
                 tuple(cota.Sprites : string, "character.run.1"),
@@ -186,7 +187,8 @@ class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
 }
 
 class SimpleMotion :
-    Playing, Motile, AdjacencyDetector, AnimatedSprite, MirrorSprite
+    Playing, Motile, AdjacencyDetector, AnimatedSprite, MirrorSprite,
+    cota.COTAOutlined
 {
     override mutating this suggestion takeInput(InputState input) {
         suggestion ret = super(input);

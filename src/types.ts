@@ -319,6 +319,8 @@ export interface SpriteProperties {
     w: number;
     h: number;
     scale: number;
+    multX: number;
+    multY: number;
     frames: number;
     speed: number;
 }

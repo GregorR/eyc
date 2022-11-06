@@ -276,10 +276,11 @@ export async function go(): Promise<void> {
                 const sprites = msg.d.sprites;
                 for (let key in sprites) {
                     const props = sprites[key];
-                    props.x *= props.scale;
-                    props.y *= props.scale;
-                    props.w *= props.scale;
-                    props.h *= props.scale;
+                    console.log(props);
+                    props.x *= props.multX || props.scale;
+                    props.y *= props.multY || props.scale;
+                    props.w *= props.multX || props.scale;
+                    props.h *= props.multY || props.scale;
                     data.frames[key] = {
                         scale: props.scale,
                         frame: {
