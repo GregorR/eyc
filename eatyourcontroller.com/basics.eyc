@@ -531,92 +531,6 @@ export class Motile : Object {
 }
 
 /**
- * An object with a sprite.
- */
-export class ObjectSprite : Object {
-    /**
-     * React by moving into place.
-     */
-    override mutating this suggestion react() {
-        suggestion ret = super();
-
-        if (this.x != this.lastX || this.y != this.lastY) {
-            this.lastX = this.x;
-            this.lastY = this.y;
-            ret = ret suggest {
-                this.stage.moveSprite(
-                    this.dynamicSprite, this.x + this.spriteOffsetX,
-                    this.y + this.spriteOffsetY
-                );
-            };
-        }
-
-        tuple(string, string) ss = this.staticSprite();
-        if (ss != this.lastStaticSprite) {
-            this.lastStaticSprite = ss;
-            ret = ret suggest {
-                this.stage.updateSprite(
-                    this.dynamicSprite, ss);
-            };
-        }
-
-        return ret;
-    }
-
-    /**
-     * When we're added to the stage, we add our sprite.
-     */
-    override mutating void addedToStage(InteractionStage stage) {
-        super(stage);
-        tuple(string, string) ss = this.lastStaticSprite = this.staticSprite();
-        this.dynamicSprite = stage.addSprite(
-            ss, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY,
-            this.z, this.spriteEx
-        );
-    }
-
-    /**
-     * When we're removed, we remove our sprite.
-     */
-    override mutating void removedFromStage(InteractionStage stage) {
-        super(stage);
-        stage.removeSprite(this.dynamicSprite);
-    }
-
-    /**
-     * ObjectSprites aren't inherently clonable, but this helper method is
-     * provided for clonable ObjectSprites.
-     */
-    mutating this void cloneSprite(ObjectSprite other) {
-        this.cloneObject(other);
-        this.spriteOffsetX = other.spriteOffsetX;
-        this.spriteOffsetY = other.spriteOffsetY;
-    }
-
-    /**
-     * The (static) sprite to use to display this object. Override this.
-     */
-    tuple(string, string) staticSprite() {
-        return tuple("", "");
-    }
-
-    // The last used static sprite (for animation)
-    tuple(string, string) lastStaticSprite;
-
-    // Extra properties of the sprite
-    string spriteEx;
-
-    // The dynamic sprite currently used to display this object
-    string dynamicSprite;
-
-    // The *previous* position of this sprite
-    num lastX, lastY;
-
-    // An optional (and usually unwanted) sprite offset
-    num spriteOffsetX, spriteOffsetY;
-}
-
-/**
  * An interaction (or interaction in potentia) between two objects.
  */
 export class Interaction {
@@ -799,6 +713,140 @@ export class InputState {
 
     set(string) pressed;
     bool up, down, left, right, north, south, east, west;
+}
+
+/**
+ * An object with a sprite.
+ */
+export class ObjectSprite : Object {
+    /**
+     * React by moving into place.
+     */
+    override mutating this suggestion react() {
+        suggestion ret = super();
+
+        if (this.x != this.lastX || this.y != this.lastY) {
+            this.lastX = this.x;
+            this.lastY = this.y;
+            ret = ret suggest {
+                this.stage.moveSprite(
+                    this.dynamicSprite, this.x + this.spriteOffsetX,
+                    this.y + this.spriteOffsetY
+                );
+            };
+        }
+
+        tuple(string, string) ss = this.staticSprite();
+        if (ss != this.lastStaticSprite) {
+            this.lastStaticSprite = ss;
+            ret = ret suggest {
+                this.stage.updateSprite(
+                    this.dynamicSprite, ss);
+            };
+        }
+
+        return ret;
+    }
+
+    /**
+     * When we're added to the stage, we add our sprite.
+     */
+    override mutating void addedToStage(InteractionStage stage) {
+        super(stage);
+        tuple(string, string) ss = this.lastStaticSprite = this.staticSprite();
+        this.dynamicSprite = stage.addSprite(
+            ss, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY,
+            this.z, this.spriteEx
+        );
+    }
+
+    /**
+     * When we're removed, we remove our sprite.
+     */
+    override mutating void removedFromStage(InteractionStage stage) {
+        super(stage);
+        stage.removeSprite(this.dynamicSprite);
+    }
+
+    /**
+     * ObjectSprites aren't inherently clonable, but this helper method is
+     * provided for clonable ObjectSprites.
+     */
+    mutating this void cloneSprite(ObjectSprite other) {
+        this.cloneObject(other);
+        this.spriteOffsetX = other.spriteOffsetX;
+        this.spriteOffsetY = other.spriteOffsetY;
+    }
+
+    /**
+     * The (static) sprite to use to display this object. Override this.
+     */
+    tuple(string, string) staticSprite() {
+        return tuple("", "");
+    }
+
+    // The last used static sprite (for animation)
+    tuple(string, string) lastStaticSprite;
+
+    // Extra properties of the sprite
+    string spriteEx;
+
+    // The dynamic sprite currently used to display this object
+    string dynamicSprite;
+
+    // The *previous* position of this sprite
+    num lastX, lastY;
+
+    // An optional (and usually unwanted) sprite offset
+    num spriteOffsetX, spriteOffsetY;
+}
+
+/**
+ * An object with an animated sprite.
+ */
+export class AnimatedSprite : ObjectSprite {
+    // Choose based on the frame
+    override tuple(string, string) staticSprite() {
+        return this.animationFrames[
+            Math.floor(this.ts() / this.animationSpeed) %
+            this.animationFrames.length
+        ];
+    }
+
+    // Animation frames
+    array(tuple(string, string)) animationFrames;
+
+    // Speed of the animation in game frames per animation frame
+    num animationSpeed = 8;
+}
+
+/**
+ * Objects with sprites that mirror based on their most recent velocity.
+ */
+export class MirrorSprite : Motile, ObjectSprite {
+    // React by mirroring
+    override mutating this suggestion react() {
+        suggestion ret = super();
+
+        if (this.vx > 0 && this.mirrored) {
+            this.mirrored = false;
+            ret = ret suggest {
+                this.stage.mirrorSprite(this.dynamicSprite, false, false);
+            };
+
+        } else if (this.vx < 0 && !this.mirrored) {
+            this.mirrored = true;
+            ret = ret suggest {
+                this.stage.mirrorSprite(this.dynamicSprite, true, false);
+            };
+
+        }
+
+        return ret;
+    }
+
+    // Whether the sprite is currently mirrored
+    bool mirrored;
 }
 
 // Explicitly immobile things (such as gravity)
@@ -1137,50 +1185,6 @@ class AdjacencyDetectorPart : Object {
 
     string dir;
     set(string) detected;
-}
-
-// Animated objects
-export class AnimatedSprite : ObjectSprite {
-    // Choose based on the frame
-    override tuple(string, string) staticSprite() {
-        return this.animationFrames[
-            Math.floor(this.ts() / this.animationSpeed) %
-            this.animationFrames.length
-        ];
-    }
-
-    // Animation frames
-    array(tuple(string, string)) animationFrames;
-
-    // Speed of the animation in game frames per animation frame
-    num animationSpeed = 8;
-}
-
-// Objects with sprites that mirror based on their most recent velocity
-export class MirrorSprite : Motile, ObjectSprite {
-    // React by mirroring
-    override mutating this suggestion react() {
-        suggestion ret = super();
-
-        if (this.vx > 0 && this.mirrored) {
-            this.mirrored = false;
-            ret = ret suggest {
-                this.stage.mirrorSprite(this.dynamicSprite, false, false);
-            };
-
-        } else if (this.vx < 0 && !this.mirrored) {
-            this.mirrored = true;
-            ret = ret suggest {
-                this.stage.mirrorSprite(this.dynamicSprite, true, false);
-            };
-
-        }
-
-        return ret;
-    }
-
-    // Whether the sprite is currently mirrored
-    bool mirrored;
 }
 
 /* Object factory based on label and surrounding sprite labels, used by
