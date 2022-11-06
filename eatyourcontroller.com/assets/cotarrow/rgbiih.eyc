@@ -69,7 +69,6 @@ export class COTAOutline : Shadow, ObjectSprite {
     override tuple(string, string) staticSprite() {
         ObjectSprite s = this.shadowed : ObjectSprite;
         tuple(string, string) sss = s.staticSprite();
-        Console.log(sss[1]);
         return tuple(Outlines : string, sss[1]);
     }
 }

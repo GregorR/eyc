@@ -276,7 +276,6 @@ export async function go(): Promise<void> {
                 const sprites = msg.d.sprites;
                 for (let key in sprites) {
                     const props = sprites[key];
-                    console.log(props);
                     props.x *= props.multX || props.scale;
                     props.y *= props.multY || props.scale;
                     props.w *= props.multX || props.scale;
