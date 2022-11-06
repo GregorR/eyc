@@ -90,6 +90,7 @@ async function loadPixiApp(opts: any = {}) {
     }
 
     PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+    PIXI.settings.SORTABLE_CHILDREN = true;
 
     const app = new PIXI.Application({
         width: opts.w || 1920,
