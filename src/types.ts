@@ -210,7 +210,7 @@ export interface EYC {
     loadSpritesheet(spritesheet: Spritesheet): string;
     addSprite(
         stageId: string, spritesheet: string, sprite: string, x: number,
-        y: number, ex: string
+        y: number, z: number, ex: string
     ): string;
     updateSprite(
         stageId: string, id: string, spritesheet: string, sprite: string
@@ -246,7 +246,7 @@ export interface EYCExt {
     // Add this sprite from a loaded spritesheet onto this stage
     addSprite: (
         stageId: string, spritesheet: string, sprite: string, x: number,
-        y: number, ex: any
+        y: number, z: number, ex: any
     ) => Promise<string>;
 
     // Update this sprite's image

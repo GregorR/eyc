@@ -85,10 +85,10 @@ const eycExtWorker: types.EYCExt = {
 
     addSprite: async function(
         stageId: string, spritesheet: string, sprite: string, x: number,
-        y: number, ex: any
+        y: number, z: number, ex: any
     ) {
         postMessage({
-            c: "addSprite", st: stageId, ss: spritesheet, s: sprite, x, y,
+            c: "addSprite", st: stageId, ss: spritesheet, s: sprite, x, y, z,
             ex
         });
         return (await awaitReply("addSprite", {

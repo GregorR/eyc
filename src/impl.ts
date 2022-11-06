@@ -1275,7 +1275,7 @@ export async function eyc(
 
     addSprite: function(
         stageId: string, spritesheet: string, sprite: string, x: number,
-        y: number, exStr: string
+        y: number, z: number, exStr: string
     ) {
         const beId = this.freshId();
         let ex: any = null;
@@ -1302,7 +1302,7 @@ export async function eyc(
 
             // Then do it
             const feIdP = this.ext.addSprite(
-                stageId, spritesheet, sprite, x, y, ex
+                stageId, spritesheet, sprite, x, y, z, ex
             ).then(feId => sprites[beId] = feId);
 
             frontendP = frontendP.then(() => feIdP).catch(console.error);

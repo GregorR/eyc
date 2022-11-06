@@ -323,6 +323,7 @@ export async function go(): Promise<void> {
                     sprite.scale.set(pixiProps.scale / ssd.frames[msg.s].scale);
                     sprite.x = msg.x * pixiProps.scale;
                     sprite.y = msg.y * pixiProps.scale;
+                    sprite.zIndex = msg.z;
                     frameActions.push(() => pixiApp.stage.addChild(sprite));
                 } while (false);
 

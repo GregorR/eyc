@@ -515,7 +515,7 @@ export class Stage : Program {
                             o2y1 = o2.y + o2.bby1,
                             o2y2 = o2.y + o2.bby2;
 
-                        if ((o1.z == o2.z) &&
+                        if ((o1.layer == o2.layer) &&
                             !(o1x2 <= o2x1 || o2x2 <= o1x1 ||
                               o1y2 <= o2y1 || o2y2 <= o1y1)) {
                             // Add o2 to the interaction map
@@ -594,9 +594,11 @@ export class Stage : Program {
     /**
      * Add a sprite to the frontend and get its frontend ID.
      */
-    mutating string addSprite(tuple(string, string) sprite, num x, num y, string ex) {
-        return @js (extStage=this.extStage, sprite, x, y, ex) {
-            return eyc.addSprite(extStage, sprite[0], sprite[1], x, y, ex);
+    mutating string addSprite(
+        tuple(string, string) sprite, num x, num y, num z, string ex
+    ) {
+        return @js (extStage=this.extStage, sprite, x, y, z, ex) {
+            return eyc.addSprite(extStage, sprite[0], sprite[1], x, y, z, ex);
         } : string;
     }
 
@@ -795,6 +797,11 @@ export class Object : Root {
     num x, y, z, bbx1, bbx2 = 1, bby1, bby2 = 1;
 
     /**
+     * Layer, used for collision (not drawing).
+     */
+    num layer;
+
+    /**
      * Movement given to the object this tick, in each axis and direction.
      */
     num stepVXP, stepVXN, stepVYP, stepVYN;
@@ -961,7 +968,7 @@ export class ObjectSprite : Object {
         tuple(string, string) ss = this.lastStaticSprite = this.staticSprite();
         this.dynamicSprite = stage.addSprite(
             ss, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY,
-            this.spriteEx
+            this.z, this.spriteEx
         );
     }
 
