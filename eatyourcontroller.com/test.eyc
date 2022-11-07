@@ -208,7 +208,7 @@ class SimpleMotion :
         if (input.south &&
             (this.detected("s", "solid") || this.detected("sw", "solid") ||
              this.detected("se", "solid"))) {
-            this.vy = -0x.7;
+            this.vy = -0x.58;
         }
         return ret;
     }
