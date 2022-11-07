@@ -745,6 +745,15 @@ export class ObjectSprite : Object {
             };
         }
 
+        tuple(bool, bool) m = this.mirror();
+        if (m != this.lastMirror) {
+            this.lastMirror = m;
+            ret = ret suggest {
+                this.stage.mirrorSprite(
+                    this.dynamicSprite, m[0], m[1]);
+            };
+        }
+
         return ret;
     }
 
@@ -781,12 +790,18 @@ export class ObjectSprite : Object {
     /**
      * The (static) sprite to use to display this object. Override this.
      */
-    tuple(string, string) staticSprite() {
-        return tuple("", "");
-    }
+    tuple(string, string) staticSprite() {}
+
+    /**
+     * The mirroring state (x, y). Override this if you want mirroring.
+     */
+    tuple(bool, bool) mirror() {}
 
     // The last used static sprite (for animation)
     tuple(string, string) lastStaticSprite;
+
+    // The last mirror state (x, y)
+    tuple(bool, bool) lastMirror;
 
     // Extra properties of the sprite
     string spriteEx;
@@ -823,26 +838,24 @@ export class AnimatedSprite : ObjectSprite {
 /**
  * Objects with sprites that mirror based on their most recent velocity.
  */
-export class MirrorSprite : Motile, ObjectSprite {
+export class MotileMirrorSprite : Motile, ObjectSprite {
+    override tuple(bool, bool) mirror() {
+        tuple(bool, bool) ret = super();
+        return tuple(this.mirrored, ret[1]);
+    }
+
     // React by mirroring
     override mutating this suggestion react() {
-        suggestion ret = super();
-
+        // Mirror before super() so ObjectSprite will see the change
         if (this.vx > 0 && this.mirrored) {
             this.mirrored = false;
-            ret = ret suggest {
-                this.stage.mirrorSprite(this.dynamicSprite, false, false);
-            };
 
         } else if (this.vx < 0 && !this.mirrored) {
             this.mirrored = true;
-            ret = ret suggest {
-                this.stage.mirrorSprite(this.dynamicSprite, true, false);
-            };
 
         }
 
-        return ret;
+        return super();
     }
 
     // Whether the sprite is currently mirrored

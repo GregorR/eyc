@@ -62,6 +62,10 @@ export class COTAOutline : Shadow, ObjectSprite {
         tuple(string, string) sss = s.staticSprite();
         return tuple(Outlines : string, sss[1]);
     }
+
+    override tuple(bool, bool) mirror() {
+        return (this.shadowed : ObjectSprite).mirror();
+    }
 }
 
 export class COTAOutlined : Shadowed {

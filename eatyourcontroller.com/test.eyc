@@ -97,7 +97,7 @@ export main class Main : robots.RobotsStage {
     }
 }
 
-class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
+class Robot : AdjacencyDetector, MotileMirrorSprite, AnimatedSprite {
     mutating this void init(string nm) {
         this.animationFrames = this.idleFrames = new {
             num len = robots.Robots.robots.orange.length;
@@ -191,7 +191,7 @@ class Robot : AdjacencyDetector, MirrorSprite, AnimatedSprite {
 }
 
 class SimpleMotion :
-    Playing, Motile, AdjacencyDetector, AnimatedSprite, MirrorSprite,
+    Playing, Motile, AdjacencyDetector, AnimatedSprite, MotileMirrorSprite,
     cota.COTAOutlined
 {
     override mutating this suggestion takeInput(InputState input) {
