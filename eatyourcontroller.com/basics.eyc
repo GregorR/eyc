@@ -1049,7 +1049,7 @@ export class MultiWall : Wall {
  */
 export class Shadow : Object {
     /**
-     * Must be called after the act stage by the shadowed object.
+     * Put this shadow into place.
      */
     mutating this void shadow() {
         Shadowed s = this.shadowed;
@@ -1061,6 +1061,16 @@ export class Shadow : Object {
         this.y = this.shadowCalc(s.y, s.bby1, s.bby2, this.shadowY);
         this.bby1 = this.shadowCalc(0, s.bby1, s.bby2, this.shadowBBY1);
         this.bby2 = this.shadowCalc(0, s.bby1, s.bby2, this.shadowBBY2);
+    }
+
+    override mutating this suggestion act() {
+        this.shadow();
+        return super();
+    }
+
+    override mutating this suggestion react() {
+        this.shadow();
+        return super();
     }
 
     /**
@@ -1084,19 +1094,6 @@ export class Shadow : Object {
  * To use shadow objects, an object must have this class.
  */
 export class Shadowed : Object {
-    override mutating this suggestion act() {
-        suggestion ret = super();
-
-        // Update every shadow object
-        for (Shadow s in this.shadows) {
-            ret = ret suggest {
-                s.shadow();
-            };
-        }
-
-        return ret;
-    }
-
     // When we're added to a stage, add our shadows
     override mutating void addedToStage(InteractionStage stage) {
         super(stage);
