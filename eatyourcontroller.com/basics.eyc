@@ -725,14 +725,14 @@ export class ObjectSprite : Object {
     override mutating this suggestion react() {
         suggestion ret = super();
 
-        if (this.x != this.lastX || this.y != this.lastY) {
-            this.lastX = this.x;
-            this.lastY = this.y;
-            tuple(num, num) soff = this.spriteOffset();
+        tuple(num, num) soff = this.spriteOffset();
+        num x = this.x + soff[0];
+        num y = this.y + soff[1];
+        if (x != this.lastX || y != this.lastY) {
+            this.lastX = x;
+            this.lastY = y;
             ret = ret suggest {
-                this.stage.moveSprite(
-                    this.dynamicSprite, this.x + soff[0], this.y + soff[1]
-                );
+                this.stage.moveSprite(this.dynamicSprite, x, y);
             };
         }
 
@@ -836,6 +836,27 @@ export class AnimatedSprite : ObjectSprite {
 
     // Speed of the animation in game frames per animation frame
     num animationSpeed = 8;
+}
+
+/**
+ * Objects with sprites that always round to a fixed multiple (typically game
+ * pixels).
+ */
+export class RoundedSprite : ObjectSprite {
+    mutating this once void initRoundedSprite(num to) {
+        this.spriteRounding = to;
+    }
+
+    override tuple(num, num) spriteOffset() {
+        return tuple(
+            Math.round(this.x / this.spriteRounding) * this.spriteRounding -
+            this.x,
+            Math.round(this.y / this.spriteRounding) * this.spriteRounding -
+            this.y
+        );
+    }
+
+    num spriteRounding = 0x.1;
 }
 
 /**

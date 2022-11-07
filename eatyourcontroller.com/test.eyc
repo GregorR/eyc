@@ -72,6 +72,7 @@ export main class Main : robots.RobotsStage {
             this.animationFrames = this.idleFrames =
                 cota.Sprites.character.idle;
             this.walkFrames = cota.Sprites.character.run;
+            this.initRoundedSprite(0x.2);
             this.initCOTAOutlined();
             /*
             this.walkFrames = [
@@ -97,7 +98,9 @@ export main class Main : robots.RobotsStage {
     }
 }
 
-class Robot : AdjacencyDetector, MotileMirrorSprite, AnimatedSprite {
+class Robot :
+    AdjacencyDetector, RoundedSprite, MotileMirrorSprite, AnimatedSprite
+{
     mutating this void init(string nm) {
         this.animationFrames = this.idleFrames = new {
             num len = robots.Robots.robots.orange.length;
@@ -116,6 +119,7 @@ class Robot : AdjacencyDetector, MotileMirrorSprite, AnimatedSprite {
                               "robots." + nm + "w." + (j : string));
             }
         };
+        this.initRoundedSprite(0x.1);
     }
 
     override mutating this suggestion act() {
@@ -191,8 +195,8 @@ class Robot : AdjacencyDetector, MotileMirrorSprite, AnimatedSprite {
 }
 
 class SimpleMotion :
-    Playing, Motile, AdjacencyDetector, AnimatedSprite, MotileMirrorSprite,
-    cota.COTAOutlined
+    Playing, Motile, AdjacencyDetector, AnimatedSprite, RoundedSprite,
+    MotileMirrorSprite, cota.COTAOutlined
 {
     override mutating this suggestion takeInput(InputState input) {
         suggestion ret = super(input);
@@ -220,13 +224,6 @@ class SimpleMotion :
         else if (this.vx != 0 && this.animationFrames != this.walkFrames)
             this.animationFrames = this.walkFrames;
         return ret;
-    }
-
-    override tuple(num, num) spriteOffset() {
-        return tuple(
-            this.x - Math.round(this.x / 0x.2) * 0x.2,
-            this.y - Math.round(this.y / 0x.2) * 0x.2
-        );
     }
 
     array(tuple(string, string)) idleFrames;
