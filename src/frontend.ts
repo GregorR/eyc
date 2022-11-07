@@ -282,7 +282,7 @@ export async function go(): Promise<void> {
                     props.y *= props.multY || props.scale;
                     props.w *= props.multX || props.scale;
                     props.h *= props.multY || props.scale;
-                    data.frames[key] = {
+                    data.frames[`${id}$${key}`] = {
                         scale: props.scale,
                         frame: {
                             x: props.x, y: props.y,
@@ -315,14 +315,15 @@ export async function go(): Promise<void> {
                     const ssd = spritesheetDatas[msg.ss];
                     if (!ssd)
                         break;
-                    if (!ss.textures[msg.s] || !ssd.frames[msg.s])
+                    const sid = `${msg.ss}$${msg.s}`;
+                    if (!ss.textures[sid] || !ssd.frames[sid])
                         break;
 
                     // Create the sprite
                     id = `sprite${spriteIdx++}`;
                     const sprite = sprites[id] =
-                        new PIXI.Sprite(ss.textures[msg.s]);
-                    sprite.scale.set(pixiProps.scale / ssd.frames[msg.s].scale);
+                        new PIXI.Sprite(ss.textures[sid]);
+                    sprite.scale.set(pixiProps.scale / ssd.frames[sid].scale);
                     sprite.x = msg.x * pixiProps.scale;
                     sprite.y = msg.y * pixiProps.scale;
                     sprite.zIndex = msg.z;
@@ -346,11 +347,12 @@ export async function go(): Promise<void> {
                     const ssd = spritesheetDatas[msg.ss];
                     if (!ssd)
                         break;
-                    if (!ss.textures[msg.s] || !ssd.frames[msg.s])
+                    const sid = `${msg.ss}$${msg.s}`;
+                    if (!ss.textures[sid] || !ssd.frames[sid])
                         break;
 
                     frameActions.push(
-                        () => sprite.texture = ss.textures[msg.s]
+                        () => sprite.texture = ss.textures[sid]
                     );
                 } while (false);
 
