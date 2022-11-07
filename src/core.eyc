@@ -87,6 +87,14 @@ export class Math : Root {
     }
 
     /**
+     * Math.round.
+     * @static
+     */
+    num round(num x) {
+        return @js (x) { return Math.round(x); } : num;
+    }
+
+    /**
      * Math.trunc. Similar to Math.floor, but always truncates (i.e., goes
      * towards zero).
      * @static

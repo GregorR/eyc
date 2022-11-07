@@ -728,10 +728,10 @@ export class ObjectSprite : Object {
         if (this.x != this.lastX || this.y != this.lastY) {
             this.lastX = this.x;
             this.lastY = this.y;
+            tuple(num, num) soff = this.spriteOffset();
             ret = ret suggest {
                 this.stage.moveSprite(
-                    this.dynamicSprite, this.x + this.spriteOffsetX,
-                    this.y + this.spriteOffsetY
+                    this.dynamicSprite, this.x + soff[0], this.y + soff[1]
                 );
             };
         }
@@ -763,9 +763,11 @@ export class ObjectSprite : Object {
     override mutating void addedToStage(InteractionStage stage) {
         super(stage);
         tuple(string, string) ss = this.lastStaticSprite = this.staticSprite();
+        this.lastX = this.x;
+        this.lastY = this.y;
+        tuple(num, num) soff = this.spriteOffset();
         this.dynamicSprite = stage.addSprite(
-            ss, this.x + this.spriteOffsetX, this.y + this.spriteOffsetY,
-            this.z, this.spriteEx
+            ss, this.x + soff[0], this.y + soff[1], this.z, this.spriteEx
         );
     }
 
@@ -783,8 +785,6 @@ export class ObjectSprite : Object {
      */
     mutating this void cloneSprite(ObjectSprite other) {
         this.cloneObject(other);
-        this.spriteOffsetX = other.spriteOffsetX;
-        this.spriteOffsetY = other.spriteOffsetY;
     }
 
     /**
@@ -796,6 +796,12 @@ export class ObjectSprite : Object {
      * The mirroring state (x, y). Override this if you want mirroring.
      */
     tuple(bool, bool) mirror() {}
+
+    /**
+     * Sprite offset, used to do things like make a sprite always align to
+     * pixels.
+     */
+    tuple(num, num) spriteOffset() {}
 
     // The last used static sprite (for animation)
     tuple(string, string) lastStaticSprite;
@@ -811,9 +817,6 @@ export class ObjectSprite : Object {
 
     // The *previous* position of this sprite
     num lastX, lastY;
-
-    // An optional (and usually unwanted) sprite offset
-    num spriteOffsetX, spriteOffsetY;
 }
 
 /**
@@ -1088,6 +1091,15 @@ export class Shadow : Object {
     tuple(num, num, num)
         shadowX, shadowBBX1, shadowBBX2,
         shadowY, shadowBBY1, shadowBBY2;
+}
+
+/**
+ * If a shadow is a sprite, it should usually use its host's sprite offset.
+ */
+export class ShadowSpriteOffset : Shadow, ObjectSprite {
+    override tuple(num, num) spriteOffset() {
+        return (this.shadowed : ObjectSprite).spriteOffset();
+    }
 }
 
 /**

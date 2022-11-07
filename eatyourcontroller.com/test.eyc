@@ -222,6 +222,13 @@ class SimpleMotion :
         return ret;
     }
 
+    override tuple(num, num) spriteOffset() {
+        return tuple(
+            this.x - Math.round(this.x / 0x.2) * 0x.2,
+            this.y - Math.round(this.y / 0x.2) * 0x.2
+        );
+    }
+
     array(tuple(string, string)) idleFrames;
     array(tuple(string, string)) walkFrames;
 }

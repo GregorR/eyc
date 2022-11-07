@@ -56,7 +56,7 @@ export sprites $1 $2 {
 
 spritebg([[Forest]], [["rgbiih-forest.png"]])
 
-export class COTAOutline : Shadow, ObjectSprite {
+export class COTAOutline : ShadowSpriteOffset {
     override tuple(string, string) staticSprite() {
         ObjectSprite s = this.shadowed : ObjectSprite;
         tuple(string, string) sss = s.staticSprite();
