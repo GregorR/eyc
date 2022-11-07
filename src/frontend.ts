@@ -80,7 +80,7 @@ async function loadPixiApp(opts: any = {}) {
         // Load it first
         const scr = document.createElement("script");
         scr.async = scr.defer = true;
-        scr.src = "https://unpkg.com/pixi.js@^6.0.4/dist/browser/pixi.min.js";
+        scr.src = "https://unpkg.com/pixi.js-legacy@^7.0.3/dist/pixi-legacy.min.js";
 
         await new Promise((res, rej) => {
             scr.onload = res;
@@ -91,6 +91,7 @@ async function loadPixiApp(opts: any = {}) {
 
     PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
     PIXI.settings.SORTABLE_CHILDREN = true;
+    PIXI.settings.FAIL_IF_MAJOR_PERFORMANCE_CAVEAT = true;
 
     const app = new PIXI.Application({
         width: opts.w || 1920,
@@ -131,7 +132,6 @@ export async function go(): Promise<void> {
 
     const w = new Worker("eyc-w" + (useAdvanced?"-dbg":"") + ".js");
     const id = 0;
-    let loader = null;
 
     // Set up input
     window.addEventListener("keydown", ev => {
@@ -234,12 +234,13 @@ export async function go(): Promise<void> {
                 // Figure out the scaling
                 const scW = Math.ceil(window.screen.width / msg.w);
                 const scH = Math.ceil(window.screen.height / msg.h);
-                const scale = Math.max(scW, scH) * window.devicePixelRatio;
+                const scale = Math.min(
+                    Math.max(scW, scH) * window.devicePixelRatio,
+                    32);
 
                 // Create the PIXI app. We (currently?) only support one stage.
                 frontendPromise = frontendPromise.then(async () => {
                     await loadPixiApp({w: msg.w * scale, h: msg.h * scale});
-                    loader = PIXI.Loader.shared;
                     pixiProps.scale = scale;
                 });
                 await frontendPromise;
@@ -253,12 +254,12 @@ export async function go(): Promise<void> {
             {
                 // PIXI must have already been loaded!
                 const url = msg.d.url;
-                frontendPromise = frontendPromise.then(async () => {
-                    await new Promise(res => loader.add(url).load(res));
+                const p = frontendPromise.then(async () => {
+                    return await PIXI.Assets.load(url);
                 });
-                await frontendPromise;
-                const rsc = loader.resources[url];
-                const bt = rsc.texture.baseTexture;
+                frontendPromise = p;
+                const rsc = await p;
+                const bt = rsc.baseTexture;
                 bt.scaleMode = PIXI.SCALE_MODES.NEAREST;
                 const id = `spritesheet${spritesheetIdx++}`;
                 spritesheetTextures[id] = url;
@@ -293,7 +294,7 @@ export async function go(): Promise<void> {
                 const pss = spritesheets[id] = new PIXI.Spritesheet(bt, data);
 
                 frontendPromise = frontendPromise.then(async () => {
-                    await new Promise(res => pss.parse(res));
+                    await pss.parse();
                 });
                 await frontendPromise;
 
