@@ -1102,142 +1102,40 @@ export class Shadowed : Object {
     array(Shadow) shadows;
 }
 
-// Objects capable of detecting surrounding objects
-export class AdjacencyDetector : Shadowed {
+// Objects that remember their adjacent interactions
+export class AdjacencyDetector : Object {
     override mutating this suggestion act() {
-        suggestion ret;
-
-        if (!this.detectors) {
-            // Set up our detectors
-            AdjacencyDetector self = this;
-
-            this.detectors = new {
-                // N
-                this += new AdjacencyDetectorPart {
-                    this.init("n", self, false, false, true, false);
-                };
-                // NE
-                this += new AdjacencyDetectorPart {
-                    this.init("ne", self, true, false, false, false);
-                };
-                // E
-                this += new AdjacencyDetectorPart {
-                    this.init("e", self, true, false, false, true);
-                };
-                // SE
-                this += new AdjacencyDetectorPart {
-                    this.init("se", self, true, true, false, false);
-                };
-                // S
-                this += new AdjacencyDetectorPart {
-                    this.init("s", self, false, true, true, false);
-                };
-                // SW
-                this += new AdjacencyDetectorPart {
-                    this.init("sw", self, false, true, false, false);
-                };
-                // W
-                this += new AdjacencyDetectorPart {
-                    this.init("w", self, false, false, false, true);
-                };
-                // NW
-                this += new AdjacencyDetectorPart {
-                    this.init("nw", self, false, false, false, false);
-                };
-            };
-
-            this.shadows = this.shadows + (this.detectors : array(Shadow));
-
-            // Get them by direction
-            this.detectorsByDir = new {
-                this["n"] = self.detectors[0];
-                this["ne"] = self.detectors[1];
-                this["e"] = self.detectors[2];
-                this["se"] = self.detectors[3];
-                this["s"] = self.detectors[4];
-                this["sw"] = self.detectors[5];
-                this["w"] = self.detectors[6];
-                this["nw"] = self.detectors[7];
-            };
-
-            // Add them to the stage
-            for (AdjacencyDetectorPart ad in this.detectors) {
-                ret = ret suggest {
-                    this.stage.addObject(ad);
-                };
-            }
-        }
-
-        return super() + ret;
-    }
-
-    // Determine what we've detected
-    bool detected(string dir, string type) {
-        return this.detectorsByDir[dir].detected[type];
-    }
-
-    array(AdjacencyDetectorPart) detectors = null;
-    map(string, AdjacencyDetectorPart) detectorsByDir;
-}
-
-// Helper class for AdjacencyDetector
-class AdjacencyDetectorPart : Shadow {
-    mutating this void init(
-        string dir, AdjacencyDetector shadowed, bool offX, bool offY,
-        bool multX, bool multY
-    ) {
-        this.dir = dir;
-        this.shadowed = shadowed;
-        this.z = shadowed.z;
-
-        if (offX)
-            this.shadowX = tuple(0, 0, 1);
-        else
-            this.shadowX = tuple(-0x.1, 1, 0);
-        if (offY)
-            this.shadowY = tuple(0, 0, 1);
-        else
-            this.shadowY = tuple(-0x.1, 1, 0);
-        if (multX) {
-            this.shadowBBX1 = tuple(0x.1, -0x.4, 0x.4);
-            this.shadowBBX2 = tuple(0x.1, -0x.c, 0x.c);
-        } else {
-            this.shadowBBX2 = tuple(0x.1, 0, 0);
-        }
-        if (multY) {
-            this.shadowBBY1 = tuple(0x.1, -0x.4, 0x.4);
-            this.shadowBBY2 = tuple(0x.1, -0x.c, 0x.c);
-        } else {
-            this.shadowBBY2 = tuple(0x.1, 0, 0);
-        }
+        suggestion ret = super();
+        this.detectedCache = new;
+        return ret;
     }
 
     override suggestion interact(
         array(tuple(Interaction, Interaction)) interactions
     ) {
         suggestion ret = super(interactions);
-        set(string) detected = new {
-            // Add everything we detect
-            for (tuple(Interaction, Interaction) ip in interactions) {
-                string type = ip[1].type;
-                if (type != "")
-                    this += type;
+        for (tuple(Interaction, Interaction) ip in interactions) {
+            if (ip[1].type) {
+                ret = ret suggest {
+                    this.cacheDetection(ip[1].dir(0x.2), ip[1].type);
+                };
             }
-        };
-
-        // Suggestion is to update it
-        return ret suggest {
-            this.setDetected(detected);
-        };
+        }
+        return ret;
     }
 
-    // Internal
-    mutating this void setDetected(set(string) to) {
-        this.detected = to;
+    mutating void cacheDetection(string dir, string type) {
+        if (!this.detectedCache[dir])
+            this.detectedCache[dir] = new;
+        this.detectedCache[dir] += type;
     }
 
-    string dir;
-    set(string) detected;
+    // Determine what we've detected
+    bool detected(string dir, string type) {
+        return this.detectedCache[dir][type];
+    }
+
+    map(string, set(string)) detectedCache;
 }
 
 /* Object factory based on label and surrounding sprite labels, used by
