@@ -100,46 +100,32 @@ export class COTAOutlined : Shadowed {
     }
 }
 
-export class DirtWall : MultiWall {
-    override tuple(string, string) getSprite(string blocking) {
-        if (blocking == "")
-            return Sprites.dirt.c;
-
-        string nm = "wall.";
-        for (string el in "nsew") {
-            if (this.blocking[el])
-                nm += el;
-        }
-        if (nm == "" || nm == "nsew")
-            nm = "c";
-        return tuple(Sprites : string, nm);
-    }
-}
-
-export class DirtWallFactory : ObjectContextFactory {
-    override mutating this Object get(
-        string label, array(string) layer, num x, num y
-    ) {
-        string blocking = "";
-        if (layer[y-1][x] != label)
-            blocking += "n";
-        if (layer[y+1][x] != label)
-            blocking += "s";
-        string row = layer[y];
-        if (row[x+1] != label)
-            blocking += "e";
-        if (row[x-1] != label)
-            blocking += "w";
-        if (blocking == "ns" || blocking == "ew")
-            blocking = "nsew";
-        return new DirtWall {
-            this.initMultiWall(blocking);
+export class DirtWallFactory : WallFactory {
+    mutating this once void initDirtWallFactory() {
+        this.undefined = new {
+            this += "nsew";
+            this += "nse";
+            this += "nsw";
+            this += "new";
+            this += "sew";
+            this += "ns";
+            this += "ew";
         };
     }
+
+    override Object newWall(string blocking) {
+        set(string) undefined = this.undefined;
+        return new MultiSpriteWall {
+            this.initMultiSpriteWall(blocking, Sprites : string, "dirt.",
+                undefined);
+        };
+    }
+
+    set(string) undefined;
 }
 
 export class COTAStage : GarmentStage {
-    override mutating void initMapping() {
+    override mutating once void initMapping() {
         super();
         this.mapping["."] = new DirtWallFactory;
     }

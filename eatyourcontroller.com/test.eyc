@@ -23,7 +23,7 @@ import /eatyourcontroller.com/assets/cotarrow/rgbiih as cota;
 
 garment Test test.txt;
 
-export main class Main : robots.RobotsStage {
+export main class Main : cota.COTAStage {
     override mutating once void init() {
         this.dw = 24;
         this.dh = 16;

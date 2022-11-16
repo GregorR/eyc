@@ -980,7 +980,7 @@ export class Wall : ObjectSprite {
         };
     }
 
-    mutating this void initWall(string blocking) {
+    mutating this once void initWall(string blocking) {
         this.setBlocking(blocking);
         this.bbx1 = 0;
         this.bbx2 = 1;
@@ -1050,7 +1050,7 @@ export class Wall : ObjectSprite {
 /* Walls where the sprite is defined differently based on the blocking
  * direction(s) */
 export class MultiWall : Wall {
-    mutating this void initMultiWall(string blocking) {
+    mutating this once void initMultiWall(string blocking) {
         this.initWall(blocking);
         this.multiWallStaticSprite = this.getSprite(blocking);
     }
@@ -1192,10 +1192,75 @@ export class ObjectContextFactory {
     }
 }
 
+/**
+ * A factory for walls.
+ */
+export class WallFactory : ObjectContextFactory {
+    override mutating this Object get(
+        string label, array(string) layer, num x, num y
+    ) {
+        string blocking = "";
+        if (layer[y-1][x] != label)
+            blocking += "n";
+        if (layer[y+1][x] != label)
+            blocking += "s";
+        string row = layer[y];
+        if (row[x+1] != label)
+            blocking += "e";
+        if (row[x-1] != label)
+            blocking += "w";
+        return this.newWall(blocking);
+    }
+
+    /**
+     * Override this to create your own walls.
+     */
+    Object newWall(string blocking) {
+        return null;
+    }
+}
+
+/**
+ * Walls that choose their sprite based on their blocking direction(s). Must be
+ * provided with a spritesheet and prefix, and sprites must have predictable
+ * names. Also may be provided with a set of undefined walls to be replaced.
+ */
+export class MultiSpriteWall : MultiWall {
+    mutating this once void initMultiSpriteWall(
+        string blocking, string spritesheet, string prefix,
+        set(string) undefined
+    ) {
+        this.spritesheet = spritesheet;
+        this.spritePrefix = prefix;
+        this.undefined = undefined;
+        this.initMultiWall(blocking);
+    }
+
+    override tuple(string, string) getSprite(string blocking) {
+        // Choose our sprite
+        if (blocking == "")
+            blocking = "c";
+        if (this.undefined[blocking]) {
+            // This direction is undefined. Prefer all-round...
+            if (this.undefined["nsew"]) {
+                // Unless we can't
+                blocking = "c";
+            } else {
+                blocking = "nsew";
+            }
+        }
+
+        return tuple(this.spritesheet, this.spritePrefix + blocking);
+    }
+
+    string spritesheet, spritePrefix;
+    set(string) undefined;
+}
+
 /* A simple data type indicating damage that an object should in some way react
  * to */
 export class Damage {
-    mutating this void init(Object from, string type, num amount) {
+    mutating this once void init(Object from, string type, num amount) {
         this.from = from;
         this.type = type;
         this.amount = amount;
@@ -1228,7 +1293,7 @@ export class Damageable : Object {
 // Stages defined by garments
 export class GarmentStage : InteractionStage {
     // Initialize the mapping (override this)
-    mutating void initMapping() {}
+    mutating once void initMapping() {}
 
     /* Initialize by loading a garment. Make sure you call this BEFORE super()
      * while doing init */

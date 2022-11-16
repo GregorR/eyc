@@ -99,7 +99,7 @@ export class RobotsWallFactory : ObjectContextFactory {
 }
 
 export class RobotsStage : GarmentStage {
-    override mutating void initMapping() {
+    override mutating once void initMapping() {
         super();
         this.mapping["."] = new RobotsWallFactory;
     }
