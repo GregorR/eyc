@@ -35,6 +35,10 @@ export sprites $1 $2 {
         c; e;
         sw (0, 2);
         s; se;
+        cnw (1, 4);
+        cne;
+        cse (0, 5);
+        csw;
     }
 
     character {
@@ -85,31 +89,32 @@ export class COTAOutlined : Shadowed {
 
 export class DirtWallFactory : WallFactory {
     mutating this once void initDirtWallFactory() {
-        this.undefined = new {
-            this += "nsew";
-            this += "nse";
-            this += "nsw";
-            this += "new";
-            this += "sew";
-            this += "ns";
-            this += "ew";
+        this.defined = new {
+            for (string d in [
+                "nw", "n", "ne", "w", "c", "e", "sw", "s", "se", "cnw", "cne",
+                "cse", "csw"
+            ]) {
+                this += d;
+            }
         };
     }
 
-    override Object newWall(string blocking) {
-        set(string) undefined = this.undefined;
+    override Object newWall(string blocking, set(string) corners) {
+        set(string) defined = this.defined;
         return new MultiSpriteWall {
-            this.initMultiSpriteWall(blocking, Sprites : string, "dirt.",
-                undefined);
+            this.initMultiSpriteWall(
+                blocking, corners, Sprites : string, "dirt.", defined);
         };
     }
 
-    set(string) undefined;
+    set(string) defined;
 }
 
 export class COTAStage : GarmentStage {
     override mutating once void initMapping() {
         super();
-        this.mapping["."] = new DirtWallFactory;
+        this.mapping["."] = new DirtWallFactory {
+            this.initDirtWallFactory();
+        };
     }
 }

@@ -1209,13 +1209,23 @@ export class WallFactory : ObjectContextFactory {
             blocking += "e";
         if (row[x-1] != label)
             blocking += "w";
-        return this.newWall(blocking);
+        set(string) corners = new {
+            if (layer[y-1][x-1] != label)
+                this += "nw";
+            if (layer[y-1][x+1] != label)
+                this += "ne";
+            if (layer[y+1][x-1] != label)
+                this += "sw";
+            if (layer[y+1][x+1] != label)
+                this += "se";
+        };
+        return this.newWall(blocking, corners);
     }
 
     /**
      * Override this to create your own walls.
      */
-    Object newWall(string blocking) {
+    Object newWall(string blocking, set(string) corners) {
         return null;
     }
 }
@@ -1223,26 +1233,32 @@ export class WallFactory : ObjectContextFactory {
 /**
  * Walls that choose their sprite based on their blocking direction(s). Must be
  * provided with a spritesheet and prefix, and sprites must have predictable
- * names. Also may be provided with a set of undefined walls to be replaced.
+ * names. Also provide a set of which sprites are actually defined, which must
+ * include at least one of nsew and c.
  */
 export class MultiSpriteWall : MultiWall {
     mutating this once void initMultiSpriteWall(
-        string blocking, string spritesheet, string prefix,
-        set(string) undefined
+        string blocking, set(string) corners, string spritesheet, string prefix,
+        set(string) defined
     ) {
+        this.corners = corners;
         this.spritesheet = spritesheet;
         this.spritePrefix = prefix;
-        this.undefined = undefined;
+        this.defined = defined;
         this.initMultiWall(blocking);
     }
 
     override tuple(string, string) getSprite(string blocking) {
         // Choose our sprite
-        if (blocking == "")
+        if (blocking == "") {
             blocking = "c";
-        if (this.undefined[blocking]) {
+            // Add corner directions to disambiguate
+            for (string s in this.corners)
+                blocking += s;
+        }
+        if (!this.defined[blocking]) {
             // This direction is undefined. Prefer all-round...
-            if (this.undefined["nsew"]) {
+            if (!this.defined["nsew"]) {
                 // Unless we can't
                 blocking = "c";
             } else {
@@ -1253,8 +1269,9 @@ export class MultiSpriteWall : MultiWall {
         return tuple(this.spritesheet, this.spritePrefix + blocking);
     }
 
+    set(string) corners;
     string spritesheet, spritePrefix;
-    set(string) undefined;
+    set(string) defined;
 }
 
 /* A simple data type indicating damage that an object should in some way react
