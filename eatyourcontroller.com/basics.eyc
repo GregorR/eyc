@@ -84,7 +84,7 @@ export class InteractionStage : Stage {
         map(Object, array(tuple(Interaction, Interaction))) interactions = new;
         // First, motile objects
         for (Object o1 in this.objects) {
-            if (o1 is Motile) {
+            if (!o1.free && o1 is Motile) {
                 Motile m = o1 : Motile;
                 num bbw = Math.max(m.bbw(), 0x.1),
                     bbh = Math.max(m.bbh(), 0x.1);
@@ -117,7 +117,7 @@ export class InteractionStage : Stage {
         }
         // Then, any non-motile objects
         for (Object o1 in this.objects) {
-            if (!(o1 is Motile))
+            if (!o1.free && !(o1 is Motile))
                 this.determineInteractions(interactionsFound, interactions, o1);
         }
 

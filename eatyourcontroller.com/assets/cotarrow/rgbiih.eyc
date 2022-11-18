@@ -99,6 +99,7 @@ export class COTAOutlined : Shadowed {
 
         COTAOutline o = new {
             this.shadowed = self;
+            this.free = true;
             this.shadowX = tuple(-0x.2, 0, 0);
             this.shadowY = tuple(-0x.2, 0, 0);
             this.z = self.z - 1;
