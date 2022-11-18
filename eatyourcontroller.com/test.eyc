@@ -43,7 +43,7 @@ export main class Main : cota.COTAStage {
         };
         this.addObject(g);
 
-        num x = 30;
+        num x = 21;
         for (string nm in [
             "orange", "cyan", "red", "black", "magenta", "teal", "purple",
             "green", "yellow"
@@ -53,6 +53,7 @@ export main class Main : cota.COTAStage {
                 this.x = x;
                 x -= 0x1.18;
                 this.vx = -0x.08;
+                this.y = 6;
                 this.z = 1;
                 this.bbx1 = 0x.1;
                 this.bbx2 = 0x.f;
@@ -63,7 +64,8 @@ export main class Main : cota.COTAStage {
         }
 
         SimpleMotion sm = new {
-            this.x = 8;
+            this.x = 3;
+            this.y = 10;
             this.z = 1;
             this.bbx1 = 0x.1;
             this.bbx2 = 0x.f;
@@ -210,8 +212,7 @@ class SimpleMotion :
             this.animationSpeed = 30;
         }
         if (input.south &&
-            (this.detected("s", "solid") || this.detected("sw", "solid") ||
-             this.detected("se", "solid"))) {
+            (this.detected("s", "solid") || this.detected("sw", "solid") || this.detected("se", "solid"))) {
             this.vy = -0x.58;
         }
         return ret;

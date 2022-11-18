@@ -21,6 +21,36 @@ PERFORMANCE OF THIS SOFTWARE.
 alias core.*;
 
 /**
+ * Utilities for using stringy directions. All static.
+ */
+export class Direction {
+    /**
+     * Reverse this direction.
+     * @static
+     */
+    string reverse(string dir) {
+        if (dir == "n")
+            return "s";
+        else if (dir == "ne")
+            return "sw";
+        else if (dir == "e")
+            return "w";
+        else if (dir == "se")
+            return "nw";
+        else if (dir == "s")
+            return "n";
+        else if (dir == "sw")
+            return "ne";
+        else if (dir == "w")
+            return "e";
+        else if (dir == "nw")
+            return "se";
+        else
+            return dir;
+    }
+}
+
+/**
  * A stage for a 2D game with object-object interactions, i.e., a normal EYC
  * program.
  */
@@ -466,34 +496,6 @@ export class Motile : Object {
                 return "w";
             else if (this.vx > 0)
                 return "e";
-            else
-                return "o";
-        }
-    }
-
-    /**
-     * Reverse of .dir(), the direction this object is coming from.
-     */
-    string dirRev() {
-        if (this.vy < 0) {
-            if (this.vx < 0)
-                return "se";
-            else if (this.vx > 0)
-                return "sw";
-            else
-                return "s";
-        } else if (this.vy > 0) {
-            if (this.vx < 0)
-                return "ne";
-            else if (this.vx > 0)
-                return "nw";
-            else
-                return "n";
-        } else { // vy == 0
-            if (this.vx < 0)
-                return "e";
-            else if (this.vx > 0)
-                return "w";
             else
                 return "o";
         }
@@ -988,10 +990,22 @@ export class Wall : ObjectSprite {
         this.bby2 = 1;
     }
 
-    // Walls are solid
-    override string preinteract(Interaction interaction) {
-        super(interaction);
-        return "solid";
+    // Walls interact solidly if it's a blocking direction
+    override string preinteract(Interaction i) {
+        string ret = super(i);
+        Motile other = i.to : Motile;
+        string dir = Direction.reverse(i.dir(0x.2));
+        if (this.preferEW)
+            dir = dir[dir.length-1];
+        else
+            dir = dir[0];
+
+        // Choose a solid interaction if they overlap
+        if (this.blocking[dir])
+            return "solid";
+
+        // Otherwise, respond whatever the parent said
+        return ret;
     }
 
     // Interaction = "get outta my way!"
@@ -1000,16 +1014,18 @@ export class Wall : ObjectSprite {
     ) {
         suggestion ret = super(interactions);
         for (tuple(Interaction, Interaction) ip in interactions) {
-            Interaction i = ip[1];
-            Motile other = i.from : Motile;
-            string dir = i.dir(0x.2);
-            if (this.preferEW)
-                dir = dir[dir.length-1];
-            else
-                dir = dir[0];
+            Interaction i = ip[0];
 
-            // Bump them in the appropriate direction
-            if (this.blocking[dir]) {
+            // We chose in preinteract whether to interact solidly
+            if (i.type == "solid") {
+                Motile other = i.to : Motile;
+                string dir = Direction.reverse(i.dir(0x.2));
+                if (this.preferEW)
+                    dir = dir[dir.length-1];
+                else
+                    dir = dir[0];
+
+                // Bump them in the appropriate direction
                 if (dir == "n") {
                     ret = ret suggest {
                         other.moveY(this.y + this.bby1 - other.bby2 - other.y);
@@ -1200,23 +1216,23 @@ export class WallFactory : ObjectContextFactory {
         string label, array(string) layer, num x, num y
     ) {
         string blocking = "";
-        if (layer[y-1][x] != label)
+        if ((layer[y-1][x] || label) != label)
             blocking += "n";
-        if (layer[y+1][x] != label)
+        if ((layer[y+1][x] || label) != label)
             blocking += "s";
         string row = layer[y];
-        if (row[x+1] != label)
+        if ((row[x+1] || label) != label)
             blocking += "e";
-        if (row[x-1] != label)
+        if ((row[x-1] || label) != label)
             blocking += "w";
         set(string) corners = new {
-            if (layer[y-1][x-1] != label)
+            if ((layer[y-1][x-1] || label) != label)
                 this += "nw";
-            if (layer[y-1][x+1] != label)
+            if ((layer[y-1][x+1] || label) != label)
                 this += "ne";
-            if (layer[y+1][x-1] != label)
+            if ((layer[y+1][x-1] || label) != label)
                 this += "sw";
-            if (layer[y+1][x+1] != label)
+            if ((layer[y+1][x+1] || label) != label)
                 this += "se";
         };
         return this.newWall(blocking, corners);
