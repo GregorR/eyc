@@ -1199,7 +1199,9 @@ function typeCheckExpression(eyc: types.EYC, methodDecl: types.MethodNode,
 
         case "OrExp":
         case "AndExp":
-            resType = eyc.boolType;
+            if (!leftType.equals(rightType))
+                throw new EYCTypeError(exp, "Logical or/and with different types.");
+            resType = leftType;
             break;
 
         case "EqExp":
@@ -2639,24 +2641,16 @@ class MethodCompilationState {
 
                 // Right
                 const r = this.compileSSA(ir, symbols, node.children.right);
-                const boolr = new SSA(node,
-                    <types.SSAOp> ("bool-from-" + node.children.right.ctype.type),
-                    ir.length, r);
-                ir.push(boolr);
 
                 // Set the result
-                const set = new SSA(node, "var-assign", ir.length, boolr.idx);
+                const set = new SSA(node, "var-assign", ir.length, r);
                 set.ex = target;
                 ir.push(set);
 
                 // Short circuit short case
                 ir.push(new SSA(node, "fi", ir.length, iff.idx));
                 ir.push(new SSA(node, "else", ir.length, iff.idx));
-                const booll = new SSA(node,
-                    <types.SSAOp> ("bool-from-" + node.children.left.ctype.type),
-                    ir.length, l);
-                ir.push(booll);
-                const set2 = new SSA(node, "var-assign", ir.length, booll.idx);
+                const set2 = new SSA(node, "var-assign", ir.length, l);
                 set2.ex = target;
                 ir.push(set2);
                 ir.push(new SSA(node, "esle", ir.length, iff.idx));
@@ -3708,8 +3702,9 @@ class MethodCompilationState {
 
                 case "not-tuple": throw new EYCTypeError(ssa.ctx, "No compiler for not-tuple");
                 case "not-suggestion": throw new EYCTypeError(ssa.ctx, "No compiler for not-suggestion");
-                case "not-num": throw new EYCTypeError(ssa.ctx, "No compiler for not-num");
-                case "not-string": throw new EYCTypeError(ssa.ctx, "No compiler for not-string");
+
+                case "not-num":
+                case "not-string":
                 case "not-bool":
                     ssa.expr = "(!" + ssa.arg(ir) + ")";
                     break;
