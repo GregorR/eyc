@@ -41,6 +41,12 @@ export sprites $1 $2 {
         csw;
     }
 
+    bridge {
+        a (4, 0);
+        b;
+        c;
+    }
+
     character {
         idle (0, 9, frames=2);
         run (0, 7, frames=5);
@@ -111,11 +117,43 @@ export class DirtWallFactory : WallFactory {
     set(string) defined;
 }
 
+export class Bridge : Wall {
+    mutating this once void initBridge(bool closeRight) {
+        if (closeRight) {
+            this.bridgeSprite = Sprites.bridge.c;
+        } else {
+            this.bridgeSprite = [
+                Sprites.bridge.a,
+                Sprites.bridge.b
+            ][Math.floor(this.rand()*2)];
+        }
+        this.initWall("n");
+    }
+
+    override tuple(string, string) staticSprite() {
+        return this.bridgeSprite;
+    }
+
+    tuple(string, string) bridgeSprite;
+}
+
+export class BridgeFactory : ObjectContextFactory {
+    override mutating this Object get(
+        string label, array(string) layer, num x, num y
+    ) {
+        bool closeRight = (layer[y][x+1] != label);
+        return new Bridge {
+            this.initBridge(closeRight);
+        };
+    }
+}
+
 export class COTAStage : GarmentStage {
     override mutating once void initMapping() {
         super();
         this.mapping["."] = new DirtWallFactory {
             this.initDirtWallFactory();
         };
+        this.mapping["-"] = new BridgeFactory;
     }
 }
